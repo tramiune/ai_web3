@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương trình Giới thiệu bạn bè - MotionAI Studio</title>
+    <meta name="description" content="Trang tổng quan chương trình Giới thiệu bạn bè MotionAI Studio — giải thích cách kiếm 10% hoa hồng khi giới thiệu người khác dùng web làm video AI.">
+    <meta property="og:title" content="Chương trình Giới thiệu bạn bè - MotionAI Studio">
+    <meta property="og:description" content="Kiếm 10% hoa hồng vĩnh viễn mỗi khi người bạn giới thiệu nạp tiền làm video AI. Xem tổng quan chương trình tại đây.">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="icon" href="../favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .ref-page {
+            padding: 100px 20px 80px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .ref-hero {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .ref-hero h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.75rem, 5vw, 2.4rem);
+            margin: 0 0 0.75rem;
+            background: linear-gradient(135deg, #fff 0%, #c084fc 50%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .ref-hero p {
+            opacity: 0.78;
+            font-size: 1.05rem;
+            line-height: 1.65;
+            margin: 0;
+        }
+
+        .ref-intro-box {
+            margin-bottom: 2rem;
+            padding: 1.35rem 1.4rem;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(168, 85, 247, 0.1));
+            border: 1px solid rgba(0, 242, 254, 0.22);
+        }
+
+        .ref-intro-box h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.05rem;
+            margin: 0 0 0.65rem;
+            color: #00f2fe;
+        }
+
+        .ref-intro-box p {
+            margin: 0 0 0.75rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            opacity: 0.88;
+        }
+
+        .ref-intro-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        .ref-intro-box ul {
+            margin: 0.5rem 0 0;
+            padding-left: 1.15rem;
+            font-size: 0.92rem;
+            line-height: 1.55;
+            opacity: 0.85;
+        }
+
+        .ref-intro-box li {
+            margin-bottom: 0.35rem;
+        }
+
+        .ref-section-label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.45);
+            margin-bottom: 0.5rem;
+        }
+
+        .ref-highlight {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+            margin: 2rem 0;
+        }
+
+        .ref-highlight-item {
+            text-align: center;
+            padding: 1.25rem 1rem;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ref-highlight-item strong {
+            display: block;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ffde00;
+            margin-bottom: 0.25rem;
+        }
+
+        .ref-highlight-item span {
+            font-size: 0.82rem;
+            opacity: 0.65;
+        }
+
+        .ref-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .ref-list li {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            line-height: 1.55;
+            opacity: 0.88;
+        }
+
+        .ref-list li:last-child {
+            border-bottom: none;
+        }
+
+        .ref-list li::before {
+            content: "✓";
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(0, 242, 254, 0.15);
+            color: #00f2fe;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .ref-footer-links {
+            margin-top: 2.5rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: center;
+        }
+
+        .ref-footer-links p {
+            opacity: 0.65;
+            margin: 0 0 1rem;
+            font-size: 0.95rem;
+        }
+
+        .ref-footer-links .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .ref-footer-links a {
+            text-decoration: none;
+        }
+
+        .ref-guide-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: 1.25rem;
+            color: #00f2fe;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+        }
+
+        .ref-guide-link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="privacy-page">
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="logo">
+                <img src="../favicon.png" alt="Logo" class="logo-img">
+                <span class="logo-text">MotionAI Studio</span>
+            </a>
+            <a href="../index.html?page=referral-page" class="auth-btn">Lấy link giới thiệu</a>
+        </div>
+    </nav>
+
+    <main class="ref-page">
+        <div class="ref-intro-box">
+            <h2>📌 Trang này dùng để làm gì?</h2>
+            <p>Bạn đang xem trang <strong>tổng quan chương trình Giới thiệu bạn bè</strong> của MotionAI Studio. Ai đó (bạn bè, đối tác…) đã gửi link này để giới thiệu cách <strong>kiếm thêm thu nhập</strong> bằng cách chia sẻ web làm video AI.</p>
+            <p><strong>Trên trang này bạn sẽ biết:</strong></p>
+            <ul>
+                <li>MotionAI Studio là gì</li>
+                <li>Chương trình giới thiệu hoạt động thế nào</li>
+                <li>Bạn nhận được gì khi tham gia (10% hoa hồng)</li>
+                <li>Bước tiếp theo để bắt đầu</li>
+            </ul>
+        </div>
+
+        <div class="ref-hero">
+            <h1>Giới thiệu bạn bè — Nhận 10% hoa hồng</h1>
+            <p>Chia sẻ MotionAI Studio với người khác. Mỗi lần họ nạp tiền làm video, bạn nhận thưởng — mãi mãi, không giới hạn lượt nạp.</p>
+        </div>
+
+        <div class="glass-card" style="padding: 1.35rem 1.4rem; margin-bottom: 1.5rem;">
+            <div class="ref-section-label">MotionAI Studio là gì?</div>
+            <p style="margin: 0; line-height: 1.6; opacity: 0.85; font-size: 0.95rem;">
+                <strong>MotionAI Studio</strong> (<a href="../index.html" style="color: #00f2fe;">motionaistudio.cloud</a>) là web biến <strong>ảnh tĩnh thành video AI</strong> — upload ảnh nhân vật, chọn video mẫu, vài phút có video trend. Dùng để làm kênh TikTok, Reels, content affiliate…
+            </p>
+        </div>
+
+        <div class="ref-highlight">
+            <div class="ref-highlight-item">
+                <strong>10%</strong>
+                <span>Hoa hồng mỗi lần nạp</span>
+            </div>
+            <div class="ref-highlight-item">
+                <strong>∞</strong>
+                <span>Không giới hạn lượt</span>
+            </div>
+            <div class="ref-highlight-item">
+                <strong>VND</strong>
+                <span>Trả bằng tiền thật</span>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 1.75rem 1.5rem;">
+            <div class="ref-section-label">Chương trình giới thiệu</div>
+            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; margin: 0 0 1rem;">Cách hoạt động</h2>
+            <ul class="ref-list">
+                <li>Đăng ký / đăng nhập MotionAI Studio, vào mục <strong>Giới thiệu bạn bè</strong> để lấy link cá nhân.</li>
+                <li>Gửi link cho người khác — họ đăng ký qua link của bạn.</li>
+                <li>Mỗi khi họ nạp tiền (VietQR hoặc PayPal), bạn nhận <strong>10% số tiền họ nạp</strong> (hoa hồng bằng tiền thật).</li>
+                <li>Đồng thời <strong>10% Coin</strong> được cộng vào ví MotionAI của bạn để tiếp tục làm video.</li>
+                <li>Thưởng áp dụng <strong>vĩnh viễn</strong> — mỗi lần họ nạp thêm, bạn vẫn nhận 10%.</li>
+            </ul>
+        </div>
+
+        <div class="ref-footer-links">
+            <p><strong>Bước tiếp theo:</strong> đăng nhập và lấy link giới thiệu của riêng bạn</p>
+            <div class="btn-row">
+                <a href="../index.html?page=referral-page" class="btn-primary" style="padding: 0.85rem 1.5rem;">Lấy link giới thiệu</a>
+                <a href="../index.html" class="btn-secondary" style="padding: 0.85rem 1.5rem;">Về trang chủ</a>
+            </div>
+            <a href="../goi-y-moi-ban-be/" class="ref-guide-link">
+                Gợi ý mời bạn bè hiệu quả →
+            </a>
+            <a href="../huong-dan-gioi-thieu/" class="ref-guide-link" style="margin-top: 0.5rem;">
+                Xem cách lấy link →
+            </a>
+        </div>
+    </main>
+
+    <footer style="text-align: center; padding: 2rem; opacity: 0.5; font-size: 0.85rem;">
+        &copy; 2026 MotionAI Studio
+    </footer>
+</body>
+</html>

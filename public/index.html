@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotionAI Studio - Biến ảnh thành video AI bắt trend</title>
+    <meta name="description"
+        content="Dịch vụ AI Motion Transfer chuyên nghiệp. Tải lên ảnh nhân vật và video mẫu, chúng tôi tạo video AI mới hoàn chỉnh.">
+    <meta name="google-site-verification" content="HxdGqnGeGOEl_U_2eu_G6lKEQY8Zeygae6PZXgXP6ek" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    
+    <!-- TikTok Pixel Code Start -->
+    <script>
+    !function (w, d, t) {
+    w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
+    var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+    ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+
+    ttq.load('D7VMB2RC77UDOFSGG2BG');
+    ttq.page();
+    }(window, document, 'ttq');
+    </script>
+    <!-- TikTok Pixel Code End -->
+</head>
+
+<body>
+
+    <!-- Sticky Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="javascript:void(0)" class="logo" onclick="window.navTo('user-dashboard')">
+                <img src="favicon.png" alt="Logo" class="logo-img">
+                <div class="logo-text">
+                    <span class="logo-main">MotionAI</span>
+                    <span class="logo-sub">Studio</span>
+                </div>
+            </a>
+
+            <div id="auth-section">
+                <!-- Navbar coin balance + top-up -->
+                <div id="navbar-coin-widget" class="navbar-coin-widget" style="display: none;">
+                    <div class="navbar-coin-balance" aria-live="polite">
+                        <svg class="navbar-coin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)" fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2"/>
+                            <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)"/>
+                        </svg>
+                        <span id="coin-balance" class="coin-balance-text">0</span>
+                    </div>
+                    <button type="button" class="navbar-coin-add-btn" onclick="window.openTopupModal()"
+                        data-i18n-title="dashboard.topup" title="Nạp thêm" aria-label="Nạp thêm">+</button>
+                </div>
+
+                <!-- Language switcher removed: default VI -->
+
+                <!-- 3. Logged In State (Hamburger menu — ngoài cùng bên phải) -->
+                <div id="user-profile-menu" class="user-profile-dropdown nav-hamburger-dropdown" style="display: none;">
+                    <button type="button" class="hamburger-btn nav-hamburger-btn user-icon-btn" id="user-menu-btn"
+                        onclick="window.toggleUserMenu(event)" aria-label="Menu" aria-haspopup="true">
+                        <img id="user-menu-avatar" alt="User avatar" style="display:none;" />
+                        <svg class="user-menu-icon" id="user-menu-avatar-fallback" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M20 21a8 8 0 0 0-16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </button>
+                    <div id="dropdown-menu" class="dropdown-content">
+                        <div class="dropdown-user-info">
+                            <strong id="dropdown-user-name">User Name</strong>
+                            <span id="dropdown-user-email">email@gmail.com</span>
+                        </div>
+                        <hr class="dropdown-divider">
+                        <!-- Tạm ẩn: Xây kênh 1000fl
+                        <a href="javascript:void(0)" class="dropdown-item premium-nav-item" onclick="window.navTo('build-channel-page')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                            </svg>
+                            <span data-i18n="navbar.build_channel">Xây kênh 1000 fl / 21 ngày</span>
+                        </a>
+                        -->
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.navTo('referral-page')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 11h-6"></path>
+                                <path d="M19 8v6"></path>
+                            </svg>
+                            <span data-i18n="navbar.referral">Giới thiệu bạn bè</span>
+                        </a>
+                        <hr class="dropdown-divider">
+                        <a href="javascript:void(0)" id="admin-dropdown-item-profile" class="dropdown-item"
+                            onclick="window.navTo('admin-panel')" style="display: none;">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <span data-i18n="navbar.admin_panel">Admin Panel</span>
+                        </a>
+                        <hr id="admin-dropdown-divider" class="dropdown-divider" style="display: none;">
+                        <a href="javascript:void(0)" class="dropdown-item" style="color: var(--danger);"
+                            onclick="window.logout()">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span data-i18n="navbar.logout">Đăng xuất</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 4. Logged Out State (Login button) -->
+                <div id="login-section">
+                    <button class="auth-btn" id="login-btn" onclick="window.loginUser()">
+                        <span data-i18n="navbar.login">Đăng nhập</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+
+
+    <!-- Main Content (Landing Page) -->
+    <main id="landing-page" style="display: none;">
+        <!-- Template Showcase -->
+        <section id="showcase" class="showcase-section">
+            <div class="showcase-intro">
+                <h1 data-i18n="hero.title">Biến 1 ảnh thành video bắt trend</h1>
+                <p data-i18n="showcase.intro_desc">Chọn video mẫu bên dưới, tải ảnh nhân vật lên — AI sẽ tạo video mới với nhân vật của bạn nhảy theo.</p>
+            </div>
+            <div class="showcase-grid" id="showcase-gallery">
+                <!-- Loaded by JS -->
+            </div>
+        </section>
+
+        <!-- Problem/Solution Section -->
+        <section id="services">
+            <div class="section-header">
+                <h2 data-i18n="services.title">Không cần tự prompt từng động tác</h2>
+                <p data-i18n="services.subtitle">Chúng tôi giúp bạn tiết kiệm hàng giờ thử nghiệm AI. Chỉ cần gửi file
+                    và nhận kết quả.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <span class="card-icon">🖼️</span>
+                    <h3 data-i18n="services.char_title">Ảnh rõ nhân vật</h3>
+                    <p data-i18n="services.char_desc">Chỉ cần 1 bức ảnh rõ mặt hoặc toàn thân của nhân vật bạn muốn
+                        animate.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">📹</span>
+                    <h3 data-i18n="services.video_title">Video mẫu</h3>
+                    <p data-i18n="services.video_desc">Chọn bất kỳ video dance trend hoặc hành động nào bạn muốn nhân
+                        vật bắt chước.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">🎬</span>
+                    <h3 data-i18n="services.ready_title">Nhận video sẵn sàng</h3>
+                    <p data-i18n="services.ready_desc">Đội ngũ chuyên gia xử lý thủ công để đảm bảo video mượt mà và tự
+                        nhiên nhất.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Use Cases Section -->
+        <section>
+            <div class="section-header">
+                <h2 data-i18n="use_cases.title">Ứng dụng đa dạng</h2>
+                <p data-i18n="use_cases.subtitle">Phù hợp cho mọi nhu cầu tạo nội dung số hiện đại.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="use_cases.dance">AI Dance Trend</h3>
+                    <p data-i18n="use_cases.dance_desc">Biến nhân vật của bạn thành ngôi sao TikTok với các điệu nhảy
+                        viral.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.fashion">Người mẫu thời trang</h3>
+                    <p data-i18n="use_cases.fashion_desc">Cho phép người mẫu/outfit thực hiện các bước đi catwalk chuyên
+                        nghiệp.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.mascot">Mascot Thương hiệu</h3>
+                    <p data-i18n="use_cases.mascot_desc">Làm sống động linh vật thương hiệu để tương tác với khách hàng.
+                    </p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.virtual">Nhân vật ảo TikTok</h3>
+                    <p data-i18n="use_cases.virtual_desc">Xây dựng kênh content với nhân vật AI không cần lộ mặt.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.product">Video Sản phẩm</h3>
+                    <p data-i18n="use_cases.product_desc">Tạo các chuyển động nghệ thuật cho sản phẩm của bạn.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.creative">Content sáng tạo</h3>
+                    <p data-i18n="use_cases.creative_desc">Bất kỳ ý tưởng nào bạn muốn hiện thực hóa qua video.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works">
+            <div class="section-header">
+                <h2 data-i18n="how_it_works.title">Quy trình đơn giản</h2>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step1_title">1. Đăng nhập</h3>
+                    <p data-i18n="how_it_works.step1_desc">Sử dụng tài khoản Google để bắt đầu ngay lập tức.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step2_title">2. Nạp coin</h3>
+                    <p data-i18n="how_it_works.step2_desc">Chọn gói coin phù hợp với nhu cầu của bạn.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step3_title">3. Gửi yêu cầu</h3>
+                    <p data-i18n="how_it_works.step3_desc">Tải ảnh, link video mẫu và mô tả yêu cầu của bạn.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem; background: var(--bg-card); padding: 2rem; border-radius: var(--radius-lg);">
+                <h3 style="margin-bottom: 1rem;" data-i18n="how_it_works.tips_title">💡 Mẹo để video đẹp nhất</h3>
+                <ul style="color: var(--text-muted); text-align: left; display: inline-block;">
+                    <li data-i18n="how_it_works.tip1">• Ảnh nên rõ mặt, rõ toàn thân nếu muốn nhảy.</li>
+                    <li data-i18n="how_it_works.tip2">• Video mẫu nên có 1 người chính, chuyển động rõ ràng.</li>
+                    <li data-i18n="how_it_works.tip3">• Tránh video quá mờ, quá tối hoặc nhiều người che nhau.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing">
+            <div class="section-header">
+                <h2 data-i18n="pricing.title">Gói nạp Coin</h2>
+                <p data-i18n="pricing.subtitle">Nạp coin một lần, sử dụng cho mọi dịch vụ.</p>
+            </div>
+            <div class="pricing-grid" id="coin-packages">
+                <!-- Will be rendered by JS -->
+            </div>
+
+            <div class="section-header" style="margin-top: 5rem;">
+                <h2 data-i18n="pricing.service_title">Gói dịch vụ Video</h2>
+            </div>
+            <div class="pricing-grid" id="service-packages">
+                <!-- Will be rendered by JS -->
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq">
+            <div class="section-header">
+                <h2 data-i18n="faq.title">Câu hỏi thường gặp</h2>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="faq.q1">Bao lâu nhận được video?</h3>
+                    <p data-i18n="faq.a1">Thời gian xử lý trung bình từ 15 - 20 phút, tối đa không quá 24h tùy độ phức
+                        tạp của yêu cầu.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="faq.q2">Nếu video chưa ưng ý?</h3>
+                    <p data-i18n="faq.a2">Các gói Plus và Viral hỗ trợ sửa đổi miễn phí theo yêu cầu.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="faq.q3">Coin có hết hạn không?</h3>
+                    <p data-i18n="faq.a3">Không, coin của bạn sẽ được bảo lưu vĩnh viễn trong tài khoản.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- User Dashboard -->
+    <div id="user-dashboard" class="dashboard" style="display: block;">
+        <!-- If Not Logged In -->
+        <div class="auth-placeholder" id="dashboard-auth-placeholder" style="display:none;"></div>
+
+        <!-- If Logged In -->
+        <div id="dashboard-logged-in" style="display: none;">
+            <!-- Tạm ẩn banner bảo trì
+            <div id="maintenance-banner" class="maintenance-banner" style="display: none;">
+                <div class="maintenance-content">
+                    <span class="maintenance-icon">🛠️</span>
+                    <span data-i18n="dashboard.maintenance_msg">Hệ thống đang bảo trì định kỳ từ 00:30 đến 07:00. Các đơn hàng trong thời gian này sẽ được xử lý sau 07:00 sáng.</span>
+                </div>
+            </div>
+            -->
+
+            <div class="db-header" style="margin-bottom: 1rem;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px; width: 100%; flex-wrap: wrap; text-align: left;">
+                    <div class="user-info-section">
+                        <h1 class="user-greeting-text" style="margin:0; font-size: 1.25rem;">Chào mừng, User!</h1>
+                        <p class="user-email-text" style="margin: 6px 0 0; opacity: 0.65; font-size: 0.9rem;"></p>
+                    </div>
+                    <div class="myvideo-actions">
+                        <button class="btn-topup-inline" onclick="window.openTopupModal()" type="button">
+                            <span class="btn-topup-inline__label">Nạp coin</span>
+                        </button>
+                        <button class="btn-primary" onclick="window.openOrderModal()" data-i18n="dashboard.create_new" style="white-space: nowrap;">+ Tạo video mới</button>
+                    </div>
+                </div>
+            </div>
+
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <span data-i18n="dashboard.note_storage">⚠️ Video kết quả chỉ lưu 7 ngày. Vui lòng tải về sớm!</span>
+            </p>
+
+            <h2 style="margin: 0 0 0.75rem; font-size: 1.05rem; font-weight: 800;">Video của tôi</h2>
+
+            <div id="my-orders-grid" class="orders-grid">
+                <!-- Cards will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Topup History Page -->
+    <div id="topup-history-page" class="dashboard" style="display: none;">
+        <div id="topup-logged-in">
+            <div class="db-header">
+                <div class="user-info-section">
+                    <h1 class="user-greeting-text">Chào mừng, User! ✨</h1>
+                    <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+                </div>
+
+                <div class="wallet-card">
+                    <div class="wallet-icon">
+                        <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                                fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                            <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                            <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <div class="wallet-info">
+                        <span class="wallet-label" data-i18n="dashboard.balance">Số dư Coin</span>
+                        <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                    </div>
+                    <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                        <span>+</span> <span data-i18n="dashboard.topup">Nạp thêm</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
+                <h2 data-i18n="dashboard.topup_history">Lịch sử nạp coin</h2>
+                <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                    <span data-i18n="modals.back">Quay lại</span>
+                </button>
+            </div>
+            
+            <div class="data-table-container" style="background: var(--bg-card); border-radius: var(--radius-md);">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="dashboard.col_package">Gói nạp</th>
+                            <th data-i18n="dashboard.col_amount">Số tiền</th>
+                            <th data-i18n="dashboard.col_coins">Coin nhận</th>
+                            <th data-i18n="dashboard.col_status">Trạng thái</th>
+                            <th data-i18n="dashboard.col_date">Ngày gửi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="my-topups-list">
+                        <!-- Topups will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral Page -->
+    <div id="referral-page" class="dashboard" style="display: none;">
+        <div class="db-header">
+            <div class="user-info-section">
+                <h1 class="user-greeting-text">Chào mừng, User! ✨</h1>
+                <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+            </div>
+
+            <div class="wallet-card">
+                <div class="wallet-icon">
+                    <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                            fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                        <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                        <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <div class="wallet-info">
+                    <span class="wallet-label" data-i18n="dashboard.balance">Số dư Coin</span>
+                    <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                </div>
+                <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                    <span>+</span> <span data-i18n="dashboard.topup">Nạp thêm</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+            <h2 data-i18n="referral.title">Giới thiệu bạn bè - Nhận 10% Coin</h2>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="/gioi-thieu-ban-be/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.program_overview">Tổng quan chương trình</a>
+                <a href="/goi-y-moi-ban-be/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.invite_tips">Gợi ý mời hiệu quả</a>
+                <a href="/huong-dan-gioi-thieu/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.guide_link">Hướng dẫn lấy link</a>
+                <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                    <span data-i18n="modals.back">Quay lại</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 2rem; margin-bottom: 2rem; background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(168, 85, 247, 0.08)); border: 1px solid rgba(0, 242, 254, 0.25);">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <div style="font-size: 2.5rem;">🎁</div>
+                <div>
+                    <h3 style="margin: 0 0 0.3rem 0;" data-i18n="referral.how_title">Cách hoạt động</h3>
+                    <p style="margin: 0; opacity: 0.75; font-size: 0.9rem;" data-i18n="referral.how_desc">Chia sẻ link cá nhân. Mỗi khi người bạn mời nạp Coin, bạn nhận ngay 10% Coin về ví — vĩnh viễn, không giới hạn lượt nạp.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <label style="display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 0.5rem;" data-i18n="referral.your_link">Link giới thiệu của bạn</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <input id="referral-link-input" type="text" readonly value=""
+                        style="flex: 1; min-width: 250px; padding: 0.75rem 1rem; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: white; font-family: monospace; font-size: 0.9rem;">
+                    <button id="referral-copy-btn" class="btn-primary" onclick="window.copyReferralLink()" style="padding: 0.75rem 1.25rem; font-size: 0.85rem; white-space: nowrap;">
+                        <svg style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span data-i18n="referral.copy_btn">Sao chép</span>
+                    </button>
+                    <button class="btn-secondary" onclick="window.shareReferralTelegram()" style="padding: 0.75rem 1.25rem; font-size: 0.85rem; white-space: nowrap;">
+                        <svg style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                        </svg>
+                        Telegram
+                    </button>
+                </div>
+                <p style="margin-top: 0.6rem; font-size: 0.75rem; opacity: 0.55;" data-i18n="referral.code_hint">Mã giới thiệu của bạn: <b id="referral-code-display">—</b></p>
+            </div>
+        </div>
+
+        <div class="referral-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_invited">Tổng người đã mời</div>
+                <div id="referral-stat-invited" style="font-size: 2.2rem; font-weight: 700; background: linear-gradient(135deg, #00f2fe, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_earned">Tổng hoa hồng (VND)</div>
+                <div id="referral-stat-earned" style="font-size: 2.2rem; font-weight: 700; color: #ffde00;">0đ</div>
+                <div id="referral-stat-earned-coins" style="font-size: 0.85rem; opacity: 0.65; margin-top: 0.35rem;">0 Coin</div>
+                <div id="referral-stat-earned-usd" style="font-size: 0.8rem; opacity: 0.55; margin-top: 0.25rem; display: none;"></div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_topups">Lượt nạp đã thưởng</div>
+                <div id="referral-stat-topups" style="font-size: 2.2rem; font-weight: 700;">0</div>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1rem;">
+            <h3 data-i18n="referral.earnings_title">Lịch sử hoa hồng</h3>
+        </div>
+        <div class="data-table-container" style="background: var(--bg-card); border-radius: var(--radius-md);">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-i18n="referral.col_friend">Người được mời</th>
+                        <th data-i18n="referral.col_base">Số tiền nạp</th>
+                        <th data-i18n="referral.col_commission">Hoa hồng (10%)</th>
+                        <th data-i18n="referral.col_gateway">Kênh</th>
+                        <th data-i18n="referral.col_date">Thời gian</th>
+                    </tr>
+                </thead>
+                <tbody id="referral-earnings-list">
+                    <tr><td colspan="5" style="text-align:center; opacity:0.5; padding:2rem;" data-i18n="referral.empty">Chưa có hoa hồng nào. Hãy chia sẻ link để bắt đầu nhận thưởng!</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Build Channel Page -->
+    <div id="build-channel-page" class="dashboard" style="display: none;">
+        <div class="db-header">
+            <div class="user-info-section">
+                <h1 class="user-greeting-text">Chào mừng, User! ✨</h1>
+                <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+            </div>
+
+            <div class="wallet-card">
+                <div class="wallet-icon">
+                    <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                            fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                        <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                        <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <div class="wallet-info">
+                    <span class="wallet-label" data-i18n="dashboard.balance">Số dư Coin</span>
+                    <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                </div>
+                <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                    <span>+</span> <span data-i18n="dashboard.topup">Nạp thêm</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
+            <h2 data-i18n="navbar.build_channel">Xây kênh 1000 fl / 21 ngày</h2>
+            <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                <span data-i18n="modals.back">Quay lại</span>
+            </button>
+        </div>
+        
+        <div class="glass-card" style="padding: 4rem 2rem; text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🚀</div>
+            <h2 style="color: #ffde00; margin-bottom: 1rem;" data-i18n="build_channel.coming_soon_title">Tính năng đang phát triển</h2>
+            <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto; line-height: 1.6;" data-i18n="build_channel.coming_soon_desc">
+                Chúng tôi đang xây dựng lộ trình chi tiết giúp bạn đạt 1000 followers trên TikTok chỉ trong 21 ngày. Vui lòng quay lại sau!
+            </p>
+        </div>
+    </div>
+
+    <!-- Admin Panel (Hidden for normal users) -->
+    <div id="admin-panel" class="admin-panel" style="display: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h1 style="margin: 0;" data-i18n="admin.title">Admin Dashboard</h1>
+            <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                <span data-i18n="modals.back">Quay lại Dashboard</span>
+            </button>
+        </div>
+        <div class="admin-tabs" style="margin-bottom: 2rem;">
+            <button class="admin-tab-btn active" onclick="switchAdminTab('orders')" data-i18n="admin.tab_orders">Đơn hàng</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('topups')" data-i18n="admin.tab_topups">Nạp Coin</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('referrals')" data-i18n="admin.tab_referrals">Hoa hồng GT</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('bots')" data-i18n="admin.tab_bots">Bots</button>
+            <button id="tab-users" class="admin-tab-btn" onclick="switchAdminTab('users')"
+                style="display: none;" data-i18n="admin.tab_users">Thành viên</button>
+        </div>
+
+        <div class="admin-controls" style="margin: 0 0 1.5rem 0; background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <div style="flex: 1; position: relative;">
+                    <input type="text" id="admin-search-input" class="form-control" 
+                           data-i18n="admin.search_placeholder"
+                           placeholder="Tìm kiếm khách hàng, email hoặc mã đơn..." 
+                           style="padding-left: 2.5rem; height: 45px;">
+                    <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <button class="btn-secondary" onclick="window.testTelegram()" style="height: 45px; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
+                    <span data-i18n="admin.test_telegram">Test Tele</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab: Orders -->
+        <div id="admin-tab-orders" class="admin-tab-content active">
+            <div class="admin-section">
+                <div class="sub-tabs"
+                    style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                    <button class="sub-tab-btn order-sub-tab active" data-status="pending"
+                        onclick="window.switchOrderSubTab('pending')" data-i18n="admin.orders_subtab_pending">Đang chờ</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="processing"
+                        onclick="window.switchOrderSubTab('processing')" data-i18n="admin.orders_subtab_processing">Đang xử lý</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="completed"
+                        onclick="window.switchOrderSubTab('completed')" data-i18n="admin.orders_subtab_completed">Hoàn thành</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="failed"
+                        onclick="window.switchOrderSubTab('failed')" data-i18n="admin.orders_subtab_failed">Thất bại</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_order_id">Mã đơn</th>
+                                <th data-i18n="admin.col_customer">Khách hàng</th>
+                                <th data-i18n="admin.col_service">Dịch vụ</th>
+                                <th data-i18n="admin.col_cost">Chi phí</th>
+                                <th data-i18n="admin.col_action">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-orders-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Topups -->
+        <div id="admin-tab-topups" class="admin-tab-content">
+            <div class="admin-section">
+                <div class="sub-tabs"
+                    style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                    <button class="sub-tab-btn active" data-status="pending"
+                        onclick="window.switchTopupSubTab('pending')" data-i18n="admin.topups_subtab_pending">Đang chờ</button>
+                    <button class="sub-tab-btn" data-status="approved" onclick="window.switchTopupSubTab('approved')" data-i18n="admin.topups_subtab_approved">Đã duyệt</button>
+                    <button class="sub-tab-btn" data-status="rejected" onclick="window.switchTopupSubTab('rejected')" data-i18n="admin.topups_subtab_rejected">Bị từ chối</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_customer">Khách hàng</th>
+                                <th data-i18n="admin.col_package_money">Gói / Tiền</th>
+                                <th data-i18n="admin.col_content">Nội dung</th>
+                                <th data-i18n="admin.col_proof">Bằng chứng</th>
+                                <th data-i18n="admin.col_action">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-topups-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Referrals -->
+        <div id="admin-tab-referrals" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 2rem;">
+                <h2 style="margin: 0 0 1rem 0;" data-i18n="admin.ref_summary_title">Tổng hoa hồng theo người giới thiệu</h2>
+                <div id="admin-referral-summary"></div>
+            </div>
+            <div class="admin-section">
+                <h2 style="margin: 0 0 1rem 0;" data-i18n="admin.ref_detail_title">Chi tiết từng giao dịch</h2>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.ref_col_referrer">Người giới thiệu</th>
+                                <th data-i18n="admin.ref_col_referred">Người được mời</th>
+                                <th data-i18n="admin.ref_col_base">Số tiền nạp</th>
+                                <th data-i18n="admin.ref_col_commission">Hoa hồng</th>
+                                <th data-i18n="referral.col_gateway">Kênh</th>
+                                <th data-i18n="referral.col_date">Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-referrals-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Bots -->
+        <div id="admin-tab-bots" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.2);">
+                <h3 style="margin: 0 0 0.5rem 0;" data-i18n="admin.render_provider_title">Engine render (đơn mới)</h3>
+                <p style="margin: 0 0 1rem 0; opacity: 0.65; font-size: 0.85rem;" data-i18n="admin.render_provider_desc">Đơn đang processing vẫn chạy trên engine cũ. Chỉ đơn pending mới dùng lựa chọn bên dưới.</p>
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+                    <button type="button" class="btn-secondary" id="admin-rp-aidancing" onclick="window.setRenderProvider('aidancing')" data-i18n="admin.render_provider_aidancing">Engine A</button>
+                    <button type="button" class="btn-secondary" id="admin-rp-xiaoyang" onclick="window.setRenderProvider('xiaoyang')" data-i18n="admin.render_provider_xiaoyang">Engine B</button>
+                    <span id="admin-render-provider-active" style="font-weight: 600; font-size: 0.9rem;"></span>
+                </div>
+                <p id="admin-render-provider-queue" style="margin: 0.75rem 0 0 0; font-size: 0.8rem; opacity: 0.7;"></p>
+            </div>
+            <div class="admin-section">
+                <h2 style="margin: 0 0 0.5rem 0;" data-i18n="admin.bots_title">Quản lý Bot xử lý đơn</h2>
+                <p style="margin: 0 0 1.25rem 0; opacity: 0.65; font-size: 0.9rem;" data-i18n="admin.bots_desc">Mỗi máy chạy <code>python bot.py --name ten-bot</code>. Tắt ở đây thì bot không nạp đơn / không check kết quả.</p>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.bots_col_name">Tên bot</th>
+                                <th data-i18n="admin.bots_col_enabled">Cho phép chạy</th>
+                                <th data-i18n="admin.bots_col_started">Lần khởi động</th>
+                                <th data-i18n="admin.bots_col_host">Máy</th>
+                                <th data-i18n="admin.bots_col_actions">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-bots-list">
+                            <tr><td colspan="5" style="text-align:center; opacity:0.5; padding:2rem;" data-i18n="admin.bots_empty">Chưa có bot nào. Chạy bot.py với --name trên server.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Users -->
+        <div id="admin-tab-users" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 3rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;" data-i18n="admin.users_list_title">Danh sách Thành viên</h2>
+                    <button type="button" id="btn-purge-inactive-users" class="btn-secondary"
+                        style="height: 42px; white-space: nowrap; color: #ff1744; border-color: rgba(255, 23, 68, 0.35); display: none;"
+                        onclick="window.purgeInactiveUsers()"
+                        data-i18n="admin.purge_inactive_btn">
+                        Xóa nick ảo (&gt;1 ngày, chưa nạp/đơn)
+                    </button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_member">Thành viên</th>
+                                <th data-i18n="admin.col_balance">Số dư Coin</th>
+                                <th data-i18n="admin.col_role">Quyền</th>
+                                <th data-i18n="admin.col_action">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h2 data-i18n="admin.grant_admin_title">Cấp quyền Admin nhanh</h2>
+                <div class="glass-card" style="padding: 1.5rem; max-width: 500px;">
+                    <div class="form-group">
+                        <label data-i18n="admin.grant_admin_email_label">Email người dùng</label>
+                        <input type="email" id="user-admin-email" class="form-control"
+                            data-i18n="admin.grant_admin_email_placeholder"
+                            placeholder="Nhập email để cấp quyền Admin">
+                    </div>
+                    <button class="btn-primary" onclick="window.makeAdmin()" style="width: 100%;" data-i18n="admin.grant_admin_btn">Cấp quyền Admin</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topup Modal (Centered QR - Automated Flow) -->
+    <div id="topup-modal" class="modal-overlay">
+        <style>
+            .dot-flashing {
+                position: relative;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite linear alternate;
+                animation-delay: 0.5s;
+                margin: 0 15px;
+            }
+
+            .dot-flashing::before,
+            .dot-flashing::after {
+                content: "";
+                display: inline-block;
+                position: absolute;
+                top: 0;
+            }
+
+            .dot-flashing::before {
+                left: -15px;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite alternate;
+                animation-delay: 0s;
+            }
+
+            .dot-flashing::after {
+                left: 15px;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite alternate;
+                animation-delay: 1s;
+            }
+
+            .bank-info-box {
+                border: 1px solid var(--glass-border);
+                border-radius: 8px;
+                margin: 1.5rem 0;
+                background: rgba(0, 0, 0, 0.2);
+            }
+
+            .bank-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.8rem;
+                border-bottom: 1px solid var(--glass-border);
+            }
+
+            .copy-btn {
+                background: var(--accent);
+                color: white;
+                border: none;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                cursor: pointer;
+            }
+
+            @keyframes dot-flashing {
+                0% {
+                    background-color: var(--accent);
+                }
+
+                50%,
+                100% {
+                    background-color: rgba(0, 242, 254, 0.2);
+                }
+            }
+        </style>
+        <div class="modal-content" style="max-width: 500px; width: 95%;">
+            <span class="modal-close" onclick="closeModal('topup-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header">
+                <h2 style="margin-bottom: 0.5rem;" data-i18n="modals.topup_title">Nạp Coin tự động</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;" data-i18n="modals.topup_subtitle">Hệ thống tự
+                    động cộng coin sau khi nhận được thanh toán.</p>
+            </div>
+
+            <div class="modal-body" style="padding: 1rem; text-align: center;">
+                <!-- VietQR Content -->
+                <div id="payment-content-vietqr" class="payment-tab-content">
+                    <div class="topup-qr-container"
+                        style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border);">
+                        <div class="bank-header"
+                            style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 1.5rem;">
+                            <img src="https://img.vietqr.io/image/OCB-logo.png"
+                                style="height: 24px; filter: brightness(0) invert(1);" alt="OCB">
+                            <h4 style="color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;"
+                                data-i18n="modals.qr_ocb_bank">Quét mã QR OCB</h4>
+                        </div>
+
+                        <div
+                            style="margin-bottom: 1.5rem; position: relative; min-height: 220px; display: flex; align-items: center; justify-content: center;">
+                            <div id="qr-loader" class="qr-loader-container">
+                                <div class="spinner-ring"></div>
+                                <div class="loading-text" data-i18n="modals.generating_qr">Đang tạo mã QR...</div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <img id="qr-code-img" src="" alt="VietQR"
+                                    style="display: none; width: 100%; max-width: 220px; border-radius: 12px; border: 4px solid white; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                                <button id="btn-save-qr" class="btn-secondary" style="display: none; padding: 8px 15px; font-size: 0.8rem; border-radius: 8px;" onclick="window.saveQRImage()" data-i18n="payment.save_qr_btn">
+                                    📥 Tải mã QR về máy
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="color: #ffde00; font-size: 0.85rem; line-height: 1.5; font-weight: 600; margin-bottom: 1.5rem; text-align: center; border: 1px dashed rgba(255, 222, 0, 0.5); padding: 12px; border-radius: 8px; background: rgba(255, 222, 0, 0.05);">
+                            ⚠️ <span data-i18n="modals.qr_scan_warning">Vui lòng quét mã QR bằng App Ngân hàng để đảm bảo nội dung chuyển khoản chính xác tuyệt đối. Nếu sai nội dung, hệ thống sẽ KHÔNG tự động cộng Coin!</span>
+                        </div>
+
+                        <div id="topup-package-info"
+                            style="margin-bottom: 1.5rem; padding: 0.8rem; background: rgba(255,255,255,0.05); border-radius: 8px; font-weight: 700; color: var(--accent); font-size: 1.1rem;">
+                        </div>
+
+                        <span id="transfer-code" style="display: none;"></span>
+
+                        <div
+                            style="margin-top: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); font-size: 0.85rem;">
+                            <div class="dot-flashing"></div>
+                            <span data-i18n="modals.waiting_payment">Đang chờ xác nhận thanh toán...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- International Content (PayPal Smart Buttons) -->
+                <div id="payment-content-intl" class="payment-tab-content" style="display: none;">
+                    <div class="topup-intl-container"
+                        style="background: var(--bg-card-hover); padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); text-align: center;">
+                        <div style="margin-bottom: 1.5rem;">
+                            <h4 style="color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; margin-bottom: 6px;" data-i18n="payment.intl_title">
+                                International Secure Payment
+                            </h4>
+                            <p style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="payment.intl_subtitle">
+                                Powered by PayPal · Visa, Mastercard, Amex, PayPal balance
+                            </p>
+                        </div>
+
+                        <div id="intl-package-info" style="margin-bottom: 1.5rem; padding: 1.2rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <!-- Filled by selectTopup('intl') -->
+                        </div>
+
+                        <!-- PayPal Buttons render here. Initialized once after SDK loads. -->
+                        <div id="paypal-button-container" style="min-height: 48px; margin-top: 0.5rem;"></div>
+
+                        <div id="paypal-status" style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); min-height: 22px;"></div>
+
+                        <div id="paypal-sandbox-banner" style="display:none; margin-top: 1rem; padding: 8px 12px; background: rgba(255, 222, 0, 0.1); border: 1px dashed rgba(255, 222, 0, 0.5); border-radius: 6px; font-size: 0.7rem; color: #ffde00; line-height: 1.4;" data-i18n="payment.sandbox_banner">
+                            ⚠️ SANDBOX MODE — Use a PayPal sandbox buyer account, no real money is charged.
+                        </div>
+                    </div>
+                </div>
+                
+                <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 1.5rem; font-style: italic;"
+                    data-i18n="modals.auto_topup_notice">
+                    * Coin sẽ được cộng tự động. Vui lòng giữ cửa sổ này cho đến khi hoàn tất.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="order-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('order-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header order-modal-header">
+                <h2 data-i18n="modals.order_title">Tạo video mới</h2>
+                <p data-i18n="modals.order_subtitle">Chọn ảnh và video để bắt đầu sáng tạo.</p>
+            </div>
+
+            <form id="order-form" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div class="modal-body order-modal-body">
+                    <!-- Upload Grid -->
+                    <div class="grid-2 order-upload-grid">
+                        <div class="form-group order-upload-field">
+                            <label data-i18n="modals.char_label">1. Ảnh nhân vật</label>
+                            <div class="upload-zone upload-zone--small" onclick="document.getElementById('file-char').click()">
+                                <span>📸</span>
+                                <button type="button" class="btn-primary order-upload-btn"
+                                    onclick="event.stopPropagation(); document.getElementById('file-char').click()">
+                                    Tải ảnh nhân vật
+                                </button>
+                                <div class="upload-note" data-i18n="modals.char_note">Lưu ý: Nên chọn ảnh chân dung full người.</div>
+                                <div id="preview-char-container" class="preview-container"></div>
+                            </div>
+                            <input type="file" id="file-char" accept="image/*" style="display:none"
+                                onchange="window.handlePreview(this, 'preview-char-container')">
+                        </div>
+                        <div class="form-group order-upload-field">
+                            <label data-i18n="modals.video_label">2. Video mẫu / bối cảnh</label>
+                            <div id="video-upload-section">
+                                <div class="upload-zone upload-zone--small" onclick="document.getElementById('file-video').click()">
+                                    <span>🎥</span>
+                                    <button type="button" class="btn-primary order-upload-btn"
+                                        onclick="event.stopPropagation(); document.getElementById('file-video').click()">
+                                        Tải video
+                                    </button>
+                                    <div class="upload-note" data-i18n="modals.video_note">Lưu ý: Đảm bảo nhân vật xuất hiện ngay từ đầu video.</div>
+                                    <div id="preview-video-container" class="preview-container"></div>
+                                </div>
+                                <input type="file" id="file-video" accept="video/*" style="display:none"
+                                    onchange="window.handlePreview(this, 'preview-video-container')">
+                            </div>
+                            <input type="hidden" id="selected-template-url" value="">
+                        </div>
+                    </div>
+
+                    <input type="radio" name="service-type" value="motion-to-char" checked style="display:none">
+
+                    <div id="custom-model-info" style="display: none; margin-bottom: 1.5rem;"></div>
+
+                    <div class="form-group" id="model-selection-group">
+                        <label data-i18n="modals.model_label">Chọn Model (Chất lượng)</label>
+                        <div class="model-selection-grid">
+                            <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                <input type="radio" name="model-type" value="fast" checked>
+                                <div class="card-content-inline"
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_fast">
+                                        Nhanh</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_fast_desc">30p</div>
+                                    <div
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <span>10</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                <input type="radio" name="model-type" value="turbo">
+                                <div class="card-content-inline"
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_turbo">
+                                        Turbo 2K</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_turbo_desc">15-20p</div>
+                                    <div
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <span>20</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <input type="radio" name="aspect-ratio" value="9:16" checked style="display:none">
+                </div>
+
+                <div class="modal-footer" style="padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
+                    <button type="submit" class="btn-primary" id="order-submit-btn"
+                        style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; height: 65px; padding: 0 1.5rem;">
+                        <div
+                            style="display: flex; flex-direction: column; align-items: center; line-height: 1.2; flex: 1;">
+                            <span data-i18n="hero.cta_create" style="font-size: 1rem; font-weight: 700;">Tạo video
+                                ngay</span>
+                            <span id="submit-summary-line" style="font-size: 0.7rem; opacity: 0.8; font-weight: 400;"
+                                data-i18n="modals.model_fast_desc">Chất lượng cao, có trong 30p</span>
+                        </div>
+                        <div class="btn-cost-tag" style="margin-left: auto; position: relative;">
+                            <svg class="coin-icon-mini" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                                    fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                                <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                            </svg>
+                            <span id="submit-cost">10</span>
+                        </div>
+                    </button>
+                    <div id="upload-progress"
+                        style="display: none; text-align:center; margin-top: 1rem; color: var(--accent);">
+                        <span data-i18n="modals.uploading">Đang tải file lên...</span> <span id="progress-val">0</span>%
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pricing Modal (Package Selection) -->
+    <div id="pricing-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="modal-close" onclick="closeModal('pricing-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header">
+                <h2 data-i18n="pricing.title">Chọn gói nạp Coin</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;" data-i18n="pricing.subtitle">Nạp càng nhiều, ưu
+                    đãi càng lớn. 1 Coin =
+                    1.000đ.</p>
+            </div>
+            <div class="modal-body">
+                <div class="pricing-grid" id="modal-coin-packages">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="admin-detail-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="modal-close" onclick="closeModal('admin-detail-modal')">&times;</span>
+                <h2 style="margin:0;" data-i18n="admin.order_detail_title">Chi tiết đơn hàng</h2>
+            </div>
+
+            <div class="modal-body">
+                <div id="admin-order-details"></div>
+
+                <form id="admin-update-form">
+                    <div class="form-group">
+                        <label data-i18n="admin.status_label">Trạng thái thực hiện</label>
+                        <select class="form-control" id="admin-status">
+                            <option value="pending" data-i18n="admin.orders_subtab_pending">Đang chờ</option>
+                            <option value="processing" data-i18n="admin.orders_subtab_processing">Đang xử lý</option>
+                            <option value="completed" data-i18n="admin.orders_subtab_completed">Hoàn thành</option>
+                            <option value="failed" data-i18n="admin.orders_subtab_failed">Thất bại</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="admin.result_link_label">🎬 Link kết quả (Video/Ảnh)</label>
+                        <div style="display: flex; gap: 6px; margin-bottom: 0.8rem;">
+                            <input type="url" class="form-control" id="admin-result-link" placeholder="https://..."
+                                style="flex: 1; margin-bottom: 0;">
+                            <button type="button" class="btn-secondary" onclick="window.copyAdminResultLink()"
+                                data-i18n-title="admin.copy_result_title"
+                                title="Copy link kết quả"
+                                style="padding: 0 14px; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                                <svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <span data-i18n="common.copy">Copy</span>
+                            </button>
+                        </div>
+
+                        <div class="glass-card"
+                            style="padding: 1rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+                            <label style="font-size: 0.75rem; opacity: 0.7; display: block; margin-bottom: 0.5rem;" data-i18n="admin.upload_direct_label">Tải
+                                lên video trực tiếp:</label>
+                            <input type="file" id="admin-file-result" accept="video/*"
+                                style="font-size: 0.75rem; width: 100%;">
+                            <button type="button" class="btn-primary" onclick="window.handleAdminResultUpload()"
+                                id="btn-admin-upload"
+                                style="width: 100%; margin-top: 0.8rem; padding: 8px; font-weight: 600; font-size: 0.85rem;" data-i18n="admin.btn_upload">🚀
+                                Tải lên Worker</button>
+                            <div id="admin-upload-status"
+                                style="font-size: 0.7rem; margin-top: 0.5rem; text-align: center; display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="admin.customer_note_label">Ghi chú cho khách hàng</label>
+                        <textarea class="form-control" id="admin-note"
+                            data-i18n="admin.customer_note_placeholder"
+                            placeholder="Nhập lời nhắn hoặc hướng dẫn..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;" data-i18n="admin.update_order_btn">Cập
+                        nhật đơn hàng</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px; text-align: center; padding: 2.5rem;">
+            <div id="confirm-icon" style="font-size: 3.5rem; margin-bottom: 1.5rem;">⏳</div>
+            <h3 id="confirm-title" style="font-size: 1.5rem; margin-bottom: 1rem;"
+                data-i18n="modals.confirm_order_title">Xác nhận</h3>
+            <p id="confirm-msg" style="color: var(--text-muted); margin-bottom: 2rem; line-height: 1.6;"></p>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn-secondary" style="flex: 1;" onclick="closeModal('confirm-modal')"
+                    data-i18n="modals.back">Quay lại</button>
+                <button class="btn-primary" style="flex: 1;" id="confirm-yes-btn" data-i18n="modals.agree">Đồng
+                    ý</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <div id="user-order-detail-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="modal-close" onclick="closeModal('user-order-detail-modal')"
+                    data-i18n="modals.close">&times;</span>
+                <h2 style="margin:0;" data-i18n="modals.order_detail_title">Chi tiết đơn hàng</h2>
+            </div>
+            <div class="modal-body">
+                <div id="user-order-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PayPal JS SDK is loaded dynamically from script.js once we know clientId + env (see initPaypalSdk). -->
+    <script src="lang-config.js"></script>
+    <script src="translations.js"></script>
+    <script src="translations-locales.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, limit, startAfter, writeBatch, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        import { firebaseConfig, ADMIN_EMAILS } from "./firebase-config.js";
+        import { initAppLogic } from "./script.js";
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Make Firebase available globally for script.js
+        window.firebase = { auth, db, storage, analytics, logEvent, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, limit, startAfter, writeBatch, runTransaction, serverTimestamp, ref, uploadBytesResumable, getDownloadURL };
+        window.ADMIN_EMAILS = ADMIN_EMAILS;
+
+        initAppLogic().catch(err => console.error('initAppLogic failed:', err));
+    </script>
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-modal" class="modal-overlay" onclick="closeModal('image-viewer-modal')">
+        <style>
+            .modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                backdrop-filter: blur(8px);
+                padding: 1rem;
+            }
+        </style>
+        <div style="max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;">
+            <img id="full-res-image" src=""
+                style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.8);">
+        </div>
+    </div>
+
+    <!-- Template Preview Modal -->
+    <div id="template-preview-modal" class="modal-overlay" onclick="window.closeTemplatePreview()">
+        <div class="modal-content"
+            style="max-width: 400px; padding: 0; background: #000; overflow: hidden; border-radius: 20px;"
+            onclick="event.stopPropagation()">
+            <div style="position: relative; width: 100%; aspect-ratio: 9/16; background: #000;">
+                <video id="template-preview-video" controls autoplay loop
+                    style="width: 100%; height: 100%; object-fit: cover;"></video>
+                <div
+                    style="position: absolute; bottom: 0; left: 0; right: 0; padding: 2rem 1.5rem; background: linear-gradient(transparent, rgba(0,0,0,0.9));">
+                    <h3 id="template-preview-name" style="color: white; margin-bottom: 0.5rem;">Template Name</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" id="template-confirm-btn" style="flex: 1;" data-i18n="modals.template_confirm_btn">Chọn mẫu này</button>
+                        <button class="btn-secondary" style="flex: 1;"
+                            onclick="window.closeTemplatePreview()" data-i18n="modals.cancel">Hủy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Viewer Modal -->
+    <div id="video-viewer-modal" class="modal-overlay" onclick="window.closeVideoModal()">
+        <div style="max-width: 90%; max-height: 90%; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;"
+            onclick="event.stopPropagation()">
+            <span class="modal-close"
+                style="position: absolute; top: -40px; right: 0; font-size: 30px; color: white; cursor: pointer;"
+                onclick="window.closeVideoModal()">&times;</span>
+            <video id="full-res-video" controls autoplay
+                style="max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 0 50px rgba(0,0,0,0.8); background: #000;"></video>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer
+        style="padding: 40px 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 50px; color: var(--text-muted); font-size: 0.9rem;">
+        <p data-i18n="footer.rights">&copy; 2026 MotionAI Studio. All rights reserved.</p>
+        <div style="margin-top: 10px; display: flex; justify-content: center; gap: 20px;">
+            <a href="terms.html" style="color: var(--text-muted); text-decoration: none;" data-i18n="footer.terms">Điều
+                khoản dịch vụ</a>
+            <a href="privacy.html" style="color: var(--text-muted); text-decoration: none;"
+                data-i18n="footer.privacy">Chính sách bảo mật</a>
+        </div>
+    </footer>
+    <!-- Floating Telegram Button (right) -->
+    <a href="https://t.me/motionaistudio" target="_blank" class="telegram-fab" data-i18n-title="common.support_chat" title="Chat với chúng tôi ✨">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
+        </svg>
+    </a>
+
+    <!-- SVG Gradients -->
+    <svg style="width:0; height:0; position:absolute;" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="coin-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00f2fe" />
+                <stop offset="100%" stop-color="#a855f7" />
+            </linearGradient>
+        </defs>
+    </svg>
+    <!-- Forced Auth Modal (non-dismissible) -->
+    <div id="auth-modal" class="auth-modal-overlay" style="display: none;">
+        <div class="auth-modal-card">
+            <div style="width: 100%; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; background:#000; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 1rem;">
+                <video id="auth-banner-video" autoplay muted loop playsinline style="width:100%; height:100%; object-fit: cover; display:block;"></video>
+            </div>
+            <h2 class="auth-modal-title" style="margin-top: 0;">Đăng nhập để tạo video trending</h2>
+            <p class="auth-modal-desc" id="auth-modal-desc" style="margin-bottom: 1.25rem;">Vào nhanh một xíu thôi nha, để mình lưu video của bạn và làm cho “xịn” hơn.</p>
+
+
+
+            <button class="auth-modal-btn" id="google-login-btn" onclick="window.loginUser()" style="margin-top: 0;">
+                <svg width="20" height="20" viewBox="0 0 48 48" style="flex-shrink:0;">
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                </svg>
+                <span data-i18n="modals.auth_google_btn">Đăng nhập với Google</span>
+            </button>
+            <div id="inapp-auth-note" data-i18n="modals.inapp_auth_note" style="display: none; font-size: 0.8rem; color: #ff9100; margin-top: 0.5rem; background: rgba(255,145,0,0.1); padding: 10px; border-radius: 8px; border: 1px dashed rgba(255,145,0,0.3); text-align: center;">
+                ⚠️ Trình duyệt này thường chặn đăng nhập Google...
+            </div>
+            <p class="auth-modal-footer" data-i18n="modals.auth_footer">Chỉ mất vài giây • Hoàn toàn miễn phí</p>
+        </div>
+    </div>
+
+</body>
+
+</html>

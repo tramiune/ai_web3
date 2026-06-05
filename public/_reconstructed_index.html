@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotionAI Studio - Biáº¿n áº£nh thÃ nh video AI báº¯t trend</title>
+    <meta name="description"
+        content="Dá»‹ch vá»¥ AI Motion Transfer chuyÃªn nghiá»‡p. Táº£i lÃªn áº£nh nhÃ¢n váº­t vÃ  video máº«u, chÃºng tÃ´i táº¡o video AI má»›i hoÃ n chá»‰nh.">
+    <meta name="google-site-verification" content="HxdGqnGeGOEl_U_2eu_G6lKEQY8Zeygae6PZXgXP6ek" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    
+    <!-- TikTok Pixel Code Start -->
+    <script>
+    !function (w, d, t) {
+    w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
+    var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+    ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+
+    ttq.load('D7VMB2RC77UDOFSGG2BG');
+    ttq.page();
+    }(window, document, 'ttq');
+    </script>
+    <!-- TikTok Pixel Code End -->
+</head>
+
+<body>
+
+    <!-- Sticky Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="javascript:void(0)" class="logo" onclick="window.navTo('landing-page')">
+                <img src="favicon.png" alt="Logo" class="logo-img">
+                <div class="logo-text">
+                    <span class="logo-main">MotionAI</span>
+                    <span class="logo-sub">Studio</span>
+                </div>
+            </a>
+
+            <div id="auth-section">
+                <!-- Navbar coin balance + top-up -->
+                <div id="navbar-coin-widget" class="navbar-coin-widget" style="display: none;">
+                    <div class="navbar-coin-balance" aria-live="polite">
+                        <svg class="navbar-coin-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)" fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2"/>
+                            <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)"/>
+                        </svg>
+                        <span id="coin-balance" class="coin-balance-text">0</span>
+                    </div>
+                    <button type="button" class="navbar-coin-add-btn" onclick="window.openTopupModal()"
+                        data-i18n-title="dashboard.topup" title="Náº¡p thÃªm" aria-label="Náº¡p thÃªm">+</button>
+                </div>
+
+                <!-- 2. Language Switcher Dropdown (Flag) -->
+                <div class="lang-dropdown" id="lang-dropdown">
+                    <div class="lang-current" onclick="window.toggleLangMenu(event)">
+                        <span id="current-lang-flag">ðŸ‡»ðŸ‡³</span>
+                    </div>
+                    <div id="lang-menu" class="dropdown-content">
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('vi')">
+                            <span class="lang-flag">ðŸ‡»ðŸ‡³</span> <span data-i18n="lang.vi">Tiáº¿ng Viá»‡t</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('en')">
+                            <span class="lang-flag">ðŸ‡ºðŸ‡¸</span> <span data-i18n="lang.en">English</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('es')">
+                            <span class="lang-flag">ðŸ‡ªðŸ‡¸</span> <span data-i18n="lang.es">EspaÃ±ol</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('pt')">
+                            <span class="lang-flag">ðŸ‡§ðŸ‡·</span> <span data-i18n="lang.pt">PortuguÃªs</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('th')">
+                            <span class="lang-flag">ðŸ‡¹ðŸ‡­</span> <span data-i18n="lang.th">à¹„à¸—à¸¢</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.switchLanguage('id')">
+                            <span class="lang-flag">ðŸ‡®ðŸ‡©</span> <span data-i18n="lang.id">Bahasa Indonesia</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 3. Logged In State (Hamburger menu â€” ngoÃ i cÃ¹ng bÃªn pháº£i) -->
+                <div id="user-profile-menu" class="user-profile-dropdown nav-hamburger-dropdown" style="display: none;">
+                    <button type="button" class="hamburger-btn nav-hamburger-btn" id="user-menu-btn"
+                        onclick="window.toggleUserMenu(event)" aria-label="Menu" aria-haspopup="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div id="dropdown-menu" class="dropdown-content">
+                        <div class="dropdown-user-info">
+                            <strong id="dropdown-user-name">User Name</strong>
+                            <span id="dropdown-user-email">email@gmail.com</span>
+                        </div>
+                        <hr class="dropdown-divider">
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.navTo('landing-page')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                            <span data-i18n="navbar.home">Home</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item premium-nav-item" onclick="window.navTo('user-dashboard')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M23 7l-7 5 7 5V7z"></path>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                            </svg>
+                            <span data-i18n="navbar.dashboard">Video cá»§a tÃ´i</span>
+                        </a>
+                        <!-- Táº¡m áº©n: XÃ¢y kÃªnh 1000fl
+                        <a href="javascript:void(0)" class="dropdown-item premium-nav-item" onclick="window.navTo('build-channel-page')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                            </svg>
+                            <span data-i18n="navbar.build_channel">XÃ¢y kÃªnh 1000 fl / 21 ngÃ y</span>
+                        </a>
+                        -->
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="window.navTo('referral-page')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 11h-6"></path>
+                                <path d="M19 8v6"></path>
+                            </svg>
+                            <span data-i18n="navbar.referral">Giá»›i thiá»‡u báº¡n bÃ¨</span>
+                        </a>
+                        <hr class="dropdown-divider">
+                        <a href="javascript:void(0)" id="admin-dropdown-item-profile" class="dropdown-item"
+                            onclick="window.navTo('admin-panel')" style="display: none;">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <span data-i18n="navbar.admin_panel">Admin Panel</span>
+                        </a>
+                        <hr id="admin-dropdown-divider" class="dropdown-divider" style="display: none;">
+                        <a href="javascript:void(0)" class="dropdown-item" style="color: var(--danger);"
+                            onclick="window.logout()">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span data-i18n="navbar.logout">Ä�Äƒng xuáº¥t</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 4. Logged Out State (Login button) -->
+                <div id="login-section">
+                    <button class="auth-btn" id="login-btn" onclick="window.loginUser()">
+                        <span data-i18n="navbar.login">Ä�Äƒng nháº­p</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+
+
+    <!-- Main Content (Landing Page) -->
+    <main id="landing-page">
+        <!-- Template Showcase -->
+        <section id="showcase" class="showcase-section">
+            <div class="showcase-intro">
+                <h1 data-i18n="hero.title">Biáº¿n 1 áº£nh thÃ nh video báº¯t trend</h1>
+                <p data-i18n="showcase.intro_desc">Chá»�n video máº«u bÃªn dÆ°á»›i, táº£i áº£nh nhÃ¢n váº­t lÃªn â€” AI sáº½ táº¡o video má»›i vá»›i nhÃ¢n váº­t cá»§a báº¡n nháº£y theo.</p>
+            </div>
+            <div class="showcase-grid" id="showcase-gallery">
+                <!-- Loaded by JS -->
+            </div>
+        </section>
+
+        <!-- Problem/Solution Section -->
+        <section id="services">
+            <div class="section-header">
+                <h2 data-i18n="services.title">KhÃ´ng cáº§n tá»± prompt tá»«ng Ä‘á»™ng tÃ¡c</h2>
+                <p data-i18n="services.subtitle">ChÃºng tÃ´i giÃºp báº¡n tiáº¿t kiá»‡m hÃ ng giá»� thá»­ nghiá»‡m AI. Chá»‰ cáº§n gá»­i file
+                    vÃ  nháº­n káº¿t quáº£.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <span class="card-icon">ðŸ–¼ï¸�</span>
+                    <h3 data-i18n="services.char_title">áº¢nh rÃµ nhÃ¢n váº­t</h3>
+                    <p data-i18n="services.char_desc">Chá»‰ cáº§n 1 bá»©c áº£nh rÃµ máº·t hoáº·c toÃ n thÃ¢n cá»§a nhÃ¢n váº­t báº¡n muá»‘n
+                        animate.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">ðŸ“¹</span>
+                    <h3 data-i18n="services.video_title">Video máº«u</h3>
+                    <p data-i18n="services.video_desc">Chá»�n báº¥t ká»³ video dance trend hoáº·c hÃ nh Ä‘á»™ng nÃ o báº¡n muá»‘n nhÃ¢n
+                        váº­t báº¯t chÆ°á»›c.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">ðŸŽ¬</span>
+                    <h3 data-i18n="services.ready_title">Nháº­n video sáºµn sÃ ng</h3>
+                    <p data-i18n="services.ready_desc">Ä�á»™i ngÅ© chuyÃªn gia xá»­ lÃ½ thá»§ cÃ´ng Ä‘á»ƒ Ä‘áº£m báº£o video mÆ°á»£t mÃ  vÃ  tá»±
+                        nhiÃªn nháº¥t.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Use Cases Section -->
+        <section>
+            <div class="section-header">
+                <h2 data-i18n="use_cases.title">á»¨ng dá»¥ng Ä‘a dáº¡ng</h2>
+                <p data-i18n="use_cases.subtitle">PhÃ¹ há»£p cho má»�i nhu cáº§u táº¡o ná»™i dung sá»‘ hiá»‡n Ä‘áº¡i.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="use_cases.dance">AI Dance Trend</h3>
+                    <p data-i18n="use_cases.dance_desc">Biáº¿n nhÃ¢n váº­t cá»§a báº¡n thÃ nh ngÃ´i sao TikTok vá»›i cÃ¡c Ä‘iá»‡u nháº£y
+                        viral.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.fashion">NgÆ°á»�i máº«u thá»�i trang</h3>
+                    <p data-i18n="use_cases.fashion_desc">Cho phÃ©p ngÆ°á»�i máº«u/outfit thá»±c hiá»‡n cÃ¡c bÆ°á»›c Ä‘i catwalk chuyÃªn
+                        nghiá»‡p.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.mascot">Mascot ThÆ°Æ¡ng hiá»‡u</h3>
+                    <p data-i18n="use_cases.mascot_desc">LÃ m sá»‘ng Ä‘á»™ng linh váº­t thÆ°Æ¡ng hiá»‡u Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c vá»›i khÃ¡ch hÃ ng.
+                    </p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.virtual">NhÃ¢n váº­t áº£o TikTok</h3>
+                    <p data-i18n="use_cases.virtual_desc">XÃ¢y dá»±ng kÃªnh content vá»›i nhÃ¢n váº­t AI khÃ´ng cáº§n lá»™ máº·t.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.product">Video Sáº£n pháº©m</h3>
+                    <p data-i18n="use_cases.product_desc">Táº¡o cÃ¡c chuyá»ƒn Ä‘á»™ng nghá»‡ thuáº­t cho sáº£n pháº©m cá»§a báº¡n.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="use_cases.creative">Content sÃ¡ng táº¡o</h3>
+                    <p data-i18n="use_cases.creative_desc">Báº¥t ká»³ Ã½ tÆ°á»Ÿng nÃ o báº¡n muá»‘n hiá»‡n thá»±c hÃ³a qua video.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works">
+            <div class="section-header">
+                <h2 data-i18n="how_it_works.title">Quy trÃ¬nh Ä‘Æ¡n giáº£n</h2>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step1_title">1. Ä�Äƒng nháº­p</h3>
+                    <p data-i18n="how_it_works.step1_desc">Sá»­ dá»¥ng tÃ i khoáº£n Google Ä‘á»ƒ báº¯t Ä‘áº§u ngay láº­p tá»©c.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step2_title">2. Náº¡p coin</h3>
+                    <p data-i18n="how_it_works.step2_desc">Chá»�n gÃ³i coin phÃ¹ há»£p vá»›i nhu cáº§u cá»§a báº¡n.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="how_it_works.step3_title">3. Gá»­i yÃªu cáº§u</h3>
+                    <p data-i18n="how_it_works.step3_desc">Táº£i áº£nh, link video máº«u vÃ  mÃ´ táº£ yÃªu cáº§u cá»§a báº¡n.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem; background: var(--bg-card); padding: 2rem; border-radius: var(--radius-lg);">
+                <h3 style="margin-bottom: 1rem;" data-i18n="how_it_works.tips_title">ðŸ’¡ Máº¹o Ä‘á»ƒ video Ä‘áº¹p nháº¥t</h3>
+                <ul style="color: var(--text-muted); text-align: left; display: inline-block;">
+                    <li data-i18n="how_it_works.tip1">â€¢ áº¢nh nÃªn rÃµ máº·t, rÃµ toÃ n thÃ¢n náº¿u muá»‘n nháº£y.</li>
+                    <li data-i18n="how_it_works.tip2">â€¢ Video máº«u nÃªn cÃ³ 1 ngÆ°á»�i chÃ­nh, chuyá»ƒn Ä‘á»™ng rÃµ rÃ ng.</li>
+                    <li data-i18n="how_it_works.tip3">â€¢ TrÃ¡nh video quÃ¡ má»�, quÃ¡ tá»‘i hoáº·c nhiá»�u ngÆ°á»�i che nhau.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing">
+            <div class="section-header">
+                <h2 data-i18n="pricing.title">GÃ³i náº¡p Coin</h2>
+                <p data-i18n="pricing.subtitle">Náº¡p coin má»™t láº§n, sá»­ dá»¥ng cho má»�i dá»‹ch vá»¥.</p>
+            </div>
+            <div class="pricing-grid" id="coin-packages">
+                <!-- Will be rendered by JS -->
+            </div>
+
+            <div class="section-header" style="margin-top: 5rem;">
+                <h2 data-i18n="pricing.service_title">GÃ³i dá»‹ch vá»¥ Video</h2>
+            </div>
+            <div class="pricing-grid" id="service-packages">
+                <!-- Will be rendered by JS -->
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq">
+            <div class="section-header">
+                <h2 data-i18n="faq.title">CÃ¢u há»�i thÆ°á»�ng gáº·p</h2>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 data-i18n="faq.q1">Bao lÃ¢u nháº­n Ä‘Æ°á»£c video?</h3>
+                    <p data-i18n="faq.a1">Thá»�i gian xá»­ lÃ½ trung bÃ¬nh tá»« 15 - 20 phÃºt, tá»‘i Ä‘a khÃ´ng quÃ¡ 24h tÃ¹y Ä‘á»™ phá»©c
+                        táº¡p cá»§a yÃªu cáº§u.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="faq.q2">Náº¿u video chÆ°a Æ°ng Ã½?</h3>
+                    <p data-i18n="faq.a2">CÃ¡c gÃ³i Plus vÃ  Viral há»— trá»£ sá»­a Ä‘á»•i miá»…n phÃ­ theo yÃªu cáº§u.</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="faq.q3">Coin cÃ³ háº¿t háº¡n khÃ´ng?</h3>
+                    <p data-i18n="faq.a3">KhÃ´ng, coin cá»§a báº¡n sáº½ Ä‘Æ°á»£c báº£o lÆ°u vÄ©nh viá»…n trong tÃ i khoáº£n.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- User Dashboard -->
+    <div id="user-dashboard" class="dashboard">
+        <!-- If Not Logged In -->
+        <div class="auth-placeholder" id="dashboard-auth-placeholder" style="text-align: center; padding: 4rem 2rem;">
+            <svg style="width: 80px; height: 80px; margin-bottom: 1.5rem; stroke: var(--text-muted); opacity: 0.3;"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h2 data-i18n="dashboard.login_required_title">YÃªu cáº§u Ä‘Äƒng nháº­p</h2>
+            <p data-i18n="dashboard.login_required_desc">Vui lÃ²ng Ä‘Äƒng nháº­p Ä‘á»ƒ truy cáº­p tÃ­nh nÄƒng nÃ y.</p>
+            <button class="btn-primary" onclick="window.loginUser()" data-i18n="navbar.login">Ä�Äƒng nháº­p</button>
+        </div>
+
+        <!-- If Logged In -->
+        <div id="dashboard-logged-in" style="display: none;">
+            <!-- Táº¡m áº©n banner báº£o trÃ¬
+            <div id="maintenance-banner" class="maintenance-banner" style="display: none;">
+                <div class="maintenance-content">
+                    <span class="maintenance-icon">ðŸ› ï¸�</span>
+                    <span data-i18n="dashboard.maintenance_msg">Há»‡ thá»‘ng Ä‘ang báº£o trÃ¬ Ä‘á»‹nh ká»³ tá»« 00:30 Ä‘áº¿n 07:00. CÃ¡c Ä‘Æ¡n hÃ ng trong thá»�i gian nÃ y sáº½ Ä‘Æ°á»£c xá»­ lÃ½ sau 07:00 sÃ¡ng.</span>
+                </div>
+            </div>
+            -->
+
+            <div class="db-header" style="margin-bottom: 1rem;">
+                <div class="section-header" style="text-align: left; display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <h2 data-i18n="dashboard.my_videos">Video cá»§a tÃ´i</h2>
+                    <button class="btn-primary" onclick="window.openOrderModal()" data-i18n="dashboard.create_new" style="white-space: nowrap;">+ Táº¡o video má»›i</button>
+                </div>
+            </div>
+
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <span data-i18n="dashboard.note_storage">âš ï¸� Video káº¿t quáº£ chá»‰ lÆ°u 7 ngÃ y. Vui lÃ²ng táº£i vá»� sá»›m!</span>
+            </p>
+
+            <div id="my-orders-grid" class="orders-grid">
+                <!-- Cards will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Topup History Page -->
+    <div id="topup-history-page" class="dashboard" style="display: none;">
+        <div id="topup-logged-in">
+            <div class="db-header">
+                <div class="user-info-section">
+                    <h1 class="user-greeting-text">ChÃ o má»«ng, User! âœ¨</h1>
+                    <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+                </div>
+
+                <div class="wallet-card">
+                    <div class="wallet-icon">
+                        <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                                fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                            <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                            <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <div class="wallet-info">
+                        <span class="wallet-label" data-i18n="dashboard.balance">Sá»‘ dÆ° Coin</span>
+                        <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                    </div>
+                    <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                        <span>+</span> <span data-i18n="dashboard.topup">Náº¡p thÃªm</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
+                <h2 data-i18n="dashboard.topup_history">Lá»‹ch sá»­ náº¡p coin</h2>
+                <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                    <span data-i18n="modals.back">Quay láº¡i</span>
+                </button>
+            </div>
+            
+            <div class="data-table-container" style="background: var(--bg-card); border-radius: var(--radius-md);">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="dashboard.col_package">GÃ³i náº¡p</th>
+                            <th data-i18n="dashboard.col_amount">Sá»‘ tiá»�n</th>
+                            <th data-i18n="dashboard.col_coins">Coin nháº­n</th>
+                            <th data-i18n="dashboard.col_status">Tráº¡ng thÃ¡i</th>
+                            <th data-i18n="dashboard.col_date">NgÃ y gá»­i</th>
+                        </tr>
+                    </thead>
+                    <tbody id="my-topups-list">
+                        <!-- Topups will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral Page -->
+    <div id="referral-page" class="dashboard" style="display: none;">
+        <div class="db-header">
+            <div class="user-info-section">
+                <h1 class="user-greeting-text">ChÃ o má»«ng, User! âœ¨</h1>
+                <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+            </div>
+
+            <div class="wallet-card">
+                <div class="wallet-icon">
+                    <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                            fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                        <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                        <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <div class="wallet-info">
+                    <span class="wallet-label" data-i18n="dashboard.balance">Sá»‘ dÆ° Coin</span>
+                    <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                </div>
+                <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                    <span>+</span> <span data-i18n="dashboard.topup">Náº¡p thÃªm</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+            <h2 data-i18n="referral.title">Giá»›i thiá»‡u báº¡n bÃ¨ - Nháº­n 10% Coin</h2>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="/gioi-thieu-ban-be/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.program_overview">Tá»•ng quan chÆ°Æ¡ng trÃ¬nh</a>
+                <a href="/goi-y-moi-ban-be/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.invite_tips">Gá»£i Ã½ má»�i hiá»‡u quáº£</a>
+                <a href="/huong-dan-gioi-thieu/" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;" data-i18n="referral.guide_link">HÆ°á»›ng dáº«n láº¥y link</a>
+                <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                    <span data-i18n="modals.back">Quay láº¡i</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="glass-card" style="padding: 2rem; margin-bottom: 2rem; background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(168, 85, 247, 0.08)); border: 1px solid rgba(0, 242, 254, 0.25);">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <div style="font-size: 2.5rem;">ðŸŽ�</div>
+                <div>
+                    <h3 style="margin: 0 0 0.3rem 0;" data-i18n="referral.how_title">CÃ¡ch hoáº¡t Ä‘á»™ng</h3>
+                    <p style="margin: 0; opacity: 0.75; font-size: 0.9rem;" data-i18n="referral.how_desc">Chia sáº» link cÃ¡ nhÃ¢n. Má»—i khi ngÆ°á»�i báº¡n má»�i náº¡p Coin, báº¡n nháº­n ngay 10% Coin vá»� vÃ­ â€” vÄ©nh viá»…n, khÃ´ng giá»›i háº¡n lÆ°á»£t náº¡p.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <label style="display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 0.5rem;" data-i18n="referral.your_link">Link giá»›i thiá»‡u cá»§a báº¡n</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <input id="referral-link-input" type="text" readonly value=""
+                        style="flex: 1; min-width: 250px; padding: 0.75rem 1rem; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: white; font-family: monospace; font-size: 0.9rem;">
+                    <button id="referral-copy-btn" class="btn-primary" onclick="window.copyReferralLink()" style="padding: 0.75rem 1.25rem; font-size: 0.85rem; white-space: nowrap;">
+                        <svg style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span data-i18n="referral.copy_btn">Sao chÃ©p</span>
+                    </button>
+                    <button class="btn-secondary" onclick="window.shareReferralTelegram()" style="padding: 0.75rem 1.25rem; font-size: 0.85rem; white-space: nowrap;">
+                        <svg style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                        </svg>
+                        Telegram
+                    </button>
+                </div>
+                <p style="margin-top: 0.6rem; font-size: 0.75rem; opacity: 0.55;" data-i18n="referral.code_hint">MÃ£ giá»›i thiá»‡u cá»§a báº¡n: <b id="referral-code-display">â€”</b></p>
+            </div>
+        </div>
+
+        <div class="referral-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_invited">Tá»•ng ngÆ°á»�i Ä‘Ã£ má»�i</div>
+                <div id="referral-stat-invited" style="font-size: 2.2rem; font-weight: 700; background: linear-gradient(135deg, #00f2fe, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_earned">Tá»•ng hoa há»“ng (VND)</div>
+                <div id="referral-stat-earned" style="font-size: 2.2rem; font-weight: 700; color: #ffde00;">0Ä‘</div>
+                <div id="referral-stat-earned-coins" style="font-size: 0.85rem; opacity: 0.65; margin-top: 0.35rem;">0 Coin</div>
+                <div id="referral-stat-earned-usd" style="font-size: 0.8rem; opacity: 0.55; margin-top: 0.25rem; display: none;"></div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 0.5rem;" data-i18n="referral.stat_total_topups">LÆ°á»£t náº¡p Ä‘Ã£ thÆ°á»Ÿng</div>
+                <div id="referral-stat-topups" style="font-size: 2.2rem; font-weight: 700;">0</div>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1rem;">
+            <h3 data-i18n="referral.earnings_title">Lá»‹ch sá»­ hoa há»“ng</h3>
+        </div>
+        <div class="data-table-container" style="background: var(--bg-card); border-radius: var(--radius-md);">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-i18n="referral.col_friend">NgÆ°á»�i Ä‘Æ°á»£c má»�i</th>
+                        <th data-i18n="referral.col_base">Sá»‘ tiá»�n náº¡p</th>
+                        <th data-i18n="referral.col_commission">Hoa há»“ng (10%)</th>
+                        <th data-i18n="referral.col_gateway">KÃªnh</th>
+                        <th data-i18n="referral.col_date">Thá»�i gian</th>
+                    </tr>
+                </thead>
+                <tbody id="referral-earnings-list">
+                    <tr><td colspan="5" style="text-align:center; opacity:0.5; padding:2rem;" data-i18n="referral.empty">ChÆ°a cÃ³ hoa há»“ng nÃ o. HÃ£y chia sáº» link Ä‘á»ƒ báº¯t Ä‘áº§u nháº­n thÆ°á»Ÿng!</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Build Channel Page -->
+    <div id="build-channel-page" class="dashboard" style="display: none;">
+        <div class="db-header">
+            <div class="user-info-section">
+                <h1 class="user-greeting-text">ChÃ o má»«ng, User! âœ¨</h1>
+                <p class="user-email-text" style="opacity: 0.6; font-size: 0.9rem;"></p>
+            </div>
+
+            <div class="wallet-card">
+                <div class="wallet-icon">
+                    <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                            fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                        <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                        <path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <div class="wallet-info">
+                    <span class="wallet-label" data-i18n="dashboard.balance">Sá»‘ dÆ° Coin</span>
+                    <div class="wallet-value"><span class="coin-balance-text">0</span></div>
+                </div>
+                <button class="topup-pill-btn" onclick="window.openTopupModal()">
+                    <span>+</span> <span data-i18n="dashboard.topup">Náº¡p thÃªm</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="section-header" style="text-align: left; margin-bottom: 1.5rem; margin-top: 2rem; display: flex; align-items: center; justify-content: space-between;">
+            <h2 data-i18n="navbar.build_channel">XÃ¢y kÃªnh 1000 fl / 21 ngÃ y</h2>
+            <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                <span data-i18n="modals.back">Quay láº¡i</span>
+            </button>
+        </div>
+        
+        <div class="glass-card" style="padding: 4rem 2rem; text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">ðŸš€</div>
+            <h2 style="color: #ffde00; margin-bottom: 1rem;" data-i18n="build_channel.coming_soon_title">TÃ­nh nÄƒng Ä‘ang phÃ¡t triá»ƒn</h2>
+            <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto; line-height: 1.6;" data-i18n="build_channel.coming_soon_desc">
+                ChÃºng tÃ´i Ä‘ang xÃ¢y dá»±ng lá»™ trÃ¬nh chi tiáº¿t giÃºp báº¡n Ä‘áº¡t 1000 followers trÃªn TikTok chá»‰ trong 21 ngÃ y. Vui lÃ²ng quay láº¡i sau!
+            </p>
+        </div>
+    </div>
+
+    <!-- Admin Panel (Hidden for normal users) -->
+    <div id="admin-panel" class="admin-panel" style="display: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h1 style="margin: 0;" data-i18n="admin.title">Admin Dashboard</h1>
+            <button class="btn-secondary" onclick="window.navTo('user-dashboard')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                <span data-i18n="modals.back">Quay láº¡i Dashboard</span>
+            </button>
+        </div>
+        <div class="admin-tabs" style="margin-bottom: 2rem;">
+            <button class="admin-tab-btn active" onclick="switchAdminTab('orders')" data-i18n="admin.tab_orders">Ä�Æ¡n hÃ ng</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('topups')" data-i18n="admin.tab_topups">Náº¡p Coin</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('referrals')" data-i18n="admin.tab_referrals">Hoa há»“ng GT</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('bots')" data-i18n="admin.tab_bots">Bots</button>
+            <button id="tab-users" class="admin-tab-btn" onclick="switchAdminTab('users')"
+                style="display: none;" data-i18n="admin.tab_users">ThÃ nh viÃªn</button>
+        </div>
+
+        <div class="admin-controls" style="margin: 0 0 1.5rem 0; background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <div style="flex: 1; position: relative;">
+                    <input type="text" id="admin-search-input" class="form-control" 
+                           data-i18n="admin.search_placeholder"
+                           placeholder="TÃ¬m kiáº¿m khÃ¡ch hÃ ng, email hoáº·c mÃ£ Ä‘Æ¡n..." 
+                           style="padding-left: 2.5rem; height: 45px;">
+                    <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <button class="btn-secondary" onclick="window.testTelegram()" style="height: 45px; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
+                    <span data-i18n="admin.test_telegram">Test Tele</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab: Orders -->
+        <div id="admin-tab-orders" class="admin-tab-content active">
+            <div class="admin-section">
+                <div class="sub-tabs"
+                    style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                    <button class="sub-tab-btn order-sub-tab active" data-status="pending"
+                        onclick="window.switchOrderSubTab('pending')" data-i18n="admin.orders_subtab_pending">Ä�ang chá»�</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="processing"
+                        onclick="window.switchOrderSubTab('processing')" data-i18n="admin.orders_subtab_processing">Ä�ang xá»­ lÃ½</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="completed"
+                        onclick="window.switchOrderSubTab('completed')" data-i18n="admin.orders_subtab_completed">HoÃ n thÃ nh</button>
+                    <button class="sub-tab-btn order-sub-tab" data-status="failed"
+                        onclick="window.switchOrderSubTab('failed')" data-i18n="admin.orders_subtab_failed">Tháº¥t báº¡i</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_order_id">MÃ£ Ä‘Æ¡n</th>
+                                <th data-i18n="admin.col_customer">KhÃ¡ch hÃ ng</th>
+                                <th data-i18n="admin.col_service">Dá»‹ch vá»¥</th>
+                                <th data-i18n="admin.col_cost">Chi phÃ­</th>
+                                <th data-i18n="admin.col_action">HÃ nh Ä‘á»™ng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-orders-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Topups -->
+        <div id="admin-tab-topups" class="admin-tab-content">
+            <div class="admin-section">
+                <div class="sub-tabs"
+                    style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                    <button class="sub-tab-btn active" data-status="pending"
+                        onclick="window.switchTopupSubTab('pending')" data-i18n="admin.topups_subtab_pending">Ä�ang chá»�</button>
+                    <button class="sub-tab-btn" data-status="approved" onclick="window.switchTopupSubTab('approved')" data-i18n="admin.topups_subtab_approved">Ä�Ã£ duyá»‡t</button>
+                    <button class="sub-tab-btn" data-status="rejected" onclick="window.switchTopupSubTab('rejected')" data-i18n="admin.topups_subtab_rejected">Bá»‹ tá»« chá»‘i</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_customer">KhÃ¡ch hÃ ng</th>
+                                <th data-i18n="admin.col_package_money">GÃ³i / Tiá»�n</th>
+                                <th data-i18n="admin.col_content">Ná»™i dung</th>
+                                <th data-i18n="admin.col_proof">Báº±ng chá»©ng</th>
+                                <th data-i18n="admin.col_action">HÃ nh Ä‘á»™ng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-topups-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Referrals -->
+        <div id="admin-tab-referrals" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 2rem;">
+                <h2 style="margin: 0 0 1rem 0;" data-i18n="admin.ref_summary_title">Tá»•ng hoa há»“ng theo ngÆ°á»�i giá»›i thiá»‡u</h2>
+                <div id="admin-referral-summary"></div>
+            </div>
+            <div class="admin-section">
+                <h2 style="margin: 0 0 1rem 0;" data-i18n="admin.ref_detail_title">Chi tiáº¿t tá»«ng giao dá»‹ch</h2>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.ref_col_referrer">NgÆ°á»�i giá»›i thiá»‡u</th>
+                                <th data-i18n="admin.ref_col_referred">NgÆ°á»�i Ä‘Æ°á»£c má»�i</th>
+                                <th data-i18n="admin.ref_col_base">Sá»‘ tiá»�n náº¡p</th>
+                                <th data-i18n="admin.ref_col_commission">Hoa há»“ng</th>
+                                <th data-i18n="referral.col_gateway">KÃªnh</th>
+                                <th data-i18n="referral.col_date">Thá»�i gian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-referrals-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Bots -->
+        <div id="admin-tab-bots" class="admin-tab-content">
+            <div class="admin-section">
+                <h2 style="margin: 0 0 0.5rem 0;" data-i18n="admin.bots_title">Quáº£n lÃ½ Bot xá»­ lÃ½ Ä‘Æ¡n</h2>
+                <p style="margin: 0 0 1.25rem 0; opacity: 0.65; font-size: 0.9rem;" data-i18n="admin.bots_desc">Má»—i mÃ¡y cháº¡y <code>python bot.py --name ten-bot</code>. Táº¯t á»Ÿ Ä‘Ã¢y thÃ¬ bot khÃ´ng náº¡p Ä‘Æ¡n / khÃ´ng check káº¿t quáº£.</p>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.bots_col_name">TÃªn bot</th>
+                                <th data-i18n="admin.bots_col_status">Tráº¡ng thÃ¡i</th>
+                                <th data-i18n="admin.bots_col_enabled">Cho phÃ©p cháº¡y</th>
+                                <th data-i18n="admin.bots_col_last_seen">Láº§n cuá»‘i online</th>
+                                <th data-i18n="admin.bots_col_host">MÃ¡y</th>
+                                <th data-i18n="admin.bots_col_actions">Thao tÃ¡c</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-bots-list">
+                            <tr><td colspan="6" style="text-align:center; opacity:0.5; padding:2rem;" data-i18n="admin.bots_empty">ChÆ°a cÃ³ bot nÃ o. Cháº¡y bot.py vá»›i --name trÃªn server.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Users -->
+        <div id="admin-tab-users" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 3rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0;" data-i18n="admin.users_list_title">Danh sÃ¡ch ThÃ nh viÃªn</h2>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.col_member">ThÃ nh viÃªn</th>
+                                <th data-i18n="admin.col_balance">Sá»‘ dÆ° Coin</th>
+                                <th data-i18n="admin.col_role">Quyá»�n</th>
+                                <th data-i18n="admin.col_action">HÃ nh Ä‘á»™ng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h2 data-i18n="admin.grant_admin_title">Cáº¥p quyá»�n Admin nhanh</h2>
+                <div class="glass-card" style="padding: 1.5rem; max-width: 500px;">
+                    <div class="form-group">
+                        <label data-i18n="admin.grant_admin_email_label">Email ngÆ°á»�i dÃ¹ng</label>
+                        <input type="email" id="user-admin-email" class="form-control"
+                            data-i18n="admin.grant_admin_email_placeholder"
+                            placeholder="Nháº­p email Ä‘á»ƒ cáº¥p quyá»�n Admin">
+                    </div>
+                    <button class="btn-primary" onclick="window.makeAdmin()" style="width: 100%;" data-i18n="admin.grant_admin_btn">Cáº¥p quyá»�n Admin</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topup Modal (Centered QR - Automated Flow) -->
+    <div id="topup-modal" class="modal-overlay">
+        <style>
+            .dot-flashing {
+                position: relative;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite linear alternate;
+                animation-delay: 0.5s;
+                margin: 0 15px;
+            }
+
+            .dot-flashing::before,
+            .dot-flashing::after {
+                content: "";
+                display: inline-block;
+                position: absolute;
+                top: 0;
+            }
+
+            .dot-flashing::before {
+                left: -15px;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite alternate;
+                animation-delay: 0s;
+            }
+
+            .dot-flashing::after {
+                left: 15px;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background-color: var(--accent);
+                color: var(--accent);
+                animation: dot-flashing 1s infinite alternate;
+                animation-delay: 1s;
+            }
+
+            .bank-info-box {
+                border: 1px solid var(--glass-border);
+                border-radius: 8px;
+                margin: 1.5rem 0;
+                background: rgba(0, 0, 0, 0.2);
+            }
+
+            .bank-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.8rem;
+                border-bottom: 1px solid var(--glass-border);
+            }
+
+            .copy-btn {
+                background: var(--accent);
+                color: white;
+                border: none;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                cursor: pointer;
+            }
+
+            @keyframes dot-flashing {
+                0% {
+                    background-color: var(--accent);
+                }
+
+                50%,
+                100% {
+                    background-color: rgba(0, 242, 254, 0.2);
+                }
+            }
+        </style>
+        <div class="modal-content" style="max-width: 500px; width: 95%;">
+            <span class="modal-close" onclick="closeModal('topup-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header">
+                <h2 style="margin-bottom: 0.5rem;" data-i18n="modals.topup_title">Náº¡p Coin tá»± Ä‘á»™ng</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;" data-i18n="modals.topup_subtitle">Há»‡ thá»‘ng tá»±
+                    Ä‘á»™ng cá»™ng coin sau khi nháº­n Ä‘Æ°á»£c thanh toÃ¡n.</p>
+            </div>
+
+            <div class="modal-body" style="padding: 1rem; text-align: center;">
+                <!-- VietQR Content -->
+                <div id="payment-content-vietqr" class="payment-tab-content">
+                    <div class="topup-qr-container"
+                        style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border);">
+                        <div class="bank-header"
+                            style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 1.5rem;">
+                            <img src="https://img.vietqr.io/image/OCB-logo.png"
+                                style="height: 24px; filter: brightness(0) invert(1);" alt="OCB">
+                            <h4 style="color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;"
+                                data-i18n="modals.qr_ocb_bank">QuÃ©t mÃ£ QR OCB</h4>
+                        </div>
+
+                        <div
+                            style="margin-bottom: 1.5rem; position: relative; min-height: 220px; display: flex; align-items: center; justify-content: center;">
+                            <div id="qr-loader" class="qr-loader-container">
+                                <div class="spinner-ring"></div>
+                                <div class="loading-text" data-i18n="modals.generating_qr">Ä�ang táº¡o mÃ£ QR...</div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <img id="qr-code-img" src="" alt="VietQR"
+                                    style="display: none; width: 100%; max-width: 220px; border-radius: 12px; border: 4px solid white; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                                <button id="btn-save-qr" class="btn-secondary" style="display: none; padding: 8px 15px; font-size: 0.8rem; border-radius: 8px;" onclick="window.saveQRImage()" data-i18n="payment.save_qr_btn">
+                                    ðŸ“¥ Táº£i mÃ£ QR vá»� mÃ¡y
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="color: #ffde00; font-size: 0.85rem; line-height: 1.5; font-weight: 600; margin-bottom: 1.5rem; text-align: center; border: 1px dashed rgba(255, 222, 0, 0.5); padding: 12px; border-radius: 8px; background: rgba(255, 222, 0, 0.05);">
+                            âš ï¸� <span data-i18n="modals.qr_scan_warning">Vui lÃ²ng quÃ©t mÃ£ QR báº±ng App NgÃ¢n hÃ ng Ä‘á»ƒ Ä‘áº£m báº£o ná»™i dung chuyá»ƒn khoáº£n chÃ­nh xÃ¡c tuyá»‡t Ä‘á»‘i. Náº¿u sai ná»™i dung, há»‡ thá»‘ng sáº½ KHÃ”NG tá»± Ä‘á»™ng cá»™ng Coin!</span>
+                        </div>
+
+                        <div id="topup-package-info"
+                            style="margin-bottom: 1.5rem; padding: 0.8rem; background: rgba(255,255,255,0.05); border-radius: 8px; font-weight: 700; color: var(--accent); font-size: 1.1rem;">
+                        </div>
+
+                        <span id="transfer-code" style="display: none;"></span>
+
+                        <div
+                            style="margin-top: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); font-size: 0.85rem;">
+                            <div class="dot-flashing"></div>
+                            <span data-i18n="modals.waiting_payment">Ä�ang chá»� xÃ¡c nháº­n thanh toÃ¡n...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- International Content (PayPal Smart Buttons) -->
+                <div id="payment-content-intl" class="payment-tab-content" style="display: none;">
+                    <div class="topup-intl-container"
+                        style="background: var(--bg-card-hover); padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); text-align: center;">
+                        <div style="margin-bottom: 1.5rem;">
+                            <h4 style="color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; margin-bottom: 6px;" data-i18n="payment.intl_title">
+                                International Secure Payment
+                            </h4>
+                            <p style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="payment.intl_subtitle">
+                                Powered by PayPal Â· Visa, Mastercard, Amex, PayPal balance
+                            </p>
+                        </div>
+
+                        <div id="intl-package-info" style="margin-bottom: 1.5rem; padding: 1.2rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <!-- Filled by selectTopup('intl') -->
+                        </div>
+
+                        <!-- PayPal Buttons render here. Initialized once after SDK loads. -->
+                        <div id="paypal-button-container" style="min-height: 48px; margin-top: 0.5rem;"></div>
+
+                        <div id="paypal-status" style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); min-height: 22px;"></div>
+
+                        <div id="paypal-sandbox-banner" style="display:none; margin-top: 1rem; padding: 8px 12px; background: rgba(255, 222, 0, 0.1); border: 1px dashed rgba(255, 222, 0, 0.5); border-radius: 6px; font-size: 0.7rem; color: #ffde00; line-height: 1.4;" data-i18n="payment.sandbox_banner">
+                            âš ï¸� SANDBOX MODE â€” Use a PayPal sandbox buyer account, no real money is charged.
+                        </div>
+                    </div>
+                </div>
+                
+                <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 1.5rem; font-style: italic;"
+                    data-i18n="modals.auto_topup_notice">
+                    * Coin sáº½ Ä‘Æ°á»£c cá»™ng tá»± Ä‘á»™ng. Vui lÃ²ng giá»¯ cá»­a sá»• nÃ y cho Ä‘áº¿n khi hoÃ n táº¥t.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="order-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('order-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header">
+                <h2 style="margin-bottom: 0.5rem;" data-i18n="modals.order_title">Táº¡o video má»›i</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;" data-i18n="modals.order_subtitle">Chá»�n áº£nh vÃ 
+                    video Ä‘á»ƒ báº¯t Ä‘áº§u sÃ¡ng táº¡o.</p>
+            </div>
+
+            <form id="order-form" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                <div class="modal-body">
+                    <!-- Upload Grid -->
+                    <div class="grid-2" style="margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label data-i18n="modals.char_label">1. áº¢nh nhÃ¢n váº­t</label>
+                            <div class="upload-zone" onclick="document.getElementById('file-char').click()">
+                                <span>ðŸ“¸</span>
+                                <p data-i18n="modals.char_placeholder">Nháº¥n Ä‘á»ƒ chá»�n áº£nh</p>
+                                <div class="upload-note" data-i18n="modals.char_note">LÆ°u Ã½: NÃªn chá»�n áº£nh chÃ¢n dung full
+                                    ngÆ°á»�i.</div>
+                                <div class="upload-note" data-i18n="modals.ai_warning" style="color: #ff4d4d; font-weight: 700; margin-top: 5px;"></div>
+                                <div id="preview-char-container" class="preview-container"></div>
+                            </div>
+                            <input type="file" id="file-char" accept="image/*" style="display:none"
+                                onchange="window.handlePreview(this, 'preview-char-container')">
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="modals.video_label">2. Video máº«u / bá»‘i cáº£nh</label>
+
+                            <!-- Video Source Tabs -->
+                            <div class="video-tabs" style="margin-bottom: 1rem;">
+                                <div class="video-tab active" onclick="window.switchVideoSource('upload')"
+                                    id="tab-upload" data-i18n="modals.video_tab_upload">Táº£i lÃªn</div>
+                                <div class="video-tab" onclick="window.switchVideoSource('library')" id="tab-library" data-i18n="modals.video_tab_library">
+                                    ThÆ° viá»‡n máº«u</div>
+                            </div>
+
+                            <!-- Upload Zone (Default) -->
+                            <div id="video-upload-section">
+                                <div class="upload-zone" onclick="document.getElementById('file-video').click()">
+                                    <span>ðŸŽ¥</span>
+                                    <p data-i18n="modals.video_placeholder">Nháº¥n Ä‘á»ƒ chá»�n video</p>
+                                    <div class="upload-note" data-i18n="modals.video_note">LÆ°u Ã½: Ä�áº£m báº£o nhÃ¢n váº­t xuáº¥t
+                                        hiá»‡n ngay tá»« Ä‘áº§u video.</div>
+                                    <div id="preview-video-container" class="preview-container"></div>
+                                </div>
+                                <input type="file" id="file-video" accept="video/*" style="display:none"
+                                    onchange="window.handlePreview(this, 'preview-video-container')">
+                            </div>
+
+                            <!-- Library Section (Hidden by default) -->
+                            <div id="video-library-section" style="display: none;">
+                                <div class="template-grid" id="template-library-grid">
+                                    <!-- Loaded by JS -->
+                                </div>
+                                <input type="hidden" id="selected-template-url" value="">
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="radio" name="service-type" value="motion-to-char" checked style="display:none">
+
+                    <div id="custom-model-info" style="display: none; margin-bottom: 1.5rem;"></div>
+
+                    <div class="form-group" id="model-selection-group">
+                        <label data-i18n="modals.model_label">Chá»�n Model (Cháº¥t lÆ°á»£ng)</label>
+                        <div class="model-selection-grid">
+                            <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                <input type="radio" name="model-type" value="fast" checked>
+                                <div class="card-content-inline"
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_fast">
+                                        Nhanh</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_fast_desc">30p</div>
+                                    <div
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <span>10</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                <input type="radio" name="model-type" value="turbo">
+                                <div class="card-content-inline"
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_turbo">
+                                        Turbo 2K</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_turbo_desc">15-20p</div>
+                                    <div
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <span>20</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <input type="radio" name="aspect-ratio" value="9:16" checked style="display:none">
+                </div>
+
+                <div class="modal-footer" style="padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
+                    <button type="submit" class="btn-primary" id="order-submit-btn"
+                        style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; height: 65px; padding: 0 1.5rem;">
+                        <div
+                            style="display: flex; flex-direction: column; align-items: center; line-height: 1.2; flex: 1;">
+                            <span data-i18n="hero.cta_create" style="font-size: 1rem; font-weight: 700;">Táº¡o video
+                                ngay</span>
+                            <span id="submit-summary-line" style="font-size: 0.7rem; opacity: 0.8; font-weight: 400;"
+                                data-i18n="modals.model_fast_desc">Cháº¥t lÆ°á»£ng cao, cÃ³ trong 30p</span>
+                        </div>
+                        <div class="btn-cost-tag" style="margin-left: auto; position: relative;">
+                            <svg class="coin-icon-mini" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)"
+                                    fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2" />
+                                <path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)" />
+                            </svg>
+                            <span id="submit-cost">10</span>
+                        </div>
+                    </button>
+                    <div id="upload-progress"
+                        style="display: none; text-align:center; margin-top: 1rem; color: var(--accent);">
+                        <span data-i18n="modals.uploading">Ä�ang táº£i file lÃªn...</span> <span id="progress-val">0</span>%
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pricing Modal (Package Selection) -->
+    <div id="pricing-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="modal-close" onclick="closeModal('pricing-modal')" data-i18n="modals.close">&times;</span>
+            <div class="modal-header">
+                <h2 data-i18n="pricing.title">Chá»�n gÃ³i náº¡p Coin</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;" data-i18n="pricing.subtitle">Náº¡p cÃ ng nhiá»�u, Æ°u
+                    Ä‘Ã£i cÃ ng lá»›n. 1 Coin =
+                    1.000Ä‘.</p>
+            </div>
+            <div class="modal-body">
+                <div class="pricing-grid" id="modal-coin-packages">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="admin-detail-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="modal-close" onclick="closeModal('admin-detail-modal')">&times;</span>
+                <h2 style="margin:0;" data-i18n="admin.order_detail_title">Chi tiáº¿t Ä‘Æ¡n hÃ ng</h2>
+            </div>
+
+            <div class="modal-body">
+                <div id="admin-order-details"></div>
+
+                <form id="admin-update-form">
+                    <div class="form-group">
+                        <label data-i18n="admin.status_label">Tráº¡ng thÃ¡i thá»±c hiá»‡n</label>
+                        <select class="form-control" id="admin-status">
+                            <option value="pending" data-i18n="admin.orders_subtab_pending">Ä�ang chá»�</option>
+                            <option value="processing" data-i18n="admin.orders_subtab_processing">Ä�ang xá»­ lÃ½</option>
+                            <option value="completed" data-i18n="admin.orders_subtab_completed">HoÃ n thÃ nh</option>
+                            <option value="failed" data-i18n="admin.orders_subtab_failed">Tháº¥t báº¡i</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="admin.result_link_label">ðŸŽ¬ Link káº¿t quáº£ (Video/áº¢nh)</label>
+                        <div style="display: flex; gap: 6px; margin-bottom: 0.8rem;">
+                            <input type="url" class="form-control" id="admin-result-link" placeholder="https://..."
+                                style="flex: 1; margin-bottom: 0;">
+                            <button type="button" class="btn-secondary" onclick="window.copyAdminResultLink()"
+                                data-i18n-title="admin.copy_result_title"
+                                title="Copy link káº¿t quáº£"
+                                style="padding: 0 14px; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                                <svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <span data-i18n="common.copy">Copy</span>
+                            </button>
+                        </div>
+
+                        <div class="glass-card"
+                            style="padding: 1rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+                            <label style="font-size: 0.75rem; opacity: 0.7; display: block; margin-bottom: 0.5rem;" data-i18n="admin.upload_direct_label">Táº£i
+                                lÃªn video trá»±c tiáº¿p:</label>
+                            <input type="file" id="admin-file-result" accept="video/*"
+                                style="font-size: 0.75rem; width: 100%;">
+                            <button type="button" class="btn-primary" onclick="window.handleAdminResultUpload()"
+                                id="btn-admin-upload"
+                                style="width: 100%; margin-top: 0.8rem; padding: 8px; font-weight: 600; font-size: 0.85rem;" data-i18n="admin.btn_upload">ðŸš€
+                                Táº£i lÃªn Worker</button>
+                            <div id="admin-upload-status"
+                                style="font-size: 0.7rem; margin-top: 0.5rem; text-align: center; display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="admin.customer_note_label">Ghi chÃº cho khÃ¡ch hÃ ng</label>
+                        <textarea class="form-control" id="admin-note"
+                            data-i18n="admin.customer_note_placeholder"
+                            placeholder="Nháº­p lá»�i nháº¯n hoáº·c hÆ°á»›ng dáº«n..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;" data-i18n="admin.update_order_btn">Cáº­p
+                        nháº­t Ä‘Æ¡n hÃ ng</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px; text-align: center; padding: 2.5rem;">
+            <div id="confirm-icon" style="font-size: 3.5rem; margin-bottom: 1.5rem;">â�³</div>
+            <h3 id="confirm-title" style="font-size: 1.5rem; margin-bottom: 1rem;"
+                data-i18n="modals.confirm_order_title">XÃ¡c nháº­n</h3>
+            <p id="confirm-msg" style="color: var(--text-muted); margin-bottom: 2rem; line-height: 1.6;"></p>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn-secondary" style="flex: 1;" onclick="closeModal('confirm-modal')"
+                    data-i18n="modals.back">Quay láº¡i</button>
+                <button class="btn-primary" style="flex: 1;" id="confirm-yes-btn" data-i18n="modals.agree">Ä�á»“ng
+                    Ã½</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <div id="user-order-detail-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="modal-close" onclick="closeModal('user-order-detail-modal')"
+                    data-i18n="modals.close">&times;</span>
+                <h2 style="margin:0;" data-i18n="modals.order_detail_title">Chi tiáº¿t Ä‘Æ¡n hÃ ng</h2>
+            </div>
+            <div class="modal-body">
+                <div id="user-order-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PayPal JS SDK is loaded dynamically from script.js once we know clientId + env (see initPaypalSdk). -->
+    <script src="lang-config.js"></script>
+    <script src="translations.js"></script>
+    <script src="translations-locales.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, limit, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        import { firebaseConfig, ADMIN_EMAILS } from "./firebase-config.js";
+        import { initAppLogic } from "./script.js";
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Make Firebase available globally for script.js
+        window.firebase = { auth, db, storage, analytics, logEvent, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, limit, runTransaction, serverTimestamp, ref, uploadBytesResumable, getDownloadURL };
+        window.ADMIN_EMAILS = ADMIN_EMAILS;
+
+        initAppLogic().catch(err => console.error('initAppLogic failed:', err));
+    </script>
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-modal" class="modal-overlay" onclick="closeModal('image-viewer-modal')">
+        <style>
+            .modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                backdrop-filter: blur(8px);
+                padding: 1rem;
+            }
+        </style>
+        <div style="max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;">
+            <img id="full-res-image" src=""
+                style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.8);">
+        </div>
+    </div>
+
+    <!-- Template Preview Modal -->
+    <div id="template-preview-modal" class="modal-overlay" onclick="window.closeTemplatePreview()">
+        <div class="modal-content"
+            style="max-width: 400px; padding: 0; background: #000; overflow: hidden; border-radius: 20px;"
+            onclick="event.stopPropagation()">
+            <div style="position: relative; width: 100%; aspect-ratio: 9/16; background: #000;">
+                <video id="template-preview-video" controls autoplay loop
+                    style="width: 100%; height: 100%; object-fit: cover;"></video>
+                <div
+                    style="position: absolute; bottom: 0; left: 0; right: 0; padding: 2rem 1.5rem; background: linear-gradient(transparent, rgba(0,0,0,0.9));">
+                    <h3 id="template-preview-name" style="color: white; margin-bottom: 0.5rem;">Template Name</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" id="template-confirm-btn" style="flex: 1;" data-i18n="modals.template_confirm_btn">Chá»�n máº«u nÃ y</button>
+                        <button class="btn-secondary" style="flex: 1;"
+                            onclick="window.closeTemplatePreview()" data-i18n="modals.cancel">Há»§y</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Viewer Modal -->
+    <div id="video-viewer-modal" class="modal-overlay" onclick="window.closeVideoModal()">
+        <div style="max-width: 90%; max-height: 90%; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;"
+            onclick="event.stopPropagation()">
+            <span class="modal-close"
+                style="position: absolute; top: -40px; right: 0; font-size: 30px; color: white; cursor: pointer;"
+                onclick="window.closeVideoModal()">&times;</span>
+            <video id="full-res-video" controls autoplay
+                style="max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 0 50px rgba(0,0,0,0.8); background: #000;"></video>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer
+        style="padding: 40px 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 50px; color: var(--text-muted); font-size: 0.9rem;">
+        <p data-i18n="footer.rights">&copy; 2026 MotionAI Studio. All rights reserved.</p>
+        <div style="margin-top: 10px; display: flex; justify-content: center; gap: 20px;">
+            <a href="terms.html" style="color: var(--text-muted); text-decoration: none;" data-i18n="footer.terms">Ä�iá»�u
+                khoáº£n dá»‹ch vá»¥</a>
+            <a href="privacy.html" style="color: var(--text-muted); text-decoration: none;"
+                data-i18n="footer.privacy">ChÃ­nh sÃ¡ch báº£o máº­t</a>
+        </div>
+    </footer>
+    <!-- Floating Telegram Button (right) -->
+    <a href="https://t.me/motionaistudio" target="_blank" class="telegram-fab" data-i18n-title="common.support_chat" title="Chat vá»›i chÃºng tÃ´i âœ¨">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
+        </svg>
+    </a>
+
+    <!-- SVG Gradients -->
+    <svg style="width:0; height:0; position:absolute;" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="coin-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00f2fe" />
+                <stop offset="100%" stop-color="#a855f7" />
+            </linearGradient>
+        </defs>
+    </svg>
+    <!-- Forced Auth Modal (non-dismissible) -->
+    <div id="auth-modal" class="auth-modal-overlay" style="display: none;">
+        <div class="auth-modal-card">
+            <span class="modal-close" onclick="closeModal('auth-modal')" style="color: white; top: 1rem; right: 1.5rem; position: absolute; font-size: 2rem;">&times;</span>
+            <div class="auth-modal-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" fill="url(#auth-icon-gradient)"/>
+                    <defs>
+                        <linearGradient id="auth-icon-gradient" x1="2" y1="2" x2="22" y2="22">
+                            <stop offset="0%" stop-color="#00f2fe"/>
+                            <stop offset="100%" stop-color="#a855f7"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h2 class="auth-modal-title" data-i18n="modals.auth_title">ChÃ o má»«ng báº¡n Ä‘áº¿n MotionAI! ðŸŽ¬</h2>
+            <p class="auth-modal-desc" id="auth-modal-desc" data-i18n="modals.auth_desc_default" style="margin-bottom: 1.5rem;">Ä�Äƒng nháº­p Ä‘á»ƒ <strong>lÆ°u Coin</strong> vÃ  <strong>video cá»§a riÃªng báº¡n</strong>.</p>
+
+
+
+            <button class="auth-modal-btn" id="google-login-btn" onclick="window.loginUser()" style="margin-top: 0;">
+                <svg width="20" height="20" viewBox="0 0 48 48" style="flex-shrink:0;">
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                </svg>
+                <span data-i18n="modals.auth_google_btn">Ä�Äƒng nháº­p vá»›i Google</span>
+            </button>
+            <div id="inapp-auth-note" data-i18n="modals.inapp_auth_note" style="display: none; font-size: 0.8rem; color: #ff9100; margin-top: 0.5rem; background: rgba(255,145,0,0.1); padding: 10px; border-radius: 8px; border: 1px dashed rgba(255,145,0,0.3); text-align: center;">
+                âš ï¸� TrÃ¬nh duyá»‡t nÃ y thÆ°á»�ng cháº·n Ä‘Äƒng nháº­p Google...
+            </div>
+            <p class="auth-modal-footer" data-i18n="modals.auth_footer">Chá»‰ máº¥t vÃ i giÃ¢y â€¢ HoÃ n toÃ n miá»…n phÃ­</p>
+        </div>
+    </div>
+
+</body>
+
+</html>
