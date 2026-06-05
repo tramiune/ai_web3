@@ -827,7 +827,7 @@ def goto_aidancing_dashboard(page, session, login_wait_sec=120):
         f"Đăng nhập trên cửa sổ Chrome bot rồi chạy lại. URL: {page.url}"
     )
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8676046240:AAE14lDxAj9otGTjVnd8Smr2__Wg-J2dCLc")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "6067707939")
 AIDANCING_LOW_BALANCE_THRESHOLD = 10
 
@@ -894,6 +894,8 @@ def start_bot_control_listener():
 
 def send_telegram_message(text):
     try:
+        if "[Kaling]" not in text:
+            text = f"[Kaling] {text}"
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": TELEGRAM_CHAT_ID,
@@ -937,7 +939,7 @@ def notify_internal_error_telegram(order_id, order_data, err, context=''):
     ctx = f" ({context})" if context else ""
     err_text = (err or '')[:500]
     msg = (
-        f"🚨 <b>[MotionAI] BOT LỖI NỘI BỘ{ctx}</b>\n\n"
+        f"🚨 <b>[Kaling] BOT LỖI NỘI BỘ{ctx}</b>\n\n"
         f"🆔 Mã đơn: #{short_id}\n"
         f"👤 Khách: {user_name}\n"
         f"📧 Email: {user_email}\n"
@@ -1831,7 +1833,7 @@ def _rescan_pending_orders_loop():
 
 def start_bot():
     global BOT_NAME
-    parser = argparse.ArgumentParser(description='MotionAI order bot — aidancing.net')
+    parser = argparse.ArgumentParser(description='Kaling order bot — aidancing.net + xiaoyang')
     parser.add_argument('--name', required=True, help='Tên bot duy nhất (vd: aidancing-vps1, bot-may-nha)')
     parser.add_argument('--mode', choices=['browser', 'api', 'http'], default=None,
                         help='browser=Playwright; api/http=Pure HTTP (cookie + XY, không Chrome)')
@@ -1843,7 +1845,7 @@ def start_bot():
         print("❌ Tên bot không hợp lệ. Dùng: python bot.py --name aidancing-vps1")
         sys.exit(1)
 
-    print(f"📡 MotionAI BOT [{BOT_NAME}] (v3.9 xy+ad - mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
+    print(f"📡 Kaling BOT [{BOT_NAME}] (v1.0 xy+ad - mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
     cdp_url = os.environ.get("BOT_CDP_URL", "").strip()
     if cdp_url:
         if ensure_cdp_available(cdp_url):

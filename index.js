@@ -1,10 +1,4 @@
 import { onRequestPost as onCassoRequestPost } from './functions/api/casso-webhook.js';
-import {
-  onConfigRequest as onPaypalConfigRequest,
-  onCreateOrderRequest as onPaypalCreateOrderRequest,
-  onCaptureOrderRequest as onPaypalCaptureOrderRequest,
-  onWebhookRequest as onPaypalWebhookRequest
-} from './functions/api/paypal.js';
 
 function isAllowedMediaUrl(rawUrl) {
   try {
@@ -29,24 +23,6 @@ export default {
     // --- Casso (VietQR) webhook ----------------------------------------------
     if (url.pathname === '/api/casso-webhook' && method === 'POST') {
       return onCassoRequestPost({ request, env, context });
-    }
-
-    // --- PayPal (International) ----------------------------------------------
-    // Public config (GET): returns clientId + env for the JS SDK on the frontend.
-    if (url.pathname === '/api/paypal-config' && method === 'GET') {
-      return onPaypalConfigRequest({ request, env, context });
-    }
-    // Smart Buttons createOrder callback target.
-    if (url.pathname === '/api/paypal-create-order' && method === 'POST') {
-      return onPaypalCreateOrderRequest({ request, env, context });
-    }
-    // Smart Buttons onApprove callback target.
-    if (url.pathname === '/api/paypal-capture-order' && method === 'POST') {
-      return onPaypalCaptureOrderRequest({ request, env, context });
-    }
-    // Server-to-server webhook from PayPal (PAYMENT.CAPTURE.COMPLETED etc.).
-    if (url.pathname === '/api/paypal-webhook' && method === 'POST') {
-      return onPaypalWebhookRequest({ request, env, context });
     }
 
     // Geo hint for auto language: tier mapping via lang-config.js on frontend.

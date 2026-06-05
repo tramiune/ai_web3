@@ -47,7 +47,7 @@ def wire(**kwargs):
 
 
 def enabled_for_bot(bot_name: str | None) -> bool:
-    return bool(bot_name and "motionai" in bot_name.lower())
+    return bool(bot_name and "kaling" in bot_name.lower())
 
 
 def get_active_render_provider():

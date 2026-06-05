@@ -30,7 +30,7 @@
  */
 
 // --- Static credentials (ENV vars override these in production) ---------------
-const TELEGRAM_BOT_TOKEN = '8676046240:AAE14lDxAj9otGTjVnd8Smr2__Wg-J2dCLc';
+const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 
 // Sandbox credentials provided by store owner. Override with PAYPAL_* env vars.
@@ -643,12 +643,13 @@ function escapeHtml(s) {
 
 async function notifyTelegram(text) {
     try {
+        const body = text.startsWith('[Kaling]') ? text : `[Kaling] ${text}`;
         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: TELEGRAM_CHAT_ID,
-                text,
+                text: body,
                 parse_mode: 'HTML'
             })
         });

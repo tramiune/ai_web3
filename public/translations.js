@@ -2,7 +2,7 @@ console.log("translations.js loaded");
 window.TRANSLATIONS = {
     vi: {
         meta: {
-            title: "MotionAI Studio - Biến ảnh thành video AI bắt trend",
+            title: "Kaling - Biến ảnh thành video AI bắt trend",
             description: "Dịch vụ AI Motion Transfer chuyên nghiệp. Tải lên ảnh nhân vật và video mẫu, chúng tôi tạo video AI mới hoàn chỉnh."
         },
         lang: {
@@ -73,7 +73,7 @@ window.TRANSLATIONS = {
             col_date: "Thời gian",
             empty: "Chưa có hoa hồng nào. Hãy chia sẻ link để bắt đầu nhận thưởng!",
             copied: "Đã sao chép link!",
-            share_msg: "Tham gia MotionAI Studio cùng mình - biến ảnh thành video AI cực chất!",
+            share_msg: "Tham gia Kaling cùng mình - biến ảnh thành video AI cực chất!",
             gateway_admin: "Admin duyệt",
             gateway_casso: "Casso (VietQR)",
             gateway_paypal: "PayPal",
@@ -337,7 +337,7 @@ window.TRANSLATIONS = {
             inapp_auth_note: "⚠️ Trình duyệt này thường chặn đăng nhập Google. Bạn hãy dùng <b>Email/Mật khẩu</b> hoặc mở trang bằng <b>Chrome/Safari</b> nhé!",
             auth_btn_default: "Đăng ký / Đăng nhập",
             auth_btn_register: "Đăng ký tài khoản mới",
-            auth_title: "Chào mừng bạn đến MotionAI! 🎬",
+            auth_title: "Chào mừng bạn đến Kaling! 🎬",
             auth_desc_default: "Đăng nhập để <strong>lưu Coin</strong> và <strong>video của riêng bạn</strong>.",
             auth_desc_register: "Đăng ký ngay để nhận <b>ưu đãi 1.000đ</b> cho video AI đầu tiên!",
             auth_google_btn: "Đăng nhập với Google",
@@ -366,7 +366,7 @@ window.TRANSLATIONS = {
             close: "&times;"
         },
         footer: {
-            rights: "&copy; 2026 MotionAI Studio. All rights reserved.",
+            rights: "&copy; 2026 Kaling. All rights reserved.",
             terms: "Điều khoản dịch vụ",
             privacy: "Chính sách bảo mật"
         },
@@ -571,11 +571,11 @@ window.TRANSLATIONS = {
         },
         legal: {
             back_home: "← Quay lại trang chủ",
-            privacy_page_title: "Chính sách bảo mật - MotionAI Studio",
-            terms_page_title: "Điều khoản dịch vụ - MotionAI Studio",
+            privacy_page_title: "Chính sách bảo mật - Kaling",
+            terms_page_title: "Điều khoản dịch vụ - Kaling",
             privacy_title: "Chính sách bảo mật",
-            privacy_scope_p: "Áp dụng cho ứng dụng Android <strong>MotionAI Studio</strong> trên Google Play và website <strong>motionaistudio.cloud</strong> (gọi chung là \"Dịch vụ\").",
-            privacy_intro: "Chào mừng bạn đến với <strong>MotionAI Studio</strong>. Chúng tôi tôn trọng quyền riêng tư và cam kết bảo vệ dữ liệu cá nhân của bạn. Chính sách này mô tả dữ liệu chúng tôi thu thập, cách sử dụng, chia sẻ và quyền của bạn khi dùng ứng dụng hoặc website.",
+            privacy_scope_p: "Áp dụng cho ứng dụng Android <strong>Kaling</strong> trên Google Play và website <strong>kaling.cloud</strong> (gọi chung là \"Dịch vụ\").",
+            privacy_intro: "Chào mừng bạn đến với <strong>Kaling</strong>. Chúng tôi tôn trọng quyền riêng tư và cam kết bảo vệ dữ liệu cá nhân của bạn. Chính sách này mô tả dữ liệu chúng tôi thu thập, cách sử dụng, chia sẻ và quyền của bạn khi dùng ứng dụng hoặc website.",
             privacy_s1_title: "1. Dữ liệu chúng tôi thu thập",
             privacy_s1_p: "Tùy cách bạn sử dụng Dịch vụ, chúng tôi có thể thu thập các loại dữ liệu sau:",
             privacy_s1_li1: "<strong>Thông tin tài khoản:</strong> email, tên hiển thị, ảnh đại diện và mã định danh người dùng (UID) khi bạn đăng nhập bằng Google hoặc phương thức xác thực được hỗ trợ.",
@@ -626,15 +626,15 @@ window.TRANSLATIONS = {
             privacy_s12_title: "12. Liên hệ",
             privacy_s12_p: "Mọi câu hỏi, yêu cầu truy cập hoặc xóa dữ liệu, vui lòng liên hệ:",
             privacy_updated: "Cập nhật lần cuối: 24/05/2026",
-            privacy_footer: "&copy; 2026 MotionAI Studio. <a href=\"terms.html\" style=\"color: var(--primary);\">Điều khoản dịch vụ</a>",
+            privacy_footer: "&copy; 2026 Kaling. <a href=\"terms.html\" style=\"color: var(--primary);\">Điều khoản dịch vụ</a>",
             terms_title: "Điều khoản dịch vụ",
             terms_s1_title: "1. Chấp nhận điều khoản",
-            terms_s1_p: "Bằng việc đăng nhập và sử dụng dịch vụ tại MotionAI Studio, bạn đồng ý tuân thủ các điều khoản này. Nếu bạn không đồng ý, vui lòng ngừng sử dụng dịch vụ.",
+            terms_s1_p: "Bằng việc đăng nhập và sử dụng dịch vụ tại Kaling, bạn đồng ý tuân thủ các điều khoản này. Nếu bạn không đồng ý, vui lòng ngừng sử dụng dịch vụ.",
             terms_s2_title: "2. Dịch vụ AI Motion",
-            terms_s2_p: "MotionAI Studio cung cấp dịch vụ chuyển đổi hình ảnh nhân vật thành video dựa trên video tham chiếu bằng công nghệ trí tuệ nhân tạo (AI). Kết quả phụ thuộc vào chất lượng hình ảnh và video tham chiếu đầu vào của người dùng.",
+            terms_s2_p: "Kaling cung cấp dịch vụ chuyển đổi hình ảnh nhân vật thành video dựa trên video tham chiếu bằng công nghệ trí tuệ nhân tạo (AI). Kết quả phụ thuộc vào chất lượng hình ảnh và video tham chiếu đầu vào của người dùng.",
             terms_s3_title: "3. Quy định về Coin và Thanh toán",
             terms_s3_li1: "Coin là đơn vị dùng để sử dụng các dịch vụ AI trên hệ thống.",
-            terms_s3_li2: "Coin được nạp qua chuyển khoản ngân hàng (VietQR) hoặc PayPal.",
+            terms_s3_li2: "Coin được nạp qua chuyển khoản ngân hàng (VietQR).",
             terms_s3_li3: "<strong>Chính sách hoàn tiền:</strong> Do đặc thù dịch vụ số và chi phí vận hành server AI, Coin đã nạp thành công sẽ <strong>KHÔNG ĐƯỢC HOÀN LẠI</strong> dưới bất kỳ hình thức nào.",
             terms_s4_title: "4. Quy định nội dung (Quan trọng)",
             terms_s4_p: "Người dùng cam kết không tải lên các nội dung:",
@@ -645,13 +645,13 @@ window.TRANSLATIONS = {
             terms_s5_title: "5. Chính sách lưu trữ dữ liệu",
             terms_s5_p: "Để tối ưu tài nguyên hệ thống, các video kết quả sẽ được lưu trữ trên máy chủ trong vòng <strong>07 ngày</strong> kể từ khi hoàn thành. Sau thời gian này, hệ thống sẽ tự động xóa vĩnh viễn dữ liệu. Người dùng có trách nhiệm tự tải video về máy trong thời gian quy định.",
             terms_s6_title: "6. Giới hạn trách nhiệm",
-            terms_s6_p: "MotionAI Studio nỗ lực cung cấp dịch vụ tốt nhất nhưng không đảm bảo kết quả AI sẽ luôn hoàn hảo 100% theo ý muốn của người dùng. Chúng tôi không chịu trách nhiệm về bất kỳ tổn thất gián tiếp nào phát sinh từ việc sử dụng dịch vụ.",
-            terms_footer: "&copy; 2026 MotionAI Studio. <a href=\"privacy.html\" style=\"color: var(--primary);\">Chính sách bảo mật</a>"
+            terms_s6_p: "Kaling nỗ lực cung cấp dịch vụ tốt nhất nhưng không đảm bảo kết quả AI sẽ luôn hoàn hảo 100% theo ý muốn của người dùng. Chúng tôi không chịu trách nhiệm về bất kỳ tổn thất gián tiếp nào phát sinh từ việc sử dụng dịch vụ.",
+            terms_footer: "&copy; 2026 Kaling. <a href=\"privacy.html\" style=\"color: var(--primary);\">Chính sách bảo mật</a>"
         }
     },
     en: {
         meta: {
-            title: "MotionAI Studio - Turn Photos into Trending AI Videos",
+            title: "Kaling - Turn Photos into Trending AI Videos",
             description: "Professional AI Motion Transfer service. Upload a character photo and reference video, we create a complete new AI video."
         },
         lang: {
@@ -722,7 +722,7 @@ window.TRANSLATIONS = {
             col_date: "Time",
             empty: "No commissions yet. Share your link to start earning!",
             copied: "Link copied!",
-            share_msg: "Join MotionAI Studio with me - turn photos into amazing AI videos!",
+            share_msg: "Join Kaling with me - turn photos into amazing AI videos!",
             gateway_admin: "Admin approval",
             gateway_casso: "Casso (VietQR)",
             gateway_paypal: "PayPal",
@@ -986,7 +986,7 @@ window.TRANSLATIONS = {
             inapp_auth_note: "⚠️ This browser often blocks Google login. Please use <b>Email/Password</b> or open the page in <b>Chrome/Safari</b>!",
             auth_btn_default: "Register / Login",
             auth_btn_register: "Register New Account",
-            auth_title: "Welcome to MotionAI! 🎬",
+            auth_title: "Welcome to Kaling! 🎬",
             auth_desc_default: "Login to <strong>save your Coins</strong> and <strong>personal videos</strong>.",
             auth_desc_register: "Register now to get your first AI video for <b>only 1 Coin</b>!",
             auth_google_btn: "Sign in with Google",
@@ -1015,7 +1015,7 @@ window.TRANSLATIONS = {
             close: "&times;"
         },
         footer: {
-            rights: "&copy; 2026 MotionAI Studio. All rights reserved.",
+            rights: "&copy; 2026 Kaling. All rights reserved.",
             terms: "Terms of Service",
             privacy: "Privacy Policy"
         },
@@ -1220,11 +1220,11 @@ window.TRANSLATIONS = {
         },
         legal: {
             back_home: "← Back to home",
-            privacy_page_title: "Privacy Policy - MotionAI Studio",
-            terms_page_title: "Terms of Service - MotionAI Studio",
+            privacy_page_title: "Privacy Policy - Kaling",
+            terms_page_title: "Terms of Service - Kaling",
             privacy_title: "Privacy Policy",
-            privacy_scope_p: "This policy applies to the <strong>MotionAI Studio</strong> Android app on Google Play and the website <strong>motionaistudio.cloud</strong> (together, the \"Service\").",
-            privacy_intro: "Welcome to <strong>MotionAI Studio</strong>. We respect your privacy and are committed to protecting your personal data. This policy describes what we collect, how we use and share data, and your rights when using our app or website.",
+            privacy_scope_p: "This policy applies to the <strong>Kaling</strong> Android app on Google Play and the website <strong>kaling.cloud</strong> (together, the \"Service\").",
+            privacy_intro: "Welcome to <strong>Kaling</strong>. We respect your privacy and are committed to protecting your personal data. This policy describes what we collect, how we use and share data, and your rights when using our app or website.",
             privacy_s1_title: "1. Data We Collect",
             privacy_s1_p: "Depending on how you use the Service, we may collect:",
             privacy_s1_li1: "<strong>Account information:</strong> email, display name, profile photo, and user ID when you sign in with Google or another supported method.",
@@ -1275,15 +1275,15 @@ window.TRANSLATIONS = {
             privacy_s12_title: "12. Contact",
             privacy_s12_p: "For privacy questions, access requests, or deletion requests, contact:",
             privacy_updated: "Last updated: May 24, 2026",
-            privacy_footer: "&copy; 2026 MotionAI Studio. <a href=\"terms.html\" style=\"color: var(--primary);\">Terms of Service</a>",
+            privacy_footer: "&copy; 2026 Kaling. <a href=\"terms.html\" style=\"color: var(--primary);\">Terms of Service</a>",
             terms_title: "Terms of Service",
             terms_s1_title: "1. Acceptance of Terms",
-            terms_s1_p: "By signing in and using MotionAI Studio, you agree to these terms. If you do not agree, please stop using the service.",
+            terms_s1_p: "By signing in and using Kaling, you agree to these terms. If you do not agree, please stop using the service.",
             terms_s2_title: "2. AI Motion Service",
-            terms_s2_p: "MotionAI Studio provides a service that converts character images into videos based on reference videos using artificial intelligence (AI). Results depend on the quality of your input image and reference video.",
+            terms_s2_p: "Kaling provides a service that converts character images into videos based on reference videos using artificial intelligence (AI). Results depend on the quality of your input image and reference video.",
             terms_s3_title: "3. Coins and Payment",
             terms_s3_li1: "Coins are used to access AI services on the platform.",
-            terms_s3_li2: "Coins can be purchased via bank transfer (VietQR) or PayPal.",
+            terms_s3_li2: "Coins can be purchased via bank transfer (VietQR).",
             terms_s3_li3: "<strong>Refund policy:</strong> Due to the nature of digital services and AI server costs, successfully purchased Coins are <strong>NON-REFUNDABLE</strong> under any circumstances.",
             terms_s4_title: "4. Content Rules (Important)",
             terms_s4_p: "Users agree not to upload content that is:",
@@ -1294,8 +1294,8 @@ window.TRANSLATIONS = {
             terms_s5_title: "5. Data Retention Policy",
             terms_s5_p: "To optimize system resources, result videos are stored on our servers for <strong>7 days</strong> after completion. After that, data is permanently deleted. Users are responsible for downloading videos within this period.",
             terms_s6_title: "6. Limitation of Liability",
-            terms_s6_p: "MotionAI Studio strives to provide the best service but does not guarantee AI results will always be 100% perfect. We are not liable for any indirect losses arising from use of the service.",
-            terms_footer: "&copy; 2026 MotionAI Studio. <a href=\"privacy.html\" style=\"color: var(--primary);\">Privacy Policy</a>"
+            terms_s6_p: "Kaling strives to provide the best service but does not guarantee AI results will always be 100% perfect. We are not liable for any indirect losses arising from use of the service.",
+            terms_footer: "&copy; 2026 Kaling. <a href=\"privacy.html\" style=\"color: var(--primary);\">Privacy Policy</a>"
         }
     }
 };

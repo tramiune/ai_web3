@@ -557,6 +557,10 @@ button {
   width: 100%;
 }
 
+.pricing-pay-btn--full {
+  width: 100%;
+}
+
 .price-card--coin {
   padding: 1.75rem 1.25rem 1.5rem;
 }

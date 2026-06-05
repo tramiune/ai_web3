@@ -2,7 +2,7 @@ console.log('translations-locales.js loaded');
 window.TRANSLATIONS_LOCALES = {
     "es": {
         "meta": {
-            "title": "MotionAI Studio - Convierte fotos en videos AI virales",
+            "title": "Kaling - Convierte fotos en videos AI virales",
             "description": "Servicio profesional de transferencia de movimiento AI. Sube una foto y un video de referencia, creamos un video AI completo."
         },
         "lang": {
@@ -124,7 +124,7 @@ window.TRANSLATIONS_LOCALES = {
             "auth_desc_register": "Crea una cuenta para empezar a crear videos AI."
         },
         "footer": {
-            "rights": "&copy; 2026 MotionAI Studio. Todos los derechos reservados.",
+            "rights": "&copy; 2026 Kaling. Todos los derechos reservados.",
             "terms": "Términos de servicio",
             "privacy": "Política de privacidad"
         },
@@ -153,7 +153,7 @@ window.TRANSLATIONS_LOCALES = {
             "title": "Invita amigos - Gana 10% Coins",
             "copy_btn": "Copiar",
             "copied": "¡Link copiado!",
-            "share_msg": "¡Únete a MotionAI Studio conmigo - convierte fotos en videos AI increíbles!"
+            "share_msg": "¡Únete a Kaling conmigo - convierte fotos en videos AI increíbles!"
         },
         "build_channel": {
             "coming_soon_title": "Función en desarrollo",
@@ -162,7 +162,7 @@ window.TRANSLATIONS_LOCALES = {
     },
     "pt": {
         "meta": {
-            "title": "MotionAI Studio - Transforme fotos em vídeos AI virais",
+            "title": "Kaling - Transforme fotos em vídeos AI virais",
             "description": "Serviço profissional de transferência de movimento AI. Envie uma foto e um vídeo de referência, criamos um vídeo AI completo."
         },
         "lang": {
@@ -284,7 +284,7 @@ window.TRANSLATIONS_LOCALES = {
             "auth_desc_register": "Crie uma conta para começar a fazer vídeos AI."
         },
         "footer": {
-            "rights": "&copy; 2026 MotionAI Studio. Todos os direitos reservados.",
+            "rights": "&copy; 2026 Kaling. Todos os direitos reservados.",
             "terms": "Termos de serviço",
             "privacy": "Política de privacidade"
         },
@@ -313,7 +313,7 @@ window.TRANSLATIONS_LOCALES = {
             "title": "Indique amigos - Ganhe 10% Coins",
             "copy_btn": "Copiar",
             "copied": "Link copiado!",
-            "share_msg": "Entre no MotionAI Studio comigo - transforme fotos em vídeos AI incríveis!"
+            "share_msg": "Entre no Kaling comigo - transforme fotos em vídeos AI incríveis!"
         },
         "build_channel": {
             "coming_soon_title": "Recurso em desenvolvimento",
@@ -322,7 +322,7 @@ window.TRANSLATIONS_LOCALES = {
     },
     "th": {
         "meta": {
-            "title": "MotionAI Studio - เปลี่ยนรูปเป็นวิดีโอ AI ไวรัล",
+            "title": "Kaling - เปลี่ยนรูปเป็นวิดีโอ AI ไวรัล",
             "description": "บริการ AI Motion Transfer มืออาชีพ อัปโหลดรูปและวิดีโอตัวอย่าง เราสร้างวิดีโอ AI ให้ครบ"
         },
         "lang": {
@@ -390,12 +390,12 @@ window.TRANSLATIONS_LOCALES = {
             "toast_login_required": "🔑 กรุณาสมัคร/เข้าสู่ระบบก่อน!"
         },
         "footer": {
-            "rights": "&copy; 2026 MotionAI Studio. สงวนลิขสิทธิ์."
+            "rights": "&copy; 2026 Kaling. สงวนลิขสิทธิ์."
         }
     },
     "id": {
         "meta": {
-            "title": "MotionAI Studio - Ubah foto jadi video AI viral",
+            "title": "Kaling - Ubah foto jadi video AI viral",
             "description": "Layanan AI Motion Transfer profesional. Unggah foto karakter dan video referensi, kami buat video AI lengkap."
         },
         "lang": {
@@ -463,7 +463,7 @@ window.TRANSLATIONS_LOCALES = {
             "toast_login_required": "🔑 Daftar/masuk dulu untuk lanjut!"
         },
         "footer": {
-            "rights": "&copy; 2026 MotionAI Studio. Hak cipta dilindungi."
+            "rights": "&copy; 2026 Kaling. Hak cipta dilindungi."
         }
     }
 };

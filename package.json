@@ -1,7 +1,7 @@
 {
   "name": "motion-ai-studio",
   "version": "1.0.0",
-  "description": "MotionAI Studio - AI Video Motion Transfer Web",
+  "description": "Kaling - AI Video Motion Transfer Web (kaling.cloud)",
   "main": "index.html",
   "scripts": {
     "start": "live-server public --host=0.0.0.0",

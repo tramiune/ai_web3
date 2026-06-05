@@ -1,15 +1,14 @@
 /**
- * Firebase Configuration for MotionAI Studio
- * Replace the placeholder values with your actual Firebase project config.
+ * Firebase Configuration for Kaling (kaling.cloud)
  */
 export const firebaseConfig = {
-  apiKey: "AIzaSyA1Fqy_hbOJc_N-Dcy0v5jiQ7kLRaIUKi4",
-  authDomain: "motionai-studio-76be9.firebaseapp.com",
-  projectId: "motionai-studio-76be9",
-  storageBucket: "motionai-studio-76be9.firebasestorage.app",
-  messagingSenderId: "910538701040",
-  appId: "1:910538701040:web:a30c3b7f20c504dc592a35",
-  measurementId: "G-E71335FCYN"
+  apiKey: "AIzaSyADGG-DTQKUy9hP-0DpfJebqQZGMAS-xtA",
+  authDomain: "ar-drawing-c167d.firebaseapp.com",
+  projectId: "ar-drawing-c167d",
+  storageBucket: "ar-drawing-c167d.firebasestorage.app",
+  messagingSenderId: "1064452971616",
+  appId: "1:1064452971616:web:25cd14912af6cc8b9cb705",
+  measurementId: "G-PFKHV13HP9"
 };
 
 /**
@@ -18,36 +17,56 @@ export const firebaseConfig = {
 export const ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.com"];
 
 /**
- * FIRESTORE SECURITY RULES (Example)
- * Copy and paste these into your Firebase Console -> Firestore -> Rules
+ * FIRESTORE SECURITY RULES
+ * Copy into Firebase Console → Firestore → Rules → Publish
  *
  * rules_version = '2';
  * service cloud.firestore {
  *   match /databases/{database}/documents {
- *     // Function to check if user is admin
  *     function isAdmin() {
- *       return request.auth != null && request.auth.token.email in ["your-email@gmail.com"];
+ *       return request.auth != null
+ *         && request.auth.token.email in ["traderfinn0312@gmail.com"];
  *     }
  *
- *     // Users can read/write their own profile (but not direct coin updates)
  *     match /users/{userId} {
  *       allow read: if request.auth != null && request.auth.uid == userId;
  *       allow create: if request.auth != null && request.auth.uid == userId;
- *       allow update: if isAdmin(); // Only admin can update coins/profile
+ *       allow update: if isAdmin();
  *     }
  *
- *     // Orders
  *     match /orders/{orderId} {
- *       allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+ *       allow read: if request.auth != null
+ *         && (resource.data.userId == request.auth.uid || isAdmin());
  *       allow create: if request.auth != null;
  *       allow update: if isAdmin();
  *     }
  *
- *     // Topup requests
  *     match /topups/{topupId} {
- *       allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+ *       allow read: if request.auth != null
+ *         && (resource.data.userId == request.auth.uid || isAdmin());
  *       allow create: if request.auth != null;
  *       allow update: if isAdmin();
+ *     }
+ *
+ *     match /bots/{botId} {
+ *       allow read: if isAdmin();
+ *       allow write: if isAdmin();
+ *     }
+ *
+ *     match /referralCodes/{codeId} {
+ *       allow read: if request.auth != null;
+ *       allow write: if isAdmin();
+ *     }
+ *
+ *     match /referralEarnings/{earningId} {
+ *       allow read: if request.auth != null
+ *         && (resource.data.userId == request.auth.uid || isAdmin());
+ *       allow write: if isAdmin();
+ *     }
+ *
+ *     match /settings/{docId} {
+ *       allow read: if isAdmin();
+ *       allow write: if isAdmin();
  *     }
  *   }
  * }

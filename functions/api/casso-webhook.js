@@ -3,11 +3,12 @@
  *
  * IMPORTANT: Never hardcode Firebase service account credentials in git.
  * Provide JSON via env vars:
- * - FIREBASE_SERVICE_ACCOUNT_MS (web cũ)
- * - FIREBASE_SERVICE_ACCOUNT_NH (web mới)
+ * - FIREBASE_SERVICE_ACCOUNT_MS (MotionAI)
+ * - FIREBASE_SERVICE_ACCOUNT_NH (Nhay Cloud)
+ * - FIREBASE_SERVICE_ACCOUNT_KL (Kaling — kaling.cloud)
  */
 
-const TELEGRAM_BOT_TOKEN = '8676046240:AAE14lDxAj9otGTjVnd8Smr2__Wg-J2dCLc';
+const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 
 function getServiceAccountFromEnv(env, key) {
@@ -21,8 +22,8 @@ function getServiceAccountFromEnv(env, key) {
 }
 
 function pickPrefixFromDescription(descUpper) {
-  // Match e.g. NH200ABCD or MS550Z9K1 anywhere in description
-  const m = (descUpper || '').match(/\b(NH|MS)\d{1,6}[A-Z0-9]{2,8}\b/);
+  // Match e.g. KL200ABCD, NH200ABCD or MS550Z9K1 anywhere in description
+  const m = (descUpper || '').match(/\b(KL|NH|MS)\d{1,6}[A-Z0-9]{2,8}\b/);
   return m ? m[1] : null;
 }
 
@@ -32,10 +33,19 @@ export async function onRequestPost(context) {
       const body = await request.json();
       if (!body.data || !Array.isArray(body.data)) return new Response("No data", { status: 400 });
 
-      const configs = {
-        NH: getServiceAccountFromEnv(env, 'FIREBASE_SERVICE_ACCOUNT_NH'),
-        MS: getServiceAccountFromEnv(env, 'FIREBASE_SERVICE_ACCOUNT_MS')
+      const configs = {};
+      const prefixEnvKeys = {
+        KL: 'FIREBASE_SERVICE_ACCOUNT_KL',
+        NH: 'FIREBASE_SERVICE_ACCOUNT_NH',
+        MS: 'FIREBASE_SERVICE_ACCOUNT_MS',
       };
+      for (const [pfx, envKey] of Object.entries(prefixEnvKeys)) {
+        try {
+          configs[pfx] = getServiceAccountFromEnv(env, envKey);
+        } catch (e) {
+          // Prefix chưa cấu hình trên worker này — bỏ qua
+        }
+      }
 
       const cache = new Map(); // prefix -> { token, pendingTopups, cfg }
 
@@ -231,13 +241,14 @@ function b64(str) { return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").rep
 
 async function notifyTelegram(text) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const body = text.startsWith('[Kaling]') ? text : `[Kaling] ${text}`;
   try {
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
-        text: text,
+        text: body,
         parse_mode: "Markdown"
       })
     });

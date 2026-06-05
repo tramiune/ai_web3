@@ -2,7 +2,7 @@
  * script.js - Core logic for Nhay Cloud
  */
 
-const TELEGRAM_BOT_TOKEN = '8676046240:AAE14lDxAj9otGTjVnd8Smr2__Wg-J2dCLc';
+const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 
 // --- EmailJS Config ---
@@ -258,7 +258,7 @@ let orderCount = 0; // Track total orders
 let initialCoinsBeforeTopup = 0; // Để theo dõi số dư trước khi nạp
 let referralEarningsUnsubscribe = null; // Cleanup handle for referralEarnings onSnapshot (legacy - giờ dùng FB_LISTENERS)
 let referralCurrentCode = null; // User's referral code, populated when opening referral page
-const SUPER_ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.com"]; // Danh sách admin khởi tạo
+const SUPER_ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.com"]; // Bootstrap super-admin (khớp Firestore rules)
 
 // =====================================================================
 // FIREBASE LISTENER REGISTRY (chống leak listener gây tốn reads)
@@ -671,7 +671,7 @@ window.downloadUrl = (event, url, suggestedName) => {
         png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif'
     };
     if (mediaExts[ext]) {
-        const name = suggestedName || `motionai_${Date.now()}.${ext}`;
+        const name = suggestedName || `kaling_${Date.now()}.${ext}`;
         return window.downloadMedia(event, url, name, mediaExts[ext]);
     }
 
@@ -699,7 +699,7 @@ window.downloadMedia = async (event, url, filename, mimeType) => {
     }
     if (!url) return;
 
-    const name = filename || 'motionai_video.mp4';
+    const name = filename || 'kaling_video.mp4';
     const mime = mimeType || 'video/mp4';
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
         || (navigator.maxTouchPoints > 1 && window.matchMedia('(max-width: 1024px)').matches);
@@ -1430,7 +1430,6 @@ function renderPricing() {
     const filteredPackages = COIN_PACKAGES;
 
     const vietqrPayIcon = `<svg class="pricing-pay-icon pricing-pay-icon--vietqr" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="3" fill="#DA251D"/><path fill="#FFCD00" d="M12 5.4l1.55 3.14 3.46.5-2.5 2.44.59 3.45L12 14.7l-3.1 1.63.59-3.45-2.5-2.44 3.46-.5L12 5.4z"/></svg>`;
-    const intlPayIcon = `<svg class="pricing-pay-icon pricing-pay-icon--intl" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.5"/><path d="M4 12h16M12 4.2c2.2 2.8 2.2 12.8 0 15.6M12 4.2c-2.2 2.8-2.2 12.8 0 15.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
     const coinIcon = `<svg class="coin-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="url(#coin-gradient)" fill-opacity="0.2" stroke="url(#coin-gradient)" stroke-width="2"/><path d="M12 6L17.2 9V15L12 18L6.8 15V9L12 6Z" fill="url(#coin-gradient)"/><path d="M12 9V15M9 12H15" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
     const buildCoinCard = (pkg, { showFeatures = false } = {}) => {
@@ -1452,12 +1451,8 @@ function renderPricing() {
             <div class="price-card-bonus-hint${pkg.hasBonus ? '' : ' price-card-bonus-hint--empty'}">${t('pricing.bonus_included_note')}</div>
             <div class="price-value">${pkg.price}</div>
             ${featuresHtml}
-            <div class="pricing-pay-actions">
-                <button type="button" class="pricing-pay-btn pricing-pay-btn--intl" onclick="window.selectTopup('${pkg.id}', 'intl')">
-                    ${intlPayIcon}
-                    <span class="pricing-pay-label pricing-pay-label--single">${t('pricing.pay_intl')}</span>
-                </button>
-                <button type="button" class="pricing-pay-btn pricing-pay-btn--vietqr" onclick="window.selectTopup('${pkg.id}', 'vietqr')">
+            <div class="pricing-pay-actions pricing-pay-actions--single">
+                <button type="button" class="pricing-pay-btn pricing-pay-btn--vietqr pricing-pay-btn--full" onclick="window.selectTopup('${pkg.id}', 'vietqr')">
                     ${vietqrPayIcon}
                     <span class="pricing-pay-label pricing-pay-label--single">${t('pricing.pay_vietqr')}</span>
                 </button>
@@ -1690,39 +1685,12 @@ window.selectTopup = async (id, method = 'vietqr') => {
     if (!currentUser) return login();
 
     selectedTopupPackage = COIN_PACKAGES.find(p => p.id === id);
-    selectedPaymentMethod = method === 'intl' ? 'intl' : 'vietqr';
-
-    _paypalLastPackageId = null;
-    const ppContainer = document.getElementById('paypal-button-container');
-    if (ppContainer) ppContainer.innerHTML = '';
-    setPaypalStatus('');
+    selectedPaymentMethod = 'vietqr';
 
     initialCoinsBeforeTopup = parseInt((document.getElementById('coin-balance') || document.querySelector('.coin-balance-text'))?.innerText) || 0;
 
     closeModal('pricing-modal');
-    showPaymentPanel(selectedPaymentMethod);
-
-    if (selectedPaymentMethod === 'intl') {
-        if (typeof ttq !== 'undefined') {
-            ttq.track('InitiateCheckout', {
-                value: parseFloat(String(selectedTopupPackage.usdPrice || '0').replace(/[^0-9.]/g, '')) || 0,
-                currency: 'USD',
-                content_id: selectedTopupPackage.id
-            });
-        }
-        logFirebaseEvent('begin_checkout', {
-            value: parseFloat(String(selectedTopupPackage.usdPrice || '0').replace(/[^0-9.]/g, '')) || 0,
-            currency: 'USD',
-            items: [{ item_id: selectedTopupPackage.id, item_name: selectedTopupPackage.name }]
-        });
-        renderIntlPackageInfo();
-        mountPaypalButtons(selectedTopupPackage).catch(err => {
-            console.error('[PayPal] mountPaypalButtons failed:', err);
-            setPaypalStatus(t('payment.paypal_load_error', { msg: err.message || err }), '#ff6b6b');
-        });
-        window.openModal('topup-modal');
-        return;
-    }
+    showPaymentPanel('vietqr');
 
     if (typeof ttq !== 'undefined') {
         ttq.track('InitiateCheckout', {
@@ -1740,7 +1708,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
     const { db, collection, addDoc, updateDoc, serverTimestamp, query, where, getDocs } = window.firebase;
     let transferContent = "";
-    const TOPUP_PREFIX = "MS"; // Prefix để Casso gateway route đúng web cũ (MotionAI Studio)
+    const TOPUP_PREFIX = "KL"; // Prefix Casso — Kaling (kaling.cloud)
     
     try {
         const q = query(
@@ -2535,7 +2503,7 @@ function renderMyOrders() {
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 ${isCompleted && finalResultLink ? `
-                                    <button type="button" class="order-download-btn" data-url="${escapeHTML(finalResultLink)}" data-name="${escapeHTML(`motionai_video_${orderId}.mp4`)}" data-mime="video/mp4" onclick="window.downloadMediaFromEl(event, this)">
+                                    <button type="button" class="order-download-btn" data-url="${escapeHTML(finalResultLink)}" data-name="${escapeHTML(`kaling_video_${orderId}.mp4`)}" data-mime="video/mp4" onclick="window.downloadMediaFromEl(event, this)">
                                         ${t('dashboard.download_btn')}
                                     </button>
                                 ` : ''}
@@ -2639,7 +2607,7 @@ window.saveQRImage = () => {
     // Create a temporary link
     const a = document.createElement('a');
     a.href = qrImg.src;
-    a.download = `MotionAI_QR_${Date.now()}.png`;
+    a.download = `Kaling_QR_${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2852,7 +2820,7 @@ function scheduleRenderAdminBots() {
     }, 400);
 }
 
-const RENDER_PROVIDER_BOT_ID = 'motionai_vps_bot';
+const RENDER_PROVIDER_BOT_ID = 'kaling_vps_bot';
 
 let adminActiveRenderProvider = 'xiaoyang';
 
@@ -4237,7 +4205,7 @@ window.openUserOrderDetail = async (orderId) => {
                             ${t('modals.video_not_supported')}
                         </video>
                     </div>
-                    <button type="button" class="btn-primary" style="display:block; width:100%; text-align:center; padding: 12px; margin-top: 12px; font-weight: 600; border:none; cursor:pointer;" data-url="${escapeHTML(finalResultLink)}" data-name="${escapeHTML(`motionai_video_${shortId}.mp4`)}" data-mime="video/mp4" onclick="window.downloadMediaFromEl(event, this)">${t('modals.order_download')}</button>
+                    <button type="button" class="btn-primary" style="display:block; width:100%; text-align:center; padding: 12px; margin-top: 12px; font-weight: 600; border:none; cursor:pointer;" data-url="${escapeHTML(finalResultLink)}" data-name="${escapeHTML(`kaling_video_${shortId}.mp4`)}" data-mime="video/mp4" onclick="window.downloadMediaFromEl(event, this)">${t('modals.order_download')}</button>
                     <p style="font-size: 0.75rem; color: #ffde00; margin-top: 8px; text-align: center;">${t('modals.mobile_download_tip')}</p>
                     <p style="font-size: 0.75rem; color: var(--danger); margin-top: 4px; text-align: center;">${t('modals.order_expiry_warn')}</p>
                 </div>
@@ -4358,7 +4326,7 @@ async function sendTelegramMessage(text) {
 }
 
 window.testTelegram = () => {
-    const msg = `🔔 <b>TEST THÔNG BÁO TELEGRAM</b>\n\n✅ Kết nối thành công!\n🕒 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+    const msg = `🔔 <b>[Kaling] TEST THÔNG BÁO TELEGRAM</b>\n\n✅ Kết nối thành công!\n🕒 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
     sendTelegramMessage(msg);
     showToast(t('admin.toast_telegram_sent'));
 };
