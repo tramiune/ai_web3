@@ -19,6 +19,7 @@ bot_chrome_profile/
 *.png
 !public/favicon.png
 !public/icon-32.png
+!public/icon-64.png
 !public/icon-180.png
 !public/icon-192.png
 !public/icon-512.png
