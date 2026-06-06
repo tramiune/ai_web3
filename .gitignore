@@ -17,4 +17,10 @@ serviceAccountKey.json
 bot_chrome_profile/
 *.mp4
 *.png
+!public/favicon.png
+!public/icon-32.png
+!public/icon-180.png
+!public/icon-192.png
+!public/icon-512.png
 *.jpg
+!public/favicon.ico
