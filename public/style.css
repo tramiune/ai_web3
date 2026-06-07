@@ -754,6 +754,106 @@ button {
   opacity: 0.75;
 }
 
+/* Coin packages — compact on mobile (more visible without scroll) */
+@media (max-width: 768px) {
+  #coin-packages.pricing-grid,
+  #modal-coin-packages.pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+
+  .price-card--coin {
+    padding: 0.75rem 0.55rem 0.65rem;
+  }
+
+  .price-card--coin:hover {
+    transform: none;
+  }
+
+  .price-card--coin-featured {
+    transform: none;
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.18);
+  }
+
+  .price-card--coin-featured.featured {
+    margin: 0;
+  }
+
+  .price-card--coin-featured:hover {
+    transform: translateY(-2px);
+  }
+
+  .price-card--coin .pkg-features {
+    display: none;
+  }
+
+  .price-card--coin .price-card-note {
+    min-height: 0;
+    margin-bottom: 0.25rem;
+    font-size: 0.58rem;
+    line-height: 1.2;
+  }
+
+  .price-card--coin .coin-amount-display {
+    gap: 0.3rem;
+    margin-bottom: 0;
+  }
+
+  .price-card--coin .coin-amount-display .coin-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .price-card--coin .coin-amount-num {
+    font-size: 1.25rem;
+  }
+
+  .price-card--coin-featured .coin-amount-num {
+    font-size: 1.35rem;
+  }
+
+  .price-card--coin .price-card-bonus-hint {
+    min-height: 0;
+    margin-bottom: 0.2rem;
+    font-size: 0.55rem;
+    line-height: 1.2;
+  }
+
+  .price-card--coin .price-value {
+    margin-bottom: 0.45rem;
+    font-size: 0.88rem;
+  }
+
+  .price-card--coin .featured-badge {
+    position: static;
+    transform: none;
+    font-size: 0.5rem;
+    padding: 2px 8px;
+    margin: 0 auto 0.3rem;
+    letter-spacing: 0.5px;
+  }
+
+  .price-card--coin .pricing-pay-actions {
+    gap: 0.35rem;
+  }
+
+  .price-card--coin .pricing-pay-btn--vietqr {
+    padding: 0.4rem 0.45rem;
+    font-size: 0.62rem;
+    gap: 0.35rem;
+  }
+
+  .price-card--coin .pricing-pay-icon--vietqr {
+    width: 16px;
+    height: 16px;
+  }
+
+  .price-card--coin .pricing-pay-label {
+    line-height: 1.15;
+  }
+}
+
 .price-card:hover {
   transform: translateY(-10px);
   border-color: var(--primary);
