@@ -129,7 +129,7 @@ function normalizeOrderCost(model) {
 // functions/api/paypal.js is the source of truth for the actual charge.
 // Keep them in sync (id + coins + USD value).
 const COIN_PACKAGES = [
-    { id: 'starter_v2', name: 'Starter',    coins: 20,  price: '80.000đ',  usdPrice: '$3.99', amount: 80000,  hasBonus: false },
+    { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '50.000đ',  usdPrice: '$1.99', amount: 50000,  hasBonus: false },
     { id: 'creator',    name: 'Creator',    coins: 200, price: '200.000đ', usdPrice: '$11.99', amount: 200000, featured: true, hasBonus: true },
     { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
@@ -1471,7 +1471,8 @@ function renderPricing() {
                 <li><span class="check-icon">✓</span> ${t('pricing.no_expiry')}</li>
             </ul>` : '';
         return `
-        <div class="price-card price-card--coin">
+        <div class="price-card price-card--coin${pkg.featured ? ' featured price-card--coin-featured' : ''}">
+            ${pkg.featured ? `<div class="featured-badge">🔥 ${t('pricing.featured_hot')}</div>` : ''}
             <div class="price-card-note">${showNote ? noteText : '&#8203;'}</div>
             <div class="coin-amount-display">
                 ${coinIcon}
@@ -4598,7 +4599,7 @@ window.__paypal = { fetchPaypalConfig, mountPaypalButtons };
 const REFERRAL_COMMISSION_RATE = 0.10;
 const REFERRAL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
 const REFERRAL_CODE_LENGTH = 8;
-const VND_PER_COIN_FALLBACK = 4000; // gói Starter: 80.000đ / 20 coin
+const VND_PER_COIN_FALLBACK = 5000; // gói Starter: 50.000đ / 10 coin
 
 function computeReferralCommissionAmount(baseAmount, currency) {
     if (!baseAmount || baseAmount <= 0) return 0;

@@ -189,7 +189,7 @@ window.TRANSLATIONS = {
             pay_intl: "Thẻ quốc tế",
             notes: {
                 starter_v2: "Gói giới hạn",
-                creator: "Tặng 100 Coin",
+                creator: "Tặng 160 Coin",
                 studio: "Tặng 300 Coin",
                 "pro-studio": "Tặng 600 Coin"
             },
@@ -841,7 +841,7 @@ window.TRANSLATIONS = {
             pay_intl: "Intl card",
             notes: {
                 starter_v2: "Limited package",
-                creator: "Bonus 100 Coins",
+                creator: "Bonus 160 Coins",
                 studio: "Bonus 300 Coins",
                 "pro-studio": "Bonus 600 Coins"
             },
