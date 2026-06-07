@@ -5,7 +5,6 @@
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const MAX_VIDEO_DURATION_SEC = 30;
-const MAX_REFERENCE_VIDEO_SEC = 20;
 
 // --- EmailJS Config ---
 const EMAILJS_SERVICE_ID = 'service_6r6rd2q';
@@ -2093,7 +2092,7 @@ async function loadFfmpegForTrim() {
     return _ffmpegLoadPromise;
 }
 
-async function trimVideoBlobToMaxSec(blob, maxSec = MAX_REFERENCE_VIDEO_SEC) {
+async function trimVideoBlobToMaxSec(blob, maxSec = MAX_VIDEO_DURATION_SEC) {
     let duration;
     try {
         duration = await getBlobVideoDurationSec(blob);
@@ -2151,15 +2150,15 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
         try {
             blobDuration = await getBlobVideoDurationSec(blob);
         } catch (_) {
-            blobDuration = MAX_REFERENCE_VIDEO_SEC + 1;
+            blobDuration = MAX_VIDEO_DURATION_SEC + 1;
         }
     }
-    const needsTrim = blobDuration > MAX_REFERENCE_VIDEO_SEC + 0.15;
+    const needsTrim = blobDuration > MAX_VIDEO_DURATION_SEC + 0.15;
 
     if (needsTrim) {
         onProgress?.('trimming');
         try {
-            const trimmed = await trimVideoBlobToMaxSec(blob, MAX_REFERENCE_VIDEO_SEC);
+            const trimmed = await trimVideoBlobToMaxSec(blob, MAX_VIDEO_DURATION_SEC);
             blob = trimmed.blob;
         } catch (trimErr) {
             console.error('[TikTok] trim failed:', trimErr);
@@ -2181,7 +2180,7 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
 
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
-        maxDurationSec: MAX_REFERENCE_VIDEO_SEC,
+        maxDurationSec: MAX_VIDEO_DURATION_SEC,
         onChange: () => {
             fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
