@@ -4,6 +4,7 @@
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
+const MAX_VIDEO_DURATION_SEC = 30;
 
 // --- EmailJS Config ---
 const EMAILJS_SERVICE_ID = 'service_6r6rd2q';
@@ -99,18 +100,37 @@ async function ensureUserPromoFieldsSynced(orders, userData) {
 }
 
 function syncPromo1CoinState(orders, userData = window.__currentUserData) {
-    promo1CoinStats = computePromo1CoinStats(orders, userData);
-    isFirstTimeUser = promo1CoinStats.eligible;
+    promo1CoinStats = { eligible: false, totalUsed: 0, usedToday: false, remainingTotal: 0, todayKey: getLocalDayKey() };
+    isFirstTimeUser = false;
     return promo1CoinStats;
 }
 
 // --- Data Constants ---
+const MODEL_COST_FAST = 3;
+const MODEL_COST_TURBO = 10;
+
+function modelCoinCost(modelKey) {
+    return modelKey === 'turbo' ? MODEL_COST_TURBO : MODEL_COST_FAST;
+}
+
+function syncModelPriceLabels() {
+    const fastEl = document.getElementById('model-fast-cost');
+    const turboEl = document.getElementById('model-turbo-cost');
+    if (fastEl) fastEl.textContent = String(MODEL_COST_FAST);
+    if (turboEl) turboEl.textContent = String(MODEL_COST_TURBO);
+}
+
+function normalizeOrderCost(model) {
+    model.promo1Coin = false;
+    return model;
+}
+
 // IMPORTANT: usdPrice here is for display only. Server-side `PACKAGES` in
 // functions/api/paypal.js is the source of truth for the actual charge.
 // Keep them in sync (id + coins + USD value).
 const COIN_PACKAGES = [
-    { id: 'starter_v2', name: 'Starter',    coins: 30,   price: '60.000đ',   usdPrice: '$2.99',  amount: 60000,   hasBonus: false },
-    { id: 'creator',    name: 'Creator',    coins: 100,  price: '100.000đ',  usdPrice: '$5.99',  amount: 100000, featured: true, hasBonus: true },
+    { id: 'starter_v2', name: 'Starter',    coins: 20,  price: '80.000đ',  usdPrice: '$3.99', amount: 80000,  hasBonus: false },
+    { id: 'creator',    name: 'Creator',    coins: 200, price: '200.000đ', usdPrice: '$11.99', amount: 200000, featured: true, hasBonus: true },
     { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
 ];
@@ -120,7 +140,7 @@ const AI_MODELS = [
         id: 'copy-motion-photo',
         titleKey: 'models.model1_title',
         descKey: 'models.model1_desc',
-        cost: 4,
+        cost: MODEL_COST_FAST,
         serviceType: 'motion-to-char',
         demoChar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
         demoRef: 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4',
@@ -201,8 +221,8 @@ function gatewayLabel(gateway) {
 
 const MODELS = {
     // "Model thường" uses Aidancing model id 124
-    fast: { nameKey: "modals.model_fast", cost: 10, timeKey: "modals.model_fast_desc", modelId: "124" },
-    turbo: { nameKey: "modals.model_turbo", cost: 20, timeKey: "modals.model_turbo_desc", modelId: "117" }
+    fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "124" },
+    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" }
 };
 
 function localizedModel(key) {
@@ -216,8 +236,8 @@ function localizedModel(key) {
 }
 
 const SERVICE_PACKAGES = [
-    { id: 'plus', name: 'Plus', cost: 12, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
-    { id: 'viral', name: 'Viral', cost: 25, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
+    { id: 'plus', name: 'Plus', cost: MODEL_COST_FAST, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
+    { id: 'viral', name: 'Viral', cost: MODEL_COST_TURBO, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
 ];
 
 async function getVideoDurationSeconds(file) {
@@ -533,17 +553,15 @@ export async function initAppLogic() {
     const { auth, onAuthStateChanged } = window.firebase;
 
     onAuthStateChanged(auth, (user) => {
-        try {
-            if (user) {
-                currentUser = user;
-                handleUserLoggedIn(user);
-            } else {
-                currentUser = null;
-                handleUserLoggedOut();
-            }
-        } catch (e) {
-            console.error("Auth Change Error:", e);
-            showToast(t('common.error_auth', { msg: e.message }));
+        if (user) {
+            currentUser = user;
+            handleUserLoggedIn(user).catch((e) => {
+                console.error("Auth profile error:", e);
+                showToast(t('common.error_auth', { msg: e.message || e.code || 'Firestore' }));
+            });
+        } else {
+            currentUser = null;
+            handleUserLoggedOut();
         }
     });
 
@@ -554,6 +572,7 @@ export async function initAppLogic() {
     initPremiumEffects();
     setupEventListeners();
     syncVideos();
+    syncModelPriceLabels();
     // Initial UI update for first order offer
     updateFirstOrderUI();
     // Check maintenance status
@@ -895,8 +914,18 @@ async function login() {
         showToast(t('common.toast_login_success'));
     } catch (error) {
         console.error("Login Error", error);
-        window.focus(); // Đưa focus về ngay cả khi lỗi
-        showToast(t('common.toast_login_failed'));
+        window.focus();
+        const code = error?.code || '';
+        const hint = code === 'auth/unauthorized-domain'
+            ? ' — thêm kaling.cloud vào Firebase Authorized domains'
+            : code === 'auth/operation-not-allowed'
+                ? ' — bật Google Sign-In trong Firebase Authentication'
+                : code === 'auth/popup-closed-by-user'
+                    ? ' — bạn đã đóng cửa sổ Google'
+                    : code
+                        ? ` (${code})`
+                        : '';
+        showToast(t('common.toast_login_failed') + hint);
     }
 }
 
@@ -1840,17 +1869,11 @@ function updateFirstOrderUI() {
     const costEl = document.getElementById('submit-cost');
     const offerBanner = document.getElementById('first-order-offer-banner');
     const guestOfferBar = document.getElementById('guest-offer-bar');
-    
-    const showOffer = (!currentUser || isFirstTimeUser) && !sessionStorage.getItem('offer_bar_dismissed');
-    console.log("🎁 updateFirstOrderUI: showOffer =", showOffer, "(isFirstTimeUser:", isFirstTimeUser, ")");
-    
-    if (offerBanner) offerBanner.style.display = isFirstTimeUser ? 'block' : 'none';
-    if (guestOfferBar) guestOfferBar.style.display = showOffer ? 'block' : 'none';
-    
     const modelGroupEl = document.getElementById('model-selection-group');
-    if (modelGroupEl) {
-        modelGroupEl.style.display = isFirstTimeUser ? 'none' : 'block';
-    }
+
+    if (offerBanner) offerBanner.style.display = 'none';
+    if (guestOfferBar) guestOfferBar.style.display = 'none';
+    if (modelGroupEl) modelGroupEl.style.display = 'block';
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
@@ -1859,25 +1882,12 @@ function updateFirstOrderUI() {
         const checkedModel = document.querySelector('input[name="model-type"]:checked');
         const modelKey = checkedModel ? checkedModel.value : 'fast';
 
-        if (promo1CoinStats.eligible) {
-            costEl.innerText = '1';
-            if (submitBtn) submitBtn.classList.add('btn-first-offer');
-            if (submitText) submitText.innerText = t('dashboard.first_order_cta_vnd');
-            if (summaryEl) {
-                summaryEl.innerText = t(`modals.model_${modelKey}_desc`);
-                summaryEl.style.color = '';
-            }
-        } else {
-            // Regular pricing
-            if (localizedModel(modelKey)) {
-                costEl.innerText = localizedModel(modelKey).cost;
-            }
-            if (submitBtn) submitBtn.classList.remove('btn-first-offer');
-            if (submitText) submitText.innerText = t('hero.cta_create');
-            if (summaryEl) {
-                summaryEl.innerText = t(`modals.model_${modelKey}_desc`);
-                summaryEl.style.color = '';
-            }
+        costEl.innerText = String(modelCoinCost(modelKey));
+        if (submitBtn) submitBtn.classList.remove('btn-first-offer');
+        if (submitText) submitText.innerText = t('hero.cta_create');
+        if (summaryEl) {
+            summaryEl.innerText = t(`modals.model_${modelKey}_desc`);
+            summaryEl.style.color = '';
         }
     }
 }
@@ -1969,7 +1979,7 @@ window.handlePreview = (input, containerId) => {
         video.preload = 'metadata';
         video.onloadedmetadata = () => {
             const duration = video.duration;
-            if (duration > 20) {
+            if (duration > MAX_VIDEO_DURATION_SEC) {
                 showToast(t('modals.video_duration_limit'));
                 input.value = '';
                 URL.revokeObjectURL(video.src);
@@ -2114,11 +2124,16 @@ async function setupEventListeners() {
 
                 // Model thường: auto select Aidancing id by uploaded video duration
                 // <10s  -> 125
-                // 10-20 -> 124
-                if (modelKeySelected === 'fast' && window.currentVideoSource === 'upload' && videoFile) {
+                // 10-30 -> 124
+                if (window.currentVideoSource === 'upload' && videoFile) {
                     const dur = await getVideoDurationSeconds(videoFile);
                     if (typeof dur === 'number') {
-                        modelIdOverride = dur < 10 ? '125' : '124';
+                        if (dur > MAX_VIDEO_DURATION_SEC) {
+                            return showToast(t('modals.video_duration_limit'));
+                        }
+                        if (modelKeySelected === 'fast') {
+                            modelIdOverride = dur < 10 ? '125' : '124';
+                        }
                     }
                 }
 
@@ -2152,18 +2167,8 @@ async function setupEventListeners() {
                     const userDoc = await transaction.get(userRef);
                     const modelKey = modelKeySelected;
                     const serviceType = document.querySelector('input[name="service-type"]:checked').value;
-                    let model = { ...localizedModel(modelKey) };
+                    let model = normalizeOrderCost({ ...localizedModel(modelKey) });
                     if (modelIdOverride) model.modelId = modelIdOverride;
-
-                    const userData = userDoc.data();
-                    const promo = getPromo1CoinEligibilityFromUser(userData);
-                    if (promo.eligible) {
-                        model.cost = 1;
-                        model.promo1Coin = true;
-                    } else if (model.cost === 1) {
-                        if (promo.usedToday) throw t('modals.promo1coin_daily_limit');
-                        if (promo.totalUsed >= PROMO_1_COIN_MAX_TOTAL) throw t('modals.promo1coin_max_reached');
-                    }
 
                     if (userDoc.data().coins < model.cost) {
                         throw t('modals.insufficient_coins_title');
@@ -2173,161 +2178,105 @@ async function setupEventListeners() {
 
                 const { model, serviceType } = userSnap;
 
-                // 1b. Show Queue/Wait Time Confirmation
-                const minWait = Math.floor(Math.random() * (15 - 10 + 1)) + 10; // 10-15
-                const maxWait = Math.floor(Math.random() * (25 - 20 + 1)) + 20; // 20-25
+                console.log("Starting process");
+                const mainText = submitBtn.querySelector('[data-i18n="hero.cta_create"]');
+                if (mainText) mainText.innerText = t('modals.uploading');
 
-                window.niceConfirm({
-                    title: t('modals.confirm_order_title'),
-                    message: t('modals.confirm_order_msg', { min: minWait, max: maxWait, cost: model.cost }),
-                    icon: "⏳",
-                    onConfirm: async () => {
-                        try {
-                            console.log("Confirm Clicked - Starting process");
-                            // 2. Upload Files
-                            showToast(t('common.loading'));
-                            
-                            const mainText = submitBtn.querySelector('[data-i18n="hero.cta_create"]');
-                            if (mainText) mainText.innerText = t('modals.uploading');
-                            
-                            submitBtn.disabled = true;
-                            progressDiv.style.display = 'block';
+                console.log("📤 Đang tải ảnh nhân vật...");
+                const charUrl = await uploadFile(charFile, "characters");
+                showToast(t('common.success'));
 
-                            console.log("📤 Đang tải ảnh nhân vật...");
-                            const charUrl = await uploadFile(charFile, "characters");
-                            showToast(t('common.success'));
+                let videoUrl = "";
+                if (window.currentVideoSource === 'library') {
+                    videoUrl = document.getElementById('selected-template-url').value;
+                    if (!videoUrl) throw new Error(t('modals.template_required'));
+                    console.log("🔗 Sử dụng video mẫu từ thư viện:", videoUrl);
+                } else {
+                    console.log("📤 Đang tải video tham chiếu...");
+                    videoUrl = await uploadFile(videoFile, "motions");
+                    showToast(t('common.success'));
+                }
 
-                            let videoUrl = "";
-                            if (window.currentVideoSource === 'library') {
-                                videoUrl = document.getElementById('selected-template-url').value;
-                                if (!videoUrl) throw new Error(t('modals.template_required'));
-                                console.log("🔗 Sử dụng video mẫu từ thư viện:", videoUrl);
-                            } else {
-                                console.log("📤 Đang tải video tham chiếu...");
-                                videoUrl = await uploadFile(videoFile, "motions");
-                                showToast(t('common.success'));
-                            }
+                const orderId = await runTransaction(db, async (transaction) => {
+                    const userDoc = await transaction.get(userRef);
+                    const userData = userDoc.data();
+                    const currentCoins = userData.coins;
+                    normalizeOrderCost(model);
 
-                            // 3. Finalize Transaction (Deduct coins and create order)
-                            const orderId = await runTransaction(db, async (transaction) => {
-                                const userDoc = await transaction.get(userRef);
-                                const userData = userDoc.data();
-                                const currentCoins = userData.coins;
-                                const todayKey = getLocalDayKey();
-                                const isPromoOrder = model.promo1Coin === true || model.cost === 1;
+                    const aspectRatioEl = document.querySelector('input[name="aspect-ratio"]:checked');
+                    const aspectRatio = aspectRatioEl ? aspectRatioEl.value : '16:9';
 
-                                if (isPromoOrder) {
-                                    const promo = getPromo1CoinEligibilityFromUser(userData);
-                                    if (!promo.eligible) {
-                                        if (promo.usedToday) throw t('modals.promo1coin_daily_limit');
-                                        throw t('modals.promo1coin_max_reached');
-                                    }
-                                    model.cost = 1;
-                                    model.promo1Coin = true;
-                                }
+                    transaction.update(userRef, {
+                        coins: currentCoins - model.cost,
+                        updatedAt: serverTimestamp()
+                    });
 
-                                const aspectRatioEl = document.querySelector('input[name="aspect-ratio"]:checked');
-                                const aspectRatio = aspectRatioEl ? aspectRatioEl.value : '16:9';
+                    const orderRef = doc(collection(db, "orders"));
+                    transaction.set(orderRef, {
+                        userId: currentUser.uid,
+                        userEmail: currentUser.email,
+                        userName: currentUser.displayName,
+                        packageName: model.name,
+                        modelId: model.modelId,
+                        serviceType: serviceType,
+                        serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
+                        costCoins: model.cost,
+                        promo1Coin: !!model.promo1Coin,
+                        characterImageLink: charUrl,
+                        referenceVideoLink: videoUrl,
+                        aspectRatio: aspectRatio,
+                        status: "pending",
+                        resultLink: "",
+                        adminNote: "",
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    return orderRef.id;
+                });
 
-                                const userUpdate = {
-                                    coins: currentCoins - model.cost,
-                                    updatedAt: serverTimestamp()
-                                };
-                                if (model.promo1Coin) {
-                                    userUpdate.promo1CoinCount = (Number(userData.promo1CoinCount) || 0) + 1;
-                                    userUpdate.promo1CoinLastDay = todayKey;
-                                }
-                                transaction.update(userRef, userUpdate);
+                showToast(t('common.toast_order_created'));
+                closeModal('order-modal');
 
-                                const orderRef = doc(collection(db, "orders"));
-                                transaction.set(orderRef, {
-                                    userId: currentUser.uid,
-                                    userEmail: currentUser.email,
-                                    userName: currentUser.displayName,
-                                    packageName: model.name,
-                                    modelId: model.modelId,
-                                    serviceType: serviceType,
-                                    serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
-                                    costCoins: model.cost,
-                                    promo1Coin: !!model.promo1Coin,
-                                    characterImageLink: charUrl,
-                                    referenceVideoLink: videoUrl,
-                                    aspectRatio: aspectRatio,
-                                    status: "pending",
-                                    resultLink: "",
-                                    adminNote: "",
-                                    createdAt: serverTimestamp(),
-                                    updatedAt: serverTimestamp()
-                                });
-                                return orderRef.id;
-                            });
+                const serviceLabelPixel = SERVICE_TYPE_MAP()[serviceType] || serviceType;
+                if (typeof ttq !== 'undefined') {
+                    ttq.track('PlaceAnOrder', {
+                        value: model.cost * 1000,
+                        currency: 'VND',
+                        content_name: serviceLabelPixel,
+                        content_id: orderId
+                    });
+                }
 
-                            showToast(t('common.toast_order_created'));
-                            closeModal('order-modal');
-                            
-                            const serviceLabelPixel = SERVICE_TYPE_MAP()[serviceType] || serviceType;
-                            // TikTok Pixel: PlaceAnOrder
-                            if (typeof ttq !== 'undefined') {
-                                ttq.track('PlaceAnOrder', {
-                                    value: model.cost * 1000,
-                                    currency: 'VND',
-                                    content_name: serviceLabelPixel,
-                                    content_id: orderId
-                                });
-                            }
+                logFirebaseEvent('generate_lead', {
+                    value: model.cost * 1000,
+                    currency: 'VND',
+                    content_name: serviceLabelPixel
+                });
 
-                            // Firebase Analytics: generate_lead
-                            logFirebaseEvent('generate_lead', {
-                                value: model.cost * 1000,
-                                currency: 'VND',
-                                content_name: serviceLabelPixel
-                            });
+                orderCount++;
+                syncPromo1CoinState(FB_CACHE.myOrders || [], window.__currentUserData);
+                updateFirstOrderUI();
 
-                            // Update order state for immediate UI feedback
-                            orderCount++;
-                            syncPromo1CoinState(FB_CACHE.myOrders || [], window.__currentUserData);
-                            updateFirstOrderUI();
-
-                            document.getElementById('order-form').reset();
-                            ['preview-char-container', 'preview-video-container'].forEach((id) => {
-                                const el = document.getElementById(id);
-                                if (el) {
-                                    el.innerHTML = '';
-                                    syncUploadZonePreviewState(el);
-                                }
-                            });
-                            showDashboard();
-                            const serviceLabel = SERVICE_TYPE_MAP()[serviceType] || serviceType;
-                            const msg = `🚀 <b>ĐƠN HÀNG MỚI: ${serviceLabel.toUpperCase()}</b>\n\n` +
-                                `🆔 Mã đơn: #${orderId}\n` +
-                                `👤 Khách: ${escapeHTML(currentUser.displayName)}\n` +
-                                `📧 Email: ${escapeHTML(currentUser.email)}\n` +
-                                `🔧 Dịch vụ: <b>${serviceLabel}</b>\n` +
-                                `📦 Gói: ${model.name}\n` +
-                                `💰 Chi phí: ${model.cost} Coin\n` +
-                                `🖼 <a href="${charUrl}">Xem ảnh nhân vật</a>\n` +
-                                `📹 <a href="${videoUrl}">Xem video tham chiếu</a>`;
-                            sendTelegramMessage(msg);
-                        } catch (err) {
-                            console.error("Order Creation Error:", err);
-                            const errMsg = err?.message || err;
-                            if (errMsg === t('modals.promo1coin_daily_limit') || errMsg === t('modals.promo1coin_max_reached')) {
-                                showToast(errMsg);
-                                syncPromo1CoinState(FB_CACHE.myOrders || [], window.__currentUserData);
-                                updateFirstOrderUI();
-                            } else {
-                                showToast(t('common.error') + ": " + errMsg);
-                            }
-                        } finally {
-                            submitBtn.disabled = false;
-                            const mainText = submitBtn.querySelector('[data-i18n="hero.cta_create"]');
-                            if (mainText) mainText.innerText = t('hero.cta_create');
-                            updateFirstOrderUI();
-                            progressDiv.style.display = 'none';
-                        }
+                document.getElementById('order-form').reset();
+                ['preview-char-container', 'preview-video-container'].forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.innerHTML = '';
+                        syncUploadZonePreviewState(el);
                     }
                 });
-                return; // Wait for confirmation callback
+                showDashboard();
+                const serviceLabel = SERVICE_TYPE_MAP()[serviceType] || serviceType;
+                const msg = `🚀 <b>ĐƠN HÀNG MỚI: ${serviceLabel.toUpperCase()}</b>\n\n` +
+                    `🆔 Mã đơn: #${orderId}\n` +
+                    `👤 Khách: ${escapeHTML(currentUser.displayName)}\n` +
+                    `📧 Email: ${escapeHTML(currentUser.email)}\n` +
+                    `🔧 Dịch vụ: <b>${serviceLabel}</b>\n` +
+                    `📦 Gói: ${model.name}\n` +
+                    `💰 Chi phí: ${model.cost} Coin\n` +
+                    `🖼 <a href="${charUrl}">Xem ảnh nhân vật</a>\n` +
+                    `📹 <a href="${videoUrl}">Xem video tham chiếu</a>`;
+                sendTelegramMessage(msg);
             } catch (error) {
                 console.error(error);
                 if (error === t('modals.insufficient_coins_title')) {
@@ -4649,7 +4598,7 @@ window.__paypal = { fetchPaypalConfig, mountPaypalButtons };
 const REFERRAL_COMMISSION_RATE = 0.10;
 const REFERRAL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
 const REFERRAL_CODE_LENGTH = 8;
-const VND_PER_COIN_FALLBACK = 2000; // gói Starter: 60.000đ / 30 coin
+const VND_PER_COIN_FALLBACK = 4000; // gói Starter: 80.000đ / 20 coin
 
 function computeReferralCommissionAmount(baseAmount, currency) {
     if (!baseAmount || baseAmount <= 0) return 0;
