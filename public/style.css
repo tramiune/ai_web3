@@ -1805,6 +1805,10 @@ button {
     border-radius: 10px;
   }
 
+  .tiktok-tab-field {
+    flex-wrap: wrap;
+  }
+
   #order-modal .order-modal-header {
     padding: 0.2rem 1rem 0.85rem;
   }
@@ -3080,6 +3084,66 @@ section {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+}
+
+.tiktok-tab-panel.has-preview > span,
+.tiktok-tab-panel.has-preview > .tiktok-tab-field,
+.tiktok-tab-panel.has-preview > .upload-note {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tiktok-tab-panel.has-preview {
+  min-height: 100px;
+}
+
+#order-modal .video-tabs {
+  margin-bottom: 0.5rem;
+}
+
+.tiktok-tab-panel {
+  cursor: default;
+}
+
+.tiktok-tab-panel:hover {
+  transform: none;
+  border-color: var(--glass-border);
+}
+
+.tiktok-tab-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  width: 100%;
+  position: relative;
+  z-index: 11;
+}
+
+.tiktok-tab-panel .tiktok-link-input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-main);
+  font-size: 0.75rem;
+}
+
+.tiktok-tab-panel .tiktok-link-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tiktok-tab-panel .tiktok-fetch-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.tiktok-tab-panel .tiktok-fetch-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .dot-flashing {

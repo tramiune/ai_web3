@@ -896,8 +896,34 @@
                         </div>
                         <div class="form-group order-upload-field">
                             <label data-i18n="modals.video_label">2. Video mẫu / bối cảnh</label>
-                            <div id="video-upload-section">
-                                <div class="upload-zone upload-zone--small" onclick="document.getElementById('file-video').click()">
+                            <div class="video-tabs">
+                                <div class="video-tab active" id="tab-tiktok"
+                                    onclick="window.switchVideoSource('tiktok')"
+                                    data-i18n="modals.video_tab_tiktok">Link TikTok</div>
+                                <div class="video-tab" id="tab-upload"
+                                    onclick="window.switchVideoSource('upload')"
+                                    data-i18n="modals.video_tab_upload">Tải lên</div>
+                            </div>
+                            <div id="video-tiktok-section">
+                                <div class="upload-zone upload-zone--small tiktok-tab-panel">
+                                    <span>🔗</span>
+                                    <div class="tiktok-tab-field">
+                                        <input type="url" id="tiktok-video-url" class="tiktok-link-input"
+                                            inputmode="url" autocomplete="off" spellcheck="false"
+                                            data-i18n="modals.tiktok_url_placeholder"
+                                            placeholder="Dán link TikTok">
+                                        <button type="button" id="tiktok-fetch-btn"
+                                            class="btn-primary order-upload-btn tiktok-fetch-btn"
+                                            onclick="window.fetchTikTokVideo()"
+                                            data-i18n="modals.tiktok_fetch_btn">Lấy video</button>
+                                    </div>
+                                    <div class="upload-note" data-i18n="modals.tiktok_tab_hint">Tự cắt còn 20s nếu video dài hơn</div>
+                                    <div id="preview-tiktok-video-container" class="preview-container"></div>
+                                </div>
+                            </div>
+                            <div id="video-upload-section" style="display: none;">
+                                <div class="upload-zone upload-zone--small"
+                                    onclick="document.getElementById('file-video').click()">
                                     <span>🎥</span>
                                     <button type="button" class="btn-primary order-upload-btn"
                                         onclick="event.stopPropagation(); document.getElementById('file-video').click()">
@@ -1220,8 +1246,8 @@
                 <span class="auth-promo-pill" data-i18n="modals.auth_promo_duration">30 giây</span>
                 <span class="auth-promo-pill" data-i18n="modals.auth_promo_quality">1080p Full HD</span>
             </div>
-            <h2 class="auth-modal-title" style="margin-top: 0;" data-i18n="modals.auth_title">Video AI chỉ 3.000đ</h2>
-            <p class="auth-modal-desc" id="auth-modal-desc" data-i18n="modals.auth_desc_default" style="margin-bottom: 1.25rem;">Tạo video trending từ 1 ảnh + video mẫu. Đăng nhập Google để bắt đầu ngay!</p>
+            <h2 class="auth-modal-title" style="margin-top: 0;" data-i18n="modals.auth_title">Chỉ 3.000đ — 1 video AI trending</h2>
+            <p class="auth-modal-desc" id="auth-modal-desc" data-i18n="modals.auth_desc_default" style="margin-bottom: 1.25rem;"><strong>3.000đ</strong> / 1 video • <strong>30 giây</strong> • <strong>1080p Full HD</strong><br>Upload 1 ảnh + chọn video mẫu — AI làm phần còn lại.</p>
 
 
 
@@ -1237,7 +1263,7 @@
             <div id="inapp-auth-note" data-i18n="modals.inapp_auth_note" style="display: none; font-size: 0.8rem; color: #ff9100; margin-top: 0.5rem; background: rgba(255,145,0,0.1); padding: 10px; border-radius: 8px; border: 1px dashed rgba(255,145,0,0.3); text-align: center;">
                 ⚠️ Trình duyệt này thường chặn đăng nhập Google...
             </div>
-            <p class="auth-modal-footer" data-i18n="modals.auth_footer">Chỉ mất vài giây • Hoàn toàn miễn phí</p>
+            <p class="auth-modal-footer" data-i18n="modals.auth_footer">≈ 3 Coin / video • 30s • 1080p • Đăng nhập miễn phí</p>
         </div>
     </div>
 
