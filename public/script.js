@@ -3173,7 +3173,7 @@ let adminActiveRenderProvider = 'xiaoyang';
 
 function normalizeRenderProvider(value) {
     const p = (value || 'xiaoyang').toString().trim().toLowerCase();
-    return ['aidancing', 'xiaoyang'].includes(p) ? p : 'xiaoyang';
+    return ['aidancing', 'xiaoyang', 'videoaieasy'].includes(p) ? p : 'xiaoyang';
 }
 
 function subscribeAdminRenderProvider() {
@@ -3199,15 +3199,19 @@ function renderAdminRenderProviderUI() {
     const queueEl = document.getElementById('admin-render-provider-queue');
     const btnAd = document.getElementById('admin-rp-aidancing');
     const btnXy = document.getElementById('admin-rp-xiaoyang');
+    const btnVae = document.getElementById('admin-rp-videoaieasy');
     const p = adminActiveRenderProvider;
     if (activeEl) {
-        activeEl.textContent = p === 'xiaoyang'
-            ? t('admin.render_provider_active_xy')
-            : t('admin.render_provider_active_ad');
-        activeEl.style.color = p === 'xiaoyang' ? '#a78bfa' : '#4ade80';
+        activeEl.textContent = p === 'videoaieasy'
+            ? t('admin.render_provider_active_vae')
+            : p === 'xiaoyang'
+                ? t('admin.render_provider_active_xy')
+                : t('admin.render_provider_active_ad');
+        activeEl.style.color = p === 'videoaieasy' ? '#fbbf24' : p === 'xiaoyang' ? '#a78bfa' : '#4ade80';
     }
     if (btnAd) btnAd.style.outline = p === 'aidancing' ? '2px solid #4ade80' : '';
     if (btnXy) btnXy.style.outline = p === 'xiaoyang' ? '2px solid #a78bfa' : '';
+    if (btnVae) btnVae.style.outline = p === 'videoaieasy' ? '2px solid #fbbf24' : '';
     if (queueEl) {
         refreshRenderProviderQueueHint(queueEl);
     }
@@ -3220,13 +3224,20 @@ async function refreshRenderProviderQueueHint(el) {
         const snap = await getDocs(query(collection(db, 'orders'), where('status', '==', 'processing')));
         let ad = 0;
         let xy = 0;
+        let vae = 0;
         snap.forEach(d => {
             const x = d.data();
-            const rp = x.renderProvider || (x.xiaoyangTaskId ? 'xiaoyang' : 'aidancing');
-            if (rp === 'xiaoyang') xy++;
+            let rp = x.renderProvider;
+            if (!rp) {
+                if (x.videoaieasyJobId) rp = 'videoaieasy';
+                else if (x.xiaoyangTaskId) rp = 'xiaoyang';
+                else rp = 'aidancing';
+            }
+            if (rp === 'videoaieasy') vae++;
+            else if (rp === 'xiaoyang') xy++;
             else ad++;
         });
-        el.textContent = t('admin.render_provider_processing', { ad, xy });
+        el.textContent = t('admin.render_provider_processing', { ad, xy, vae });
     } catch (e) {
         el.textContent = '';
     }
@@ -3242,9 +3253,11 @@ window.setRenderProvider = async (provider) => {
             updatedAt: serverTimestamp(),
             updatedBy: currentUser?.email || ''
         });
-        showToast(provider === 'xiaoyang'
-            ? t('admin.render_provider_toast_xy')
-            : t('admin.render_provider_toast_ad'));
+        showToast(provider === 'videoaieasy'
+            ? t('admin.render_provider_toast_vae')
+            : provider === 'xiaoyang'
+                ? t('admin.render_provider_toast_xy')
+                : t('admin.render_provider_toast_ad'));
     } catch (e) {
         showToast(t('common.error_with_msg', { msg: e.message }));
     }

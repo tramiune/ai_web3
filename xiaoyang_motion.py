@@ -1,5 +1,5 @@
 """
-XiaoYang web multi-account + Aidancing fallback cho motionai (web1).
+XiaoYang web multi-account + Aidancing fallback cho kaling (web3).
 Gọi xy_wire() từ bot.py khi khởi động.
 """
 
@@ -17,18 +17,35 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 from project_env import get_env, load_project_env
 from xiaoyang_web import XiaoyangAuthError, XiaoyangWebClient, XiaoyangWebError
+from videoaieasy_web import (
+    VideoAiEasyClient,
+    VideoAiEasyAuthError,
+    VideoAiEasyError,
+    MODEL_KLING_26,
+    MODEL_KLING_30,
+)
 
 load_project_env()
 
 RENDER_PROVIDER_AIDANCING = "aidancing"
 RENDER_PROVIDER_XIAOYANG = "xiaoyang"
+RENDER_PROVIDER_VIDEOAIEASY = "videoaieasy"
+_RENDER_PROVIDERS = (
+    RENDER_PROVIDER_AIDANCING,
+    RENDER_PROVIDER_XIAOYANG,
+    RENDER_PROVIDER_VIDEOAIEASY,
+)
+VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("VIDEOAIEASY_MAX_CONCURRENT", "4"))
 AIDANCING_TURBO_MODEL_IDS = frozenset({"117"})
 AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 
-USER_NOTE_ORDER_FAILED = "Đơn hàng xử lý không thành công, hệ thống đã hoàn lại coin."
+USER_NOTE_ORDER_FAILED = (
+    "Ảnh hoặc video có thể nhạy cảm, không vượt qua khâu kiểm duyệt. "
+    "Nếu bạn tin đây là nhầm lẫn thì vui lòng thử lại. Hệ thống đã hoàn lại coin."
+)
 USER_NOTE_FILES_MISSING = "Ảnh hoặc video quý khách tải lên không tồn tại, hệ thống đã hoàn lại coin."
 
 _g: dict = {}
@@ -40,6 +57,12 @@ _xy_inflight: dict = {}
 _xy_inflight_lock = threading.Lock()
 _xy_accounts_cache = None
 _xy_accounts_cache_lock = threading.Lock()
+_vae_web_clients: dict = {}
+_vae_web_clients_lock = threading.Lock()
+_vae_inflight: dict = {}
+_vae_inflight_lock = threading.Lock()
+_vae_accounts_cache = None
+_vae_accounts_cache_lock = threading.Lock()
 
 
 def wire(**kwargs):
@@ -59,7 +82,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
     global _active_render_provider
     p = (data.get("activeRenderProvider") or data.get("activeProvider") or RENDER_PROVIDER_XIAOYANG)
     p = p.strip().lower()
-    if p not in (RENDER_PROVIDER_AIDANCING, RENDER_PROVIDER_XIAOYANG):
+    if p not in _RENDER_PROVIDERS:
         p = RENDER_PROVIDER_XIAOYANG
     with _active_render_provider_lock:
         prev = _active_render_provider
@@ -156,6 +179,153 @@ def _ensure_xy_web_session(client: XiaoyangWebClient, email=None, password=None)
         return client.me()
 
 
+def _use_videoaieasy() -> bool:
+    return enabled_for_bot(_g.get("bot_name"))
+
+
+def _videoaieasy_model_for_order(order_data: dict) -> str:
+    model_id = str((order_data or {}).get("modelId") or "").strip()
+    if model_id in AIDANCING_TURBO_MODEL_IDS:
+        return MODEL_KLING_30
+    return MODEL_KLING_26
+
+
+def _videoaieasy_account_id(email: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", (email or "").strip().lower()).strip("_") or "default"
+
+
+def load_videoaieasy_accounts():
+    global _vae_accounts_cache
+    with _vae_accounts_cache_lock:
+        if _vae_accounts_cache is not None:
+            return _vae_accounts_cache
+        accounts = []
+        raw = (get_env("VIDEOAIEASY_ACCOUNTS") or "").strip()
+        if raw:
+            if raw.startswith("["):
+                import json as _json
+                try:
+                    for item in _json.loads(raw):
+                        email = (item.get("email") or "").strip()
+                        password = item.get("password") or ""
+                        if email and password:
+                            accounts.append({
+                                "id": _videoaieasy_account_id(email),
+                                "email": email,
+                                "password": password,
+                            })
+                except Exception as e:
+                    print(f"⚠️ VIDEOAIEASY_ACCOUNTS JSON lỗi: {e}")
+            else:
+                for part in raw.split(","):
+                    part = part.strip()
+                    if ":" not in part:
+                        continue
+                    email, password = part.split(":", 1)
+                    email, password = email.strip(), password.strip()
+                    if email and password:
+                        accounts.append({
+                            "id": _videoaieasy_account_id(email),
+                            "email": email,
+                            "password": password,
+                        })
+        if not accounts:
+            email = (get_env("VIDEOAIEASY_EMAIL") or "").strip()
+            password = get_env("VIDEOAIEASY_PASSWORD") or ""
+            if email and password:
+                accounts.append({
+                    "id": _videoaieasy_account_id(email),
+                    "email": email,
+                    "password": password,
+                })
+        _vae_accounts_cache = accounts
+        return accounts
+
+
+def _get_vae_web_client(account_id: str) -> VideoAiEasyClient:
+    key = account_id.lower()
+    with _vae_web_clients_lock:
+        if key not in _vae_web_clients:
+            _vae_web_clients[key] = VideoAiEasyClient(account_id=key)
+        return _vae_web_clients[key]
+
+
+def _reset_vae_web_client(account_id: str | None = None):
+    with _vae_web_clients_lock:
+        if account_id:
+            _vae_web_clients.pop(account_id.lower(), None)
+        else:
+            _vae_web_clients.clear()
+
+
+def _ensure_vae_web_session(api: VideoAiEasyClient, email: str, password: str):
+    return api.ensure_session(email, password)
+
+
+def _vae_inflight_inc(account_id: str):
+    with _vae_inflight_lock:
+        _vae_inflight[account_id] = _vae_inflight.get(account_id, 0) + 1
+
+
+def _vae_inflight_dec(account_id: str):
+    with _vae_inflight_lock:
+        n = _vae_inflight.get(account_id, 0) - 1
+        if n <= 0:
+            _vae_inflight.pop(account_id, None)
+        else:
+            _vae_inflight[account_id] = n
+
+
+def _count_vae_processing_for_account(account_id: str) -> int:
+    db = _g["db"]
+    cache = _g.get("processing_cache", {})
+    cache_lock = _g["processing_cache_lock"]
+    cache_count = 0
+    with cache_lock:
+        for doc in cache.values():
+            d = doc.to_dict() or {}
+            if d.get("status") == "processing" and d.get("videoaieasyAccount") == account_id:
+                cache_count += 1
+    try:
+        q = db.collection("orders").where(
+            filter=FieldFilter("status", "==", "processing")
+        ).where(
+            filter=FieldFilter("videoaieasyAccount", "==", account_id)
+        )
+        db_count = sum(1 for _ in q.stream())
+        return max(cache_count, db_count)
+    except Exception as e:
+        print(f"⚠️ Đếm đơn VideoAiEasy nick {account_id}: {e}")
+        return cache_count
+
+
+def _vae_active_count(account_id: str) -> int:
+    with _vae_inflight_lock:
+        inflight = _vae_inflight.get(account_id, 0)
+    return _count_vae_processing_for_account(account_id) + inflight
+
+
+def _pick_videoaieasy_account():
+    accounts = load_videoaieasy_accounts()
+    if not accounts:
+        return None
+    best = None
+    best_count = VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT
+    for acc in accounts:
+        c = _vae_active_count(acc["id"])
+        if c < VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT and c < best_count:
+            best = acc
+            best_count = c
+    return best
+
+
+def _videoaieasy_account_lookup(account_id: str):
+    for acc in load_videoaieasy_accounts():
+        if acc["id"] == account_id:
+            return acc
+    return None
+
+
 def _xy_inflight_inc(account_id: str):
     with _xy_inflight_lock:
         _xy_inflight[account_id] = _xy_inflight.get(account_id, 0) + 1
@@ -236,8 +406,10 @@ def _order_render_provider(order_data: dict) -> str:
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
     rp = (order_data.get("renderProvider") or "").strip().lower()
-    if rp in (RENDER_PROVIDER_AIDANCING, RENDER_PROVIDER_XIAOYANG):
+    if rp in _RENDER_PROVIDERS:
         return rp
+    if order_data.get("videoaieasyJobId"):
+        return RENDER_PROVIDER_VIDEOAIEASY
     if order_data.get("xiaoyangTaskId"):
         return RENDER_PROVIDER_XIAOYANG
     return RENDER_PROVIDER_AIDANCING
@@ -247,6 +419,7 @@ def split_monitor_state(processing_cache: dict, min_render_sec: int):
     now = datetime.now(timezone.utc)
     ad_eligible = []
     xy_eligible = []
+    vae_eligible = []
     for doc in processing_cache.values():
         d = doc.to_dict() or {}
         if d.get("status") != "processing":
@@ -254,13 +427,16 @@ def split_monitor_state(processing_cache: dict, min_render_sec: int):
         submitted_at = d.get("submittedAt")
         if submitted_at and (now - submitted_at).total_seconds() <= min_render_sec:
             continue
-        if _order_render_provider(d) == RENDER_PROVIDER_XIAOYANG and d.get("xiaoyangTaskId"):
+        rp = _order_render_provider(d)
+        if rp == RENDER_PROVIDER_XIAOYANG and d.get("xiaoyangTaskId"):
             xy_eligible.append(doc)
+        elif rp == RENDER_PROVIDER_VIDEOAIEASY and d.get("videoaieasyJobId"):
+            vae_eligible.append(doc)
         else:
             job_id = d.get("aidancingJobId")
             if job_id and job_id != "MANUAL":
                 ad_eligible.append(doc)
-    return ad_eligible, xy_eligible
+    return ad_eligible, xy_eligible, vae_eligible
 
 
 def _fail_order_processing(doc, order_data, err_detail, system_note, context: str):
@@ -284,7 +460,16 @@ def _fail_order_processing(doc, order_data, err_detail, system_note, context: st
         pop(doc.id)
 
 
-def _mark_order_processing(doc_ref, job_id, *, provider, xiaoyang_account=None, xiaoyang_account_email=None):
+def _mark_order_processing(
+    doc_ref,
+    job_id,
+    *,
+    provider,
+    xiaoyang_account=None,
+    xiaoyang_account_email=None,
+    videoaieasy_account=None,
+    videoaieasy_account_email=None,
+):
     payload = {
         "status": "processing",
         "renderProvider": provider,
@@ -298,6 +483,12 @@ def _mark_order_processing(doc_ref, job_id, *, provider, xiaoyang_account=None, 
             payload["xiaoyangAccount"] = str(xiaoyang_account)
         if xiaoyang_account_email:
             payload["xiaoyangAccountEmail"] = str(xiaoyang_account_email)
+    elif provider == RENDER_PROVIDER_VIDEOAIEASY:
+        payload["videoaieasyJobId"] = str(job_id)
+        if videoaieasy_account:
+            payload["videoaieasyAccount"] = str(videoaieasy_account)
+        if videoaieasy_account_email:
+            payload["videoaieasyAccountEmail"] = str(videoaieasy_account_email)
     else:
         payload["aidancingJobId"] = str(job_id)
     doc_ref.update(payload)
@@ -424,22 +615,167 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
     return success
 
 
-def submit_order(order_id: str):
-    if get_active_render_provider() != RENDER_PROVIDER_XIAOYANG:
-        _g["submit_to_aidancing"](order_id)
-        return
+def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
+    if not _g["is_bot_enabled"]():
+        return False
+    if _g["pending_submit_backoff_active"](order_id):
+        return False
+    submitting_lock = _g["submitting_orders_lock"]
+    submitting = _g["submitting_orders"]
+    with submitting_lock:
+        if order_id in submitting:
+            return False
+        submitting.add(order_id)
+
+    account_id = account["id"]
+    account_email = account.get("email", "")
+    _vae_inflight_inc(account_id)
+    success = False
+    try:
+        with _g["browser_lock"]:
+            db = _g["db"]
+            doc_ref = db.collection("orders").document(order_id)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return False
+            data = doc.to_dict() or {}
+            if data.get("status") != "pending":
+                return False
+
+            nick_label = account_email or account_id
+            print(f"\n⚡ [NẠP ĐƠN / VideoAiEasy] {order_id} — nick {nick_label}...")
+            img_url = (data.get("characterImageLink") or "").strip()
+            vid_url = (data.get("referenceVideoLink") or "").strip()
+            if not img_url or not vid_url:
+                print(f"❌ Thiếu link ảnh/video cho đơn {order_id}")
+                return False
+
+            char_path = None
+            vid_path = None
+            download_file = _g["download_file"]
+            session_error_backoff = _g.get("session_error_backoff", {})
+            try:
+                model_id = _videoaieasy_model_for_order(data)
+                tier = "Kling 3.0" if model_id == MODEL_KLING_30 else "Kling 2.6"
+                prompt = (data.get("prompt") or get_env(
+                    "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
+                )).strip()
+                api = _get_vae_web_client(account_id)
+                _ensure_vae_web_session(api, account_email, account.get("password"))
+                print(
+                    f"🚀 [VideoAiEasy/{nick_label}] {tier} — "
+                    f"modelId={data.get('modelId')} → {model_id}..."
+                )
+                for attempt in range(1, 3):
+                    if attempt > 1:
+                        print(f"🔄 Thử tải file lần {attempt}...")
+                    char_path = download_file(img_url, f"char_{order_id}.png")
+                    vid_path = download_file(vid_url, f"vid_{order_id}.mp4")
+                    if char_path and vid_path:
+                        break
+                    time.sleep(2)
+                if not char_path or not vid_path:
+                    raise VideoAiEasyError("Không tải được ảnh/video từ link đơn hàng")
+                print("📤 Upload ảnh lên videoaieasy.hdgr.online...")
+                image_url = api.upload_file(char_path, kind="image")
+                print("📤 Upload video motion...")
+                video_url = api.upload_file(vid_path, kind="video")
+                job_id = api.create_motion_job(
+                    input_image_url=image_url,
+                    driving_video_url=video_url,
+                    prompt=prompt,
+                    model_id=model_id,
+                )
+                print(f"🆔 [VideoAiEasy/{nick_label}] job: {job_id}")
+                _mark_order_processing(
+                    doc_ref,
+                    job_id,
+                    provider=RENDER_PROVIDER_VIDEOAIEASY,
+                    videoaieasy_account=account_id,
+                    videoaieasy_account_email=account_email,
+                )
+                session_error_backoff.pop(order_id, None)
+                print(f"✅ Đơn {order_id} → processing (VideoAiEasy, {nick_label})")
+                try:
+                    short_id = order_id[-6:].upper()
+                    _g["send_telegram_message"](
+                        f"⚙️ <b>ĐƠN HÀNG ĐANG XỬ LÝ</b> (VideoAiEasy)\n\n"
+                        f"🆔 Mã đơn: #{short_id}\n"
+                        f"📧 Nick: {nick_label}\n"
+                        f"🤖 Job: <code>{job_id}</code>\n"
+                        f"⏳ Poll sau {_g['min_render_sec'] // 60} phút..."
+                    )
+                except Exception:
+                    pass
+                success = True
+            except (requests.RequestException, VideoAiEasyAuthError, VideoAiEasyError) as e:
+                print(f"❌ Nạp VideoAiEasy thất bại {order_id} ({nick_label}): {e}")
+                if isinstance(e, VideoAiEasyAuthError):
+                    _reset_vae_web_client(account_id)
+                _g["notify_internal_error_telegram"](
+                    order_id, data, str(e), f"submit videoaieasy/{nick_label}"
+                )
+            finally:
+                if char_path and os.path.exists(char_path):
+                    os.remove(char_path)
+                if vid_path and os.path.exists(vid_path):
+                    os.remove(vid_path)
+    finally:
+        _vae_inflight_dec(account_id)
+        with submitting_lock:
+            submitting.discard(order_id)
+    return success
+
+
+def _try_submit_xiaoyang(order_id: str) -> bool:
     account = _pick_xiaoyang_account()
     if not account:
         print(
-            f"📊 XiaoYang đầy slot ({XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick) "
-            f"→ Aidancing {order_id}"
+            f"📊 XiaoYang đầy slot ({XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick) — {order_id}"
         )
-        _g["submit_to_aidancing"](order_id, fallback_reason="xiaoyang_queue_full")
+        return False
+    return submit_to_xiaoyang(order_id, account)
+
+
+def _try_submit_videoaieasy(order_id: str) -> bool:
+    if not _use_videoaieasy():
+        return False
+    account = _pick_videoaieasy_account()
+    if not account:
+        print(f"📊 Không có nick VideoAiEasy hoặc đầy slot — {order_id}")
+        return False
+    return submit_to_videoaieasy(order_id, account)
+
+
+def submit_order(order_id: str):
+    """Nạp đơn theo renderProvider (Admin). Đơn processing giữ engine cũ."""
+    provider = get_active_render_provider()
+
+    if provider == RENDER_PROVIDER_AIDANCING:
+        _g["submit_to_aidancing"](order_id)
         return
-    if submit_to_xiaoyang(order_id, account):
+
+    if provider == RENDER_PROVIDER_XIAOYANG:
+        if _try_submit_xiaoyang(order_id):
+            return
+        print(f"⚠️ XiaoYang không nạp được {order_id} → thử VideoAiEasy")
+        if _try_submit_videoaieasy(order_id):
+            return
+        print(f"⚠️ VideoAiEasy không nạp được {order_id} → chuyển Aidancing")
+        _g["submit_to_aidancing"](order_id, fallback_reason="xiaoyang_fail")
         return
-    print(f"⚠️ XiaoYang thất bại {order_id} → Aidancing")
-    _g["submit_to_aidancing"](order_id, fallback_reason="xiaoyang_fail")
+
+    if provider == RENDER_PROVIDER_VIDEOAIEASY:
+        if _try_submit_videoaieasy(order_id):
+            return
+        print(f"⚠️ VideoAiEasy không nạp được {order_id} → thử XiaoYang")
+        if _try_submit_xiaoyang(order_id):
+            return
+        print(f"⚠️ XiaoYang không nạp được {order_id} → chuyển Aidancing")
+        _g["submit_to_aidancing"](order_id, fallback_reason="videoaieasy_fail")
+        return
+
+    _g["submit_to_aidancing"](order_id)
 
 
 def poll_xiaoyang_orders(orders_to_check):
@@ -492,6 +828,51 @@ def poll_xiaoyang_orders(orders_to_check):
             print(f"⏳ Task {task_id} vẫn {st}")
 
 
+def poll_videoaieasy_orders(orders_to_check):
+    skip_done = _g.get("skip_if_order_done")
+    complete = _g["complete_order_with_video"]
+    for doc in orders_to_check:
+        order_data = doc.to_dict() or {}
+        job_id = str(order_data.get("videoaieasyJobId") or "").strip()
+        if not job_id:
+            continue
+        account_id = (order_data.get("videoaieasyAccount") or "").strip()
+        nick = order_data.get("videoaieasyAccountEmail") or account_id
+        print(f"🧐 VideoAiEasy — job {job_id} (đơn {doc.id}, {nick})...")
+        try:
+            api = _get_vae_web_client(account_id or "default")
+            acc = _videoaieasy_account_lookup(account_id)
+            if acc:
+                _ensure_vae_web_session(api, acc["email"], acc["password"])
+            job = api.get_job(job_id)
+        except (VideoAiEasyAuthError, VideoAiEasyError) as e:
+            print(f"❌ Poll VideoAiEasy {job_id}: {e}")
+            if isinstance(e, VideoAiEasyAuthError) and account_id:
+                _reset_vae_web_client(account_id)
+            continue
+        status = (job.get("status") or "").lower()
+        err = job.get("error_message")
+        print(f"   status={status}" + (f" — {err}" if err else ""))
+        if status == "done":
+            if skip_done and skip_done(doc.id, "đã completed"):
+                continue
+            print(f"🎉 VideoAiEasy job {job_id} HOÀN TẤT — tải video...")
+            try:
+                local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
+                complete(doc, local_vid)
+            except Exception as e:
+                print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
+        elif status in ("failed", "expired"):
+            _fail_order_processing(
+                doc, order_data,
+                f"VideoAiEasy job {job_id} {status}: {err or ''}",
+                USER_NOTE_ORDER_FAILED,
+                "render videoaieasy",
+            )
+        else:
+            print(f"⏳ Job {job_id} vẫn {status}")
+
+
 def log_accounts_on_startup():
     accounts = load_xiaoyang_accounts()
     hd = "bật" if get_env("XIAOYANG_ENHANCE_4K", "1").strip().lower() not in ("0", "false", "no") else "tắt"
@@ -510,3 +891,20 @@ def log_accounts_on_startup():
             )
         except Exception as e:
             print(f"  ⚠️  {acc['email']}: {e}")
+    if _use_videoaieasy():
+        vae_accounts = load_videoaieasy_accounts()
+        print(
+            f"👥 VideoAiEasy accounts: {len(vae_accounts)} nick | "
+            f"max {VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick"
+        )
+        for acc in vae_accounts:
+            try:
+                api = _get_vae_web_client(acc["id"])
+                me = _ensure_vae_web_session(api, acc["email"], acc["password"])
+                active = _vae_active_count(acc["id"])
+                print(
+                    f"  ✅ {acc['email']} | credits: {me.get('credits', '?')} | "
+                    f"đang chạy: {active}/{VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT}"
+                )
+            except Exception as e:
+                print(f"  ⚠️  {acc['email']}: {e}")
