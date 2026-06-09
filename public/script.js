@@ -1862,7 +1862,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
 window.openOrderModal = () => {
     updateFirstOrderUI();
-    window.switchVideoSource('tiktok');
+    window.switchVideoSource('upload');
     window.openModal('order-modal');
 
     requestAnimationFrame(() => {

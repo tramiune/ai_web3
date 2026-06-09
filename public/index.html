@@ -898,14 +898,14 @@
                         <div class="form-group order-upload-field">
                             <label data-i18n="modals.video_label">2. Video mẫu / bối cảnh</label>
                             <div class="video-tabs">
-                                <div class="video-tab active" id="tab-tiktok"
-                                    onclick="window.switchVideoSource('tiktok')"
-                                    data-i18n="modals.video_tab_tiktok">Link TikTok</div>
-                                <div class="video-tab" id="tab-upload"
+                                <div class="video-tab active" id="tab-upload"
                                     onclick="window.switchVideoSource('upload')"
                                     data-i18n="modals.video_tab_upload">Tải lên</div>
+                                <div class="video-tab" id="tab-tiktok"
+                                    onclick="window.switchVideoSource('tiktok')"
+                                    data-i18n="modals.video_tab_tiktok">Link TikTok</div>
                             </div>
-                            <div id="video-tiktok-section">
+                            <div id="video-tiktok-section" style="display: none;">
                                 <div class="upload-zone upload-zone--small tiktok-tab-panel">
                                     <span>🔗</span>
                                     <div class="tiktok-tab-field">
@@ -922,7 +922,7 @@
                                     <div id="preview-tiktok-video-container" class="preview-container"></div>
                                 </div>
                             </div>
-                            <div id="video-upload-section" style="display: none;">
+                            <div id="video-upload-section">
                                 <div class="upload-zone upload-zone--small"
                                     onclick="document.getElementById('file-video').click()">
                                     <span>🎥</span>
