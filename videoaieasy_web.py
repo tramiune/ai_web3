@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 import re
+import time
 from pathlib import Path
 
 import requests
@@ -239,7 +240,19 @@ class VideoAiEasyClient:
         return str(resp["data"]["jobId"])
 
     def get_job(self, job_id: str) -> dict:
-        return self._api("GET", f"/api/jobs/{job_id}")["data"]
+        last_err = None
+        retries = int(get_env("VIDEOAIEASY_GET_JOB_RETRIES", "3"))
+        pause = int(get_env("VIDEOAIEASY_GET_JOB_RETRY_SEC", "3"))
+        for attempt in range(1, retries + 1):
+            try:
+                return self._api("GET", f"/api/jobs/{job_id}")["data"]
+            except VideoAiEasyError as e:
+                last_err = e
+                if attempt < retries and ("500" in str(e) or "502" in str(e) or "503" in str(e)):
+                    time.sleep(pause * attempt)
+                    continue
+                raise
+        raise last_err  # pragma: no cover
 
     def download_job(self, job_id: str, dest_path: str) -> str:
         dest_path = os.path.abspath(dest_path)

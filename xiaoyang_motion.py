@@ -69,6 +69,10 @@ def wire(**kwargs):
     _g.update(kwargs)
 
 
+def _submit_engine_lock():
+    return _g.get("submit_lock") or _g.get("browser_lock")
+
+
 def enabled_for_bot(bot_name: str | None) -> bool:
     return bool(bot_name and "kaling" in bot_name.lower())
 
@@ -511,7 +515,7 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
     _xy_inflight_inc(account_id)
     success = False
     try:
-        with _g["browser_lock"]:
+        with _submit_engine_lock():
             db = _g["db"]
             doc_ref = db.collection("orders").document(order_id)
             doc = doc_ref.get()
@@ -632,7 +636,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
     _vae_inflight_inc(account_id)
     success = False
     try:
-        with _g["browser_lock"]:
+        with _submit_engine_lock():
             db = _g["db"]
             doc_ref = db.collection("orders").document(order_id)
             doc = doc_ref.get()
@@ -839,6 +843,7 @@ def poll_videoaieasy_orders(orders_to_check):
         account_id = (order_data.get("videoaieasyAccount") or "").strip()
         nick = order_data.get("videoaieasyAccountEmail") or account_id
         print(f"🧐 VideoAiEasy — job {job_id} (đơn {doc.id}, {nick})...")
+        api = None
         try:
             api = _get_vae_web_client(account_id or "default")
             acc = _videoaieasy_account_lookup(account_id)
@@ -849,6 +854,14 @@ def poll_videoaieasy_orders(orders_to_check):
             print(f"❌ Poll VideoAiEasy {job_id}: {e}")
             if isinstance(e, VideoAiEasyAuthError) and account_id:
                 _reset_vae_web_client(account_id)
+            if api and ("500" in str(e) or "404" in str(e)):
+                try:
+                    print(f"↪️ Thử download trực tiếp job {job_id}...")
+                    local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
+                    complete(doc, local_vid)
+                    continue
+                except Exception as dl_err:
+                    print(f"⚠️ Download trực tiếp {job_id} thất bại: {dl_err}")
             continue
         status = (job.get("status") or "").lower()
         err = job.get("error_message")

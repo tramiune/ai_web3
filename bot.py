@@ -54,6 +54,8 @@ WORKER_URL = "https://motionai-upload-api.traderfinn0312.workers.dev"
 BOT_CHROME_PROFILE = os.path.abspath(os.environ.get("BOT_CHROME_PROFILE", "bot_chrome_profile"))
 
 browser_lock = threading.Lock()
+submit_lock = threading.Lock()  # HTTP nạp đơn — tách khỏi poll (browser_lock chỉ Playwright)
+_processing_cache_refresh_at = 0.0
 _pending_order_queue = []
 _pending_queue_lock = threading.Lock()
 _pending_worker_started = False
@@ -560,6 +562,36 @@ def start_processing_listener():
         filter=FieldFilter("status", "==", "processing")
     ).on_snapshot(on_processing_orders_snapshot)
     print("👂 Listener processing orders — cache RAM, không query Firestore mỗi lần poll")
+
+
+def _submit_engine_lock():
+    """HTTP: submit_lock — poll monitor chạy song song. Browser: browser_lock (Playwright)."""
+    return submit_lock if use_api_mode() else browser_lock
+
+
+def _maybe_refresh_processing_cache():
+    """Phòng listener Firestore GOAWAY — đồng bộ lại cache processing định kỳ."""
+    global _processing_cache_refresh_at
+    if not use_api_mode():
+        return
+    interval = int(os.environ.get("BOT_PROCESSING_CACHE_REFRESH_SEC", "600"))
+    now = time.time()
+    if now - _processing_cache_refresh_at < interval:
+        return
+    _processing_cache_refresh_at = now
+    try:
+        fresh = {
+            doc.id: doc
+            for doc in db.collection("orders")
+            .where(filter=FieldFilter("status", "==", "processing"))
+            .stream()
+        }
+        with _processing_cache_lock:
+            _processing_cache.clear()
+            _processing_cache.update(fresh)
+        print(f"🔄 Refresh processing cache: {len(fresh)} đơn")
+    except Exception as e:
+        print(f"⚠️ Refresh processing cache: {e}")
 
 
 def _monitor_sleep_seconds(eligible_count, processing_count):
@@ -1241,9 +1273,10 @@ def _complete_order_with_video(doc, local_vid):
     return True
 
 def check_finished_orders_api():
-    """Monitor Aidancing + XiaoYang — Pure HTTP."""
-    if not is_bot_enabled() or browser_lock.locked():
+    """Monitor Aidancing + XiaoYang + VideoAiEasy — Pure HTTP (không giữ browser_lock)."""
+    if not is_bot_enabled():
         return
+    _maybe_refresh_processing_cache()
     ad_orders, xy_orders, vae_orders, _ = _processing_monitor_state()
     if not ad_orders and not xy_orders and not vae_orders:
         return
@@ -1252,31 +1285,30 @@ def check_finished_orders_api():
         f"\n🔍 [MONITOR/HTTP] Poll Aidancing={len(ad_orders)} XiaoYang={len(xy_orders)} "
         f"VideoAiEasy={len(vae_orders)} (sau {MIN_RENDER_SEC // 60}p từ submittedAt)..."
     )
-    with browser_lock:
-        if ad_orders:
-            try:
-                _http_poll_orders(ad_orders)
-            except SessionExpiredError as e:
-                print(f"❌ Session hết hạn: {e}")
+    if ad_orders:
+        try:
+            _http_poll_orders(ad_orders)
+        except SessionExpiredError as e:
+            print(f"❌ Session hết hạn: {e}")
+            _reset_http_client()
+        except Exception as e:
+            err = str(e)
+            print(f"❌ Lỗi monitor Aidancing HTTP: {e}")
+            if any(x in err.lower() for x in ("401", "403", "session expired", "aidancing_cookie")):
                 _reset_http_client()
-            except Exception as e:
-                err = str(e)
-                print(f"❌ Lỗi monitor Aidancing HTTP: {e}")
-                if any(x in err.lower() for x in ("401", "403", "session expired", "aidancing_cookie")):
-                    _reset_http_client()
-        if xy_orders:
-            try:
-                if xy_motion.enabled_for_bot(BOT_NAME):
-                    xy_motion.poll_xiaoyang_orders(xy_orders)
-                else:
-                    _http_poll_xiaoyang_orders(xy_orders)
-            except Exception as e:
-                print(f"❌ Lỗi monitor XiaoYang: {e}")
-        if vae_orders and xy_motion.enabled_for_bot(BOT_NAME):
-            try:
-                xy_motion.poll_videoaieasy_orders(vae_orders)
-            except Exception as e:
-                print(f"❌ Lỗi monitor VideoAiEasy: {e}")
+    if xy_orders:
+        try:
+            if xy_motion.enabled_for_bot(BOT_NAME):
+                xy_motion.poll_xiaoyang_orders(xy_orders)
+            else:
+                _http_poll_xiaoyang_orders(xy_orders)
+        except Exception as e:
+            print(f"❌ Lỗi monitor XiaoYang: {e}")
+    if vae_orders and xy_motion.enabled_for_bot(BOT_NAME):
+        try:
+            xy_motion.poll_videoaieasy_orders(vae_orders)
+        except Exception as e:
+            print(f"❌ Lỗi monitor VideoAiEasy: {e}")
 
 def _mark_order_processing(
     doc_ref,
@@ -1321,7 +1353,7 @@ def submit_to_xiaoyang(order_id):
             return
         _submitting_orders.add(order_id)
     try:
-        with browser_lock:
+        with _submit_engine_lock():
             doc_ref = db.collection("orders").document(order_id)
             doc = doc_ref.get()
             if not doc.exists:
@@ -1419,7 +1451,7 @@ def submit_to_aidancing(order_id, fallback_reason=None):
             return
         _submitting_orders.add(order_id)
     try:
-        with browser_lock:
+        with _submit_engine_lock():
             doc_ref = db.collection('orders').document(order_id)
             doc = doc_ref.get()
             if not doc.exists:
@@ -1882,6 +1914,7 @@ def start_bot():
             submitting_orders_lock=_submitting_orders_lock,
             submitting_orders=_submitting_orders,
             browser_lock=browser_lock,
+            submit_lock=submit_lock,
             download_file=download_file,
             session_error_backoff=_session_error_backoff,
             send_telegram_message=send_telegram_message,
