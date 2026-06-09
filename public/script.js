@@ -129,8 +129,8 @@ function normalizeOrderCost(model) {
 // functions/api/paypal.js is the source of truth for the actual charge.
 // Keep them in sync (id + coins + USD value).
 const COIN_PACKAGES = [
-    { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '50.000đ',  usdPrice: '$1.99', amount: 50000,  hasBonus: false },
-    { id: 'creator',    name: 'Creator',    coins: 200, price: '200.000đ', usdPrice: '$11.99', amount: 200000, featured: true, hasBonus: true },
+    { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '10.000đ',  usdPrice: '$0.49', amount: 10000,  hasBonus: false },
+    { id: 'creator',    name: 'Creator',    coins: 50,  price: '50.000đ',  usdPrice: '$2.99', amount: 50000,  featured: true, hasBonus: false },
     { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
 ];
@@ -5009,7 +5009,7 @@ window.__paypal = { fetchPaypalConfig, mountPaypalButtons };
 const REFERRAL_COMMISSION_RATE = 0.10;
 const REFERRAL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
 const REFERRAL_CODE_LENGTH = 8;
-const VND_PER_COIN_FALLBACK = 5000; // gói Starter: 50.000đ / 10 coin
+const VND_PER_COIN_FALLBACK = 1000; // gói Starter: 10.000đ / 10 coin
 
 function computeReferralCommissionAmount(baseAmount, currency) {
     if (!baseAmount || baseAmount <= 0) return 0;

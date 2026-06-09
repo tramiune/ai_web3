@@ -44,8 +44,8 @@ const PAYPAL_DEFAULTS = {
 // Server-side package map. Frontend must NEVER set the price.
 // Keep in sync with COIN_PACKAGES in public/script.js (id + coins).
 const PACKAGES = {
-    'starter_v2':  { coins: 10,   priceUsd: 1.99,  name: 'Starter (International)' },
-    'creator':     { coins: 200,  priceUsd: 11.99, name: 'Creator (International)' },
+    'starter_v2':  { coins: 10,   priceUsd: 0.49,  name: 'Starter (International)' },
+    'creator':     { coins: 50,   priceUsd: 2.99,  name: 'Creator (International)' },
     'studio':      { coins: 550,  priceUsd: 24.99, name: 'Studio (International)' },
     'pro-studio':  { coins: 1100, priceUsd: 49.99, name: 'Enterprise (International)' }
 };

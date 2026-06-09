@@ -82,7 +82,7 @@ window.TRANSLATIONS_LOCALES = {
             },
             "notes": {
                 "starter_v2": "Paquete limitado",
-                "creator": "Bonus 160 Coins",
+                "creator": "Popular package",
                 "studio": "Bonus 300 Coins",
                 "pro-studio": "Bonus 600 Coins"
             }
@@ -242,7 +242,7 @@ window.TRANSLATIONS_LOCALES = {
             },
             "notes": {
                 "starter_v2": "Pacote limitado",
-                "creator": "Bônus 160 Coins",
+                "creator": "Pacote popular",
                 "studio": "Bônus 300 Coins",
                 "pro-studio": "Bônus 600 Coins"
             }
