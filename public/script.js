@@ -366,6 +366,34 @@ function logFirebaseEvent(name, params = {}) {
     }
 }
 
+function metaPixelId() {
+    return (window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.metaPixelId) || '';
+}
+
+function isMetaPixelReady() {
+    return typeof fbq === 'function' && !!metaPixelId();
+}
+
+function metaEventId(prefix) {
+    const safe = String(prefix || 'evt').replace(/\s+/g, '_');
+    return `${safe}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function trackMetaEvent(eventName, params = {}) {
+    if (!isMetaPixelReady()) return;
+    const payload = { ...params };
+    if (!payload.eventID) payload.eventID = metaEventId(eventName);
+    fbq('track', eventName, payload);
+    console.log(`📘 Meta Pixel: ${eventName}`, payload);
+}
+
+function updateMetaAdvancedMatching(user) {
+    if (!isMetaPixelReady() || !user?.email) return;
+    const em = String(user.email).trim().toLowerCase();
+    if (!em) return;
+    fbq('init', metaPixelId(), { em });
+}
+
 export function t(path, params = {}) {
     const langs = [currentLang || 'vi', 'en', 'vi'];
     for (const lang of langs) {
@@ -526,6 +554,9 @@ function clearPendingReferralCode() {
 
 // --- App Initialization ---
 export async function initAppLogic() {
+    if (!metaPixelId()) {
+        console.warn('[Meta Pixel] Chưa cấu hình metaPixelId trong public/analytics-config.js — Facebook Ads sẽ không nhận event.');
+    }
     try {
         currentLang = await resolveInitialLanguage();
     } catch (e) {
@@ -1107,6 +1138,7 @@ async function handleUserLoggedIn(user) {
         });
         console.log("🎯 TikTok Pixel: Identified user for Advanced Matching");
     }
+    updateMetaAdvancedMatching(user);
 
     // Firebase/Google Identify
     if (user.email) {
@@ -1162,6 +1194,13 @@ async function handleUserLoggedIn(user) {
         if (referredBy) newUserPayload.referredBy = referredBy;
 
         await setDoc(userRef, newUserPayload);
+
+        trackMetaEvent('CompleteRegistration', {
+            value: 0,
+            currency: 'VND',
+            status: true,
+            content_name: user.providerData?.[0]?.providerId || 'signup'
+        });
 
         // Clear the pending ref code after a successful signup attempt.
         if (referredBy) {
@@ -1227,6 +1266,15 @@ async function handleUserLoggedIn(user) {
                         content_id: purchaseId
                     });
                 }
+
+                trackMetaEvent('Purchase', {
+                    value: purchaseValue,
+                    currency: 'VND',
+                    content_ids: [purchaseId],
+                    content_name: purchaseName,
+                    content_type: 'product',
+                    num_items: 1
+                });
 
                 sendTelegramMessage(`💰 <b>NẠP COIN THÀNH CÔNG!</b>\n👤 Khách: ${escapeHTML(data.displayName)}\n📧 Email: ${escapeHTML(data.email)}\n✨ Đã cộng: +${addedCoins} Coin\n💰 Số dư mới: ${currentCoins} Coin`);
             }
@@ -1839,6 +1887,12 @@ window.openPricingModal = () => {
         });
     }
 
+    trackMetaEvent('ViewContent', {
+        content_name: 'Topup Packages',
+        content_type: 'product_group',
+        content_ids: ['all_packages']
+    });
+
     // Firebase Analytics: view_item_list
     logFirebaseEvent('view_item_list', { item_list_name: 'Topup Packages' });
 };
@@ -1861,6 +1915,15 @@ window.selectTopup = async (id, method = 'vietqr') => {
             content_id: selectedTopupPackage.id
         });
     }
+
+    trackMetaEvent('InitiateCheckout', {
+        value: selectedTopupPackage.amount,
+        currency: 'VND',
+        content_ids: [selectedTopupPackage.id],
+        content_name: selectedTopupPackage.name,
+        content_type: 'product',
+        num_items: 1
+    });
 
     logFirebaseEvent('begin_checkout', {
         value: selectedTopupPackage.amount,
@@ -1997,6 +2060,12 @@ window.openOrderModal = () => {
             content_id: 'ai_video_generation'
         });
     }
+
+    trackMetaEvent('ViewContent', {
+        content_name: 'AI Video Service',
+        content_type: 'product',
+        content_ids: ['ai_video_generation']
+    });
 };
 
 function updateFirstOrderUI() {
@@ -2756,6 +2825,14 @@ async function setupEventListeners() {
                         content_id: orderId
                     });
                 }
+
+                trackMetaEvent('Lead', {
+                    value: model.cost * 1000,
+                    currency: 'VND',
+                    content_name: serviceLabelPixel,
+                    content_ids: [orderId],
+                    content_category: 'ai_video_order'
+                });
 
                 logFirebaseEvent('generate_lead', {
                     value: model.cost * 1000,
