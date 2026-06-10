@@ -557,6 +557,9 @@ export async function initAppLogic() {
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
+            if (isInAppBrowser()) {
+                showInAppBrowserBanner();
+            }
             handleUserLoggedIn(user).catch((e) => {
                 console.error("Auth profile error:", e);
                 showToast(t('common.error_auth', { msg: e.message || e.code || 'Firestore' }));
@@ -586,16 +589,132 @@ export async function initAppLogic() {
     applyTranslations();
 }
 
-// --- Browser Detection ---
-function detectInAppBrowser() {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isTikTok = /TikTok/i.test(ua);
-    const isInApp = isTikTok || /FBAV|FBAN|Messenger|Instagram|Line|WhatsApp|Telegram|MicroMessenger/i.test(ua);
+// --- In-app browser (TikTok / Facebook / …) ---
+function isInAppBrowser() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+    return /TikTok|FBAV|FBAN|Instagram|Messenger|Line\/|WhatsApp|Telegram|MicroMessenger|Twitter|LinkedInApp/i.test(ua);
+}
 
-    // Special logic: Hide Google Login if not Chrome/Safari or if In-App
+function isStandaloneBrowser() {
+    const ua = navigator.userAgent || '';
     const isChrome = (/Chrome/i.test(ua) || /CriOS/i.test(ua)) && !/Edge|OPR|Edg|SamsungBrowser|Vivaldi|MiuiBrowser/i.test(ua);
     const isSafari = /Safari/i.test(ua) && !/Chrome|CriOS/i.test(ua) && !/SamsungBrowser|MiuiBrowser/i.test(ua);
-    const isSupported = (isChrome || isSafari) && !isInApp;
+    return (isChrome || isSafari) && !isInAppBrowser();
+}
+
+function showInAppBrowserBanner() {
+    if (!isInAppBrowser() || sessionStorage.getItem('inapp-banner-dismissed') === '1') return;
+    const modal = document.getElementById('inapp-browser-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.classList.add('inapp-modal-open');
+    applyTranslations();
+}
+
+window.dismissInAppBrowserBanner = () => {
+    const modal = document.getElementById('inapp-browser-modal');
+    if (modal) modal.hidden = true;
+    document.body.classList.remove('inapp-modal-open');
+    sessionStorage.setItem('inapp-banner-dismissed', '1');
+};
+
+window.copyPageLinkForExternal = async (url) => {
+    const link = url || window.location.href;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(link);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = link;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        showToast(t('modals.inapp_link_copied'));
+        return true;
+    } catch (e) {
+        showToast(t('common.toast_copy_failed', { msg: e?.message || '' }));
+        return false;
+    }
+};
+
+async function copyPageLinkSilent(url) {
+    const link = url || window.location.href;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(link);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = link;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+window.openExternalBrowser = async (targetUrl) => {
+    const url = targetUrl || window.location.href;
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+    await copyPageLinkSilent(url);
+
+    if (isAndroid) {
+        try {
+            const parsed = new URL(url);
+            const intent =
+                `intent://${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}` +
+                `#Intent;scheme=${parsed.protocol.replace(':', '')};` +
+                `package=com.android.chrome;` +
+                `S.browser_fallback_url=${encodeURIComponent(url)};end`;
+            window.location.href = intent;
+            showToast(t('modals.inapp_open_attempt'));
+            return;
+        } catch (e) {
+            console.warn('[OpenBrowser] Android intent failed:', e);
+        }
+    }
+
+    if (isIOS) {
+        const noProto = url.replace(/^https?:\/\//, '');
+        try {
+            window.location.href = `x-safari-https://${noProto}`;
+            showToast(t('modals.inapp_open_attempt'));
+            return;
+        } catch (e) {
+            console.warn('[OpenBrowser] iOS Safari scheme failed:', e);
+        }
+        try {
+            window.location.href = `googlechromes://${noProto}`;
+            showToast(t('modals.inapp_open_attempt'));
+            return;
+        } catch (e) {
+            console.warn('[OpenBrowser] iOS Chrome scheme failed:', e);
+        }
+    }
+
+    showToast(t('modals.inapp_open_attempt'));
+};
+
+// --- Browser Detection ---
+function detectInAppBrowser() {
+    const isInApp = isInAppBrowser();
+    const isSupported = isStandaloneBrowser();
+
+    if (isInApp) {
+        showInAppBrowserBanner();
+    }
 
     if (!isSupported) {
         const googleBtn = document.getElementById('google-login-btn');
