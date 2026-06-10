@@ -73,10 +73,8 @@
 
     <div id="inapp-browser-modal" class="inapp-browser-modal" hidden role="dialog" aria-modal="true"
         aria-labelledby="inapp-browser-modal-title">
-        <div class="inapp-browser-modal__backdrop" onclick="window.dismissInAppBrowserBanner()"></div>
+        <div class="inapp-browser-modal__backdrop" aria-hidden="true"></div>
         <div class="inapp-browser-modal__card">
-            <button type="button" class="inapp-browser-modal__close" onclick="window.dismissInAppBrowserBanner()"
-                aria-label="Đóng">&times;</button>
             <div class="inapp-browser-modal__icon" aria-hidden="true">🌐</div>
             <h2 id="inapp-browser-modal-title" class="inapp-browser-modal__title"
                 data-i18n="modals.inapp_browser_title">Mở bằng Chrome hoặc Safari</h2>
@@ -94,10 +92,6 @@
                 <button type="button" class="inapp-browser-modal__copy"
                     onclick="window.copyPageLinkForExternal()" data-i18n="modals.inapp_copy_link_btn">
                     Copy link
-                </button>
-                <button type="button" class="inapp-browser-modal__later"
-                    onclick="window.dismissInAppBrowserBanner()" data-i18n="modals.inapp_browser_later">
-                    Để sau
                 </button>
             </div>
         </div>

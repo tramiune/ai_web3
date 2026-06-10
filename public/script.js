@@ -603,20 +603,13 @@ function isStandaloneBrowser() {
 }
 
 function showInAppBrowserBanner() {
-    if (!isInAppBrowser() || sessionStorage.getItem('inapp-banner-dismissed') === '1') return;
+    if (!isInAppBrowser()) return;
     const modal = document.getElementById('inapp-browser-modal');
     if (!modal) return;
     modal.hidden = false;
     document.body.classList.add('inapp-modal-open');
     applyTranslations();
 }
-
-window.dismissInAppBrowserBanner = () => {
-    const modal = document.getElementById('inapp-browser-modal');
-    if (modal) modal.hidden = true;
-    document.body.classList.remove('inapp-modal-open');
-    sessionStorage.setItem('inapp-banner-dismissed', '1');
-};
 
 window.copyPageLinkForExternal = async (url) => {
     const link = url || window.location.href;
