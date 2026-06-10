@@ -635,6 +635,8 @@ function isStandaloneBrowser() {
 
 function showInAppBrowserBanner() {
     if (!isInAppBrowser()) return;
+    const authModal = document.getElementById('auth-modal');
+    if (authModal) authModal.style.display = 'none';
     const modal = document.getElementById('inapp-browser-modal');
     if (!modal) return;
     modal.hidden = false;
@@ -1374,9 +1376,15 @@ function navigateFromURLParam() {
 }
 
 function handleUserLoggedOut() {
-    // Show login-required popup with banner video
-    const authModal = document.getElementById('auth-modal');
-    if (authModal) authModal.style.display = 'flex';
+    // In TikTok/FB in-app browser: only show Chrome/Safari prompt, not login
+    if (isInAppBrowser()) {
+        showInAppBrowserBanner();
+        const authModalHidden = document.getElementById('auth-modal');
+        if (authModalHidden) authModalHidden.style.display = 'none';
+    } else {
+        const authModal = document.getElementById('auth-modal');
+        if (authModal) authModal.style.display = 'flex';
+    }
     const v = document.getElementById('auth-banner-video');
     if (v && !v.src) {
         v.src = 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4';
