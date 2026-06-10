@@ -5,6 +5,8 @@
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const MAX_VIDEO_DURATION_SEC = 30;
+const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
 // --- EmailJS Config ---
 const EMAILJS_SERVICE_ID = 'service_6r6rd2q';
@@ -2141,7 +2143,7 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
     const { onProgress } = options;
     const { blob: initialBlob, duration: metaDuration } = await downloadTikTokVideoBlob(pageUrl);
     let blob = initialBlob;
-    if (blob.size > 90 * 1024 * 1024) {
+    if (blob.size > MAX_VIDEO_FILE_BYTES) {
         throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
     }
 
@@ -2236,7 +2238,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
 
     const maxDurationSec = options.maxDurationSec ?? MAX_VIDEO_DURATION_SEC;
 
-    if (file.size > 90 * 1024 * 1024) {
+    if (file.size > MAX_VIDEO_FILE_BYTES) {
         showToast(t('modals.video_size_limit'));
         if (options.inputId) {
             const input = document.getElementById(options.inputId);
@@ -2334,7 +2336,7 @@ window.handlePreview = (input, containerId) => {
     container.innerHTML = '';
 
     if (file.type.startsWith('image/')) {
-        if (file.size > 10 * 1024 * 1024) {
+        if (file.size > MAX_CHAR_FILE_BYTES) {
             showToast(t('modals.char_size_limit'));
             input.value = '';
             syncUploadZonePreviewState(container);
@@ -2546,8 +2548,8 @@ async function setupEventListeners() {
                 }
 
                 // Kiểm tra lại lần cuối trước khi upload
-                if (charFile.size > 10 * 1024 * 1024) return showToast(t('modals.char_note'));
-                if (window.currentVideoSource === 'upload' && videoFile && videoFile.size > 90 * 1024 * 1024) {
+                if (charFile.size > MAX_CHAR_FILE_BYTES) return showToast(t('modals.char_size_limit'));
+                if (window.currentVideoSource === 'upload' && videoFile && videoFile.size > MAX_VIDEO_FILE_BYTES) {
                     return showToast(t('modals.video_size_limit'));
                 }
 

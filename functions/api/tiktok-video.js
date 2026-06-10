@@ -1,5 +1,5 @@
 const TIKWM_API = 'https://www.tikwm.com/api/';
-const MAX_BYTES = 90 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
