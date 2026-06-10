@@ -17,6 +17,43 @@
     <link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
     <link rel="apple-touch-icon" href="icon-180.png" sizes="180x180">
     <link rel="manifest" href="site.webmanifest">
+
+    <script src="analytics-config.js"></script>
+
+    <!-- Meta (Facebook) Pixel -->
+    <script>
+    (function () {
+        var pid = window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.metaPixelId;
+        if (!pid) return;
+        !function (f, b, e, v, n, t, s) {
+            if (f.fbq) return;
+            n = f.fbq = function () {
+                n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+            };
+            if (!f._fbq) f._fbq = n;
+            n.push = n;
+            n.loaded = !0;
+            n.version = '2.0';
+            n.queue = [];
+            t = b.createElement(e);
+            t.async = !0;
+            t.src = v;
+            s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s);
+        }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', pid);
+        fbq('track', 'PageView');
+    })();
+    </script>
+    <noscript id="meta-pixel-noscript"></noscript>
+    <script>
+    (function () {
+        var pid = window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.metaPixelId;
+        var el = document.getElementById('meta-pixel-noscript');
+        if (!pid || !el) return;
+        el.innerHTML = '<img height="1" width="1" style="display:none" alt="" src="https://www.facebook.com/tr?id=' + encodeURIComponent(pid) + '&ev=PageView&noscript=1"/>';
+    })();
+    </script>
     
     <!-- TikTok Pixel Code Start -->
     <script>

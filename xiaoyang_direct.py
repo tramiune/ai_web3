@@ -64,6 +64,43 @@ def _guess_filename(url: str, default: str) -> str:
     return default
 
 
+def upload_file_to_r2_public(file_path: str, key: str, content_type: str) -> str:
+    """Upload file lên R2 public bucket (multipart, không giới hạn 100MB Worker)."""
+    try:
+        import boto3
+    except ImportError as e:
+        raise DirectMediaError("Cần boto3 để upload direct R2: pip install boto3") from e
+
+    account = os.environ.get("R2_ACCOUNT_ID", "").strip()
+    access = os.environ.get("R2_ACCESS_KEY_ID", "").strip()
+    secret = os.environ.get("R2_SECRET_ACCESS_KEY", "").strip()
+    bucket = os.environ.get("R2_BUCKET_NAME", "").strip()
+    public_base = os.environ.get("R2_PUBLIC_BASE", "").strip().rstrip("/")
+
+    missing = [n for n, v in [
+        ("R2_ACCOUNT_ID", account),
+        ("R2_ACCESS_KEY_ID", access),
+        ("R2_SECRET_ACCESS_KEY", secret),
+        ("R2_BUCKET_NAME", bucket),
+        ("R2_PUBLIC_BASE", public_base),
+    ] if not v]
+    if missing:
+        raise DirectMediaError("Thiếu biến .env R2 direct: " + ", ".join(missing))
+
+    client = boto3.client(
+        "s3",
+        endpoint_url=f"https://{account}.r2.cloudflarestorage.com",
+        aws_access_key_id=access,
+        aws_secret_access_key=secret,
+        region_name="auto",
+    )
+    key = key.lstrip("/")
+    # Token R2 thường chỉ có Object Write — multipart bị AccessDenied; dùng single PUT (≤5GB).
+    with open(file_path, "rb") as f:
+        client.put_object(Bucket=bucket, Key=key, Body=f, ContentType=content_type)
+    return f"{public_base}/{key}"
+
+
 def upload_bytes_to_r2_public(data: bytes, key: str, content_type: str) -> str:
     """PUT lên bucket R2 public → URL https://pub-xxx.r2.dev/key"""
     try:
@@ -196,3 +233,71 @@ def resolve_api_v1_media_urls(image_url: str, video_url: str) -> tuple[str, str]
         raise DirectMediaError("Sau mirror vẫn không có URL direct — kiểm tra R2_PUBLIC_BASE")
 
     return image_url, video_url
+
+
+def _worker_upload_max_bytes() -> int:
+    from project_env import get_env
+
+    return int(get_env("R2_WORKER_MAX_BYTES", str(90 * 1024 * 1024)))
+
+
+def r2_direct_configured() -> bool:
+    keys = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "R2_PUBLIC_BASE")
+    return all(os.environ.get(k, "").strip() for k in keys)
+
+
+def _upload_via_motion_worker(file_path: str, object_key: str, content_type: str) -> str | None:
+    from xiaoyang_media import WORKER_BASE
+
+    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"📤 Upload Worker ({size_mb:.1f} MB)...")
+    url = (
+        f"{WORKER_BASE}/?file={quote(object_key)}"
+        f"&t={int(time.time() * 1000)}"
+    )
+    timeout = int(os.environ.get("R2_WORKER_UPLOAD_TIMEOUT_SEC", "600"))
+    with open(file_path, "rb") as f:
+        response = requests.post(url, data=f, headers={"Content-Type": content_type}, timeout=timeout)
+    if response.status_code == 200:
+        body = response.json() if response.content else {}
+        out = (body.get("url") or "").strip()
+        if out:
+            return out
+        print(f"❌ Worker upload không trả url: {(response.text or '')[:200]}")
+        return None
+    if response.status_code == 413:
+        print("⚠️ Worker 413 Payload Too Large (>~100MB Cloudflare)")
+        return None
+    print(f"❌ Worker upload HTTP {response.status_code}: {(response.text or '')[:200]}")
+    return None
+
+
+def upload_result_file(file_path: str, folder: str = "results", content_type: str = "video/mp4") -> str:
+    """
+    Upload video kết quả lên R2 public URL.
+    File ≤ R2_WORKER_MAX_BYTES: Worker. File lớn hoặc 413 → upload direct R2 (boto3).
+    """
+    if not os.path.isfile(file_path):
+        raise DirectMediaError(f"Không tìm thấy file upload: {file_path}")
+
+    max_worker = _worker_upload_max_bytes()
+    size = os.path.getsize(file_path)
+    object_key = f"{folder}/{int(time.time() * 1000)}_{os.path.basename(file_path)}"
+
+    if size <= max_worker:
+        url = _upload_via_motion_worker(file_path, object_key, content_type)
+        if url:
+            return url
+    else:
+        print(
+            f"⚠️ File {size / (1024 * 1024):.1f} MB > "
+            f"{max_worker / (1024 * 1024):.0f} MB — chuyển upload direct R2"
+        )
+
+    if r2_direct_configured():
+        print(f"📤 Upload direct R2 ({size / (1024 * 1024):.1f} MB)...")
+        return upload_file_to_r2_public(file_path, object_key, content_type)
+
+    raise DirectMediaError(
+        "Worker từ chối file lớn (>~100MB) — cần cấu hình R2_* trong .env để upload direct."
+    )
