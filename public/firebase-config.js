@@ -60,7 +60,14 @@ export const ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.
  *
  *     match /referralEarnings/{earningId} {
  *       allow read: if request.auth != null
- *         && (resource.data.userId == request.auth.uid || isAdmin());
+ *         && (resource.data.referrerId == request.auth.uid || isAdmin());
+ *       allow write: if isAdmin();
+ *     }
+ *
+ *     match /referralAllowlist/{emailId} {
+ *       allow read: if request.auth != null && (
+ *         request.auth.token.email.lower() == emailId || isAdmin()
+ *       );
  *       allow write: if isAdmin();
  *     }
  *

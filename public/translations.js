@@ -81,7 +81,8 @@ window.TRANSLATIONS = {
             telegram_btn: "Telegram",
             guide_link: "Hướng dẫn lấy link",
             program_overview: "Tổng quan chương trình",
-            invite_tips: "Gợi ý mời hiệu quả"
+            invite_tips: "Gợi ý mời hiệu quả",
+            not_allowed: "Tính năng Giới thiệu bạn bè chưa mở cho tài khoản này."
         },
         models: {
             title: "Chọn Model AI Tạo Video",
@@ -465,6 +466,15 @@ window.TRANSLATIONS = {
             col_member: "Thành viên",
             col_balance: "Số dư Coin",
             col_role: "Quyền",
+            ref_allowlist_title: "Email được phép Giới thiệu bạn bè",
+            ref_allowlist_desc: "Chỉ email trong danh sách mới thấy mục Giới thiệu bạn bè và nhận hoa hồng.",
+            ref_allowlist_add: "Thêm email",
+            ref_allowlist_remove: "Xóa",
+            ref_allowlist_empty: "Chưa có email nào — thêm email đối tác bên trên.",
+            ref_allowlist_added: "Đã thêm {email}",
+            ref_allowlist_removed: "Đã xóa email khỏi danh sách.",
+            ref_allowlist_confirm_remove: "Xóa {email} khỏi danh sách được phép?",
+            ref_allowlist_rules_hint: "Cần deploy Firestore rules cho collection referralAllowlist (xem firestore.rules).",
             ref_summary_title: "Tổng hoa hồng theo người giới thiệu",
             ref_detail_title: "Chi tiết từng giao dịch",
             ref_col_referrer: "Người giới thiệu",
@@ -759,7 +769,8 @@ window.TRANSLATIONS = {
             telegram_btn: "Telegram",
             guide_link: "How to get your link",
             program_overview: "Program overview",
-            invite_tips: "Invite tips"
+            invite_tips: "Invite tips",
+            not_allowed: "Referral program is not enabled for this account."
         },
         models: {
             title: "Select AI Video Model",
@@ -1143,6 +1154,15 @@ window.TRANSLATIONS = {
             col_member: "Member",
             col_balance: "Coin Balance",
             col_role: "Role",
+            ref_allowlist_title: "Referral program allowlist",
+            ref_allowlist_desc: "Only listed emails can see Refer Friends and earn commission.",
+            ref_allowlist_add: "Add email",
+            ref_allowlist_remove: "Remove",
+            ref_allowlist_empty: "No emails yet — add a partner email above.",
+            ref_allowlist_added: "Added {email}",
+            ref_allowlist_removed: "Email removed from allowlist.",
+            ref_allowlist_confirm_remove: "Remove {email} from allowlist?",
+            ref_allowlist_rules_hint: "Deploy Firestore rules for referralAllowlist (see firestore.rules).",
             ref_summary_title: "Commission totals by referrer",
             ref_detail_title: "Transaction details",
             ref_col_referrer: "Referrer",

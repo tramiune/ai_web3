@@ -336,6 +336,14 @@ function formatMoneyForTelegram(amount, currency) {
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
 
+async function isReferrerOnAllowlist(token, projectId, referrerEmail) {
+  const key = (referrerEmail || '').trim().toLowerCase();
+  if (!key) return false;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/referralAllowlist/${encodeURIComponent(key)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  return res.ok;
+}
+
 /**
  * Pay 10% referral commission in coins to the referrer of `referredUserId`.
  * Idempotent: uses topupId as the referralEarnings doc ID and aborts if it already exists.
@@ -373,6 +381,11 @@ async function payReferralCommission(token, projectId, params) {
     || referrerData.fields?.email?.stringValue?.split('@')[0]
     || 'N/A';
   const referrerEmail = referrerData.fields?.email?.stringValue || '';
+  const allowlisted = await isReferrerOnAllowlist(token, projectId, referrerEmail);
+  if (!allowlisted) {
+    console.log(`[Referral] Referrer ${referrerEmail || referredBy} not on allowlist — skip commission`);
+    return;
+  }
 
   const earningsFields = {
     referrerId: { stringValue: referredBy },

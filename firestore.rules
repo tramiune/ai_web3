@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isBootstrapSuperAdmin() {
+      return request.auth != null && request.auth.token.email in [
+        'traderfinn0312@gmail.com',
+        'dinhhoangvan.hh@gmail.com'
+      ];
+    }
+
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin');
+    }
+
+    function isSuperAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin';
+    }
+
+    function isReferralAllowlisted() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/referralAllowlist/$(request.auth.token.email.lower()));
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && (
+                         !('referredBy' in request.resource.data)
+                         || (request.resource.data.referredBy is string
+                             && request.resource.data.referredBy != userId)
+                       );
+
+      allow update: if isAdmin() ||
+        (request.auth.uid == userId
+         && (request.resource.data.role == resource.data.role || isBootstrapSuperAdmin())
+         && request.resource.data.coins <= resource.data.coins
+         && (
+              !('referredBy' in resource.data)
+              || request.resource.data.referredBy == resource.data.referredBy
+            )
+         && (
+              !('referralCode' in resource.data)
+              || request.resource.data.referralCode == resource.data.referralCode
+            ));
+
+      allow delete: if isSuperAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /topups/{topupId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /bots/{botId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if false;
+    }
+
+    match /referralAllowlist/{emailId} {
+      allow read: if request.auth != null && (
+        request.auth.token.email.lower() == emailId || isAdmin()
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /referralCodes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && isReferralAllowlisted()
+                    && request.resource.data.uid == request.auth.uid
+                    && code.matches('^[A-Z0-9]{6,12}$');
+      allow update, delete: if isAdmin();
+    }
+
+    match /referralEarnings/{id} {
+      allow read: if request.auth != null && (resource.data.referrerId == request.auth.uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

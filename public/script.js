@@ -300,7 +300,37 @@ let orderCount = 0; // Track total orders
 let initialCoinsBeforeTopup = 0; // Để theo dõi số dư trước khi nạp
 let referralEarningsUnsubscribe = null; // Cleanup handle for referralEarnings onSnapshot (legacy - giờ dùng FB_LISTENERS)
 let referralCurrentCode = null; // User's referral code, populated when opening referral page
+window.__referralAllowed = false;
 const SUPER_ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.com"]; // Bootstrap super-admin (khớp Firestore rules)
+
+function normalizeReferralAllowlistEmail(email) {
+    return (email || '').trim().toLowerCase();
+}
+
+function updateReferralNavVisibility(allowed) {
+    const item = document.getElementById('nav-referral-item');
+    if (item) item.style.display = allowed ? 'flex' : 'none';
+}
+
+async function refreshReferralAllowance(user) {
+    const email = user?.email || currentUser?.email || '';
+    const key = normalizeReferralAllowlistEmail(email);
+    if (!key) {
+        window.__referralAllowed = false;
+        updateReferralNavVisibility(false);
+        return false;
+    }
+    const { db, doc, getDoc } = window.firebase;
+    try {
+        const snap = await getDoc(doc(db, 'referralAllowlist', key));
+        window.__referralAllowed = snap.exists();
+    } catch (e) {
+        console.warn('[Referral] allowlist check failed:', e.message);
+        window.__referralAllowed = false;
+    }
+    updateReferralNavVisibility(window.__referralAllowed);
+    return window.__referralAllowed;
+}
 
 // =====================================================================
 // FIREBASE LISTENER REGISTRY (chống leak listener gây tốn reads)
@@ -1364,7 +1394,7 @@ async function handleUserLoggedIn(user) {
 
     loadMyOrders();
     loadMyTopups();
-    navigateFromURLParam();
+    refreshReferralAllowance(user).finally(() => navigateFromURLParam());
 }
 
 function navigateFromURLParam() {
@@ -1372,6 +1402,10 @@ function navigateFromURLParam() {
         const params = new URLSearchParams(window.location.search);
         const page = params.get('page');
         if (page === 'referral-page') {
+            if (!window.__referralAllowed) {
+                showDashboard();
+                return;
+            }
             showReferralPage();
         } else if (page === 'topup-history-page') {
             showTopupHistory();
@@ -1440,6 +1474,8 @@ function handleUserLoggedOut() {
 
     // Reset các flag/cache liên quan
     window.__isAdmin = false;
+    window.__referralAllowed = false;
+    updateReferralNavVisibility(false);
     window.__isSuperAdmin = false;
     window.__currentUserData = null;
     adminSubscribedOrderStatus = null;
@@ -1497,6 +1533,11 @@ function hideAllPages() {
 }
 
 function showReferralPage() {
+    if (!window.__referralAllowed) {
+        showToast(t('referral.not_allowed'));
+        showDashboard();
+        return;
+    }
     hideAllPages();
     document.getElementById('referral-page').style.display = 'block';
     window.scrollTo(0, 0);
@@ -1532,6 +1573,7 @@ window.navTo = (target) => {
         fbUnsub('adminTopups');
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
+        fbUnsub('adminReferralAllowlist');
         fbUnsub('adminBots');
         adminSubscribedOrderStatus = null;
         adminSubscribedTopupStatus = null;
@@ -3598,6 +3640,83 @@ window.deleteBot = (event, botId) => {
 };
 
 // ----- REFERRALS (Admin tab) -----
+function subscribeAdminReferralAllowlist() {
+    const { db, collection, onSnapshot, query, orderBy } = window.firebase;
+    if (fbHas('adminReferralAllowlist')) {
+        renderAdminReferralAllowlist();
+        return;
+    }
+    const q = query(collection(db, 'referralAllowlist'), orderBy('addedAt', 'desc'));
+    fbSub('adminReferralAllowlist', onSnapshot(q, (snapshot) => {
+        FB_CACHE.adminReferralAllowlist = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAdminReferralAllowlist();
+    }, (err) => {
+        console.error('Admin referral allowlist error:', err);
+        const list = document.getElementById('referral-allowlist-list');
+        if (list) {
+            list.innerHTML = `<p style="opacity:0.6;margin:0;">${t('admin.ref_allowlist_rules_hint')}</p>`;
+        }
+    }));
+}
+
+function renderAdminReferralAllowlist() {
+    const list = document.getElementById('referral-allowlist-list');
+    if (!list) return;
+    const rows = FB_CACHE.adminReferralAllowlist || [];
+    if (!rows.length) {
+        list.innerHTML = `<p style="opacity:0.6;margin:0;">${t('admin.ref_allowlist_empty')}</p>`;
+        return;
+    }
+    list.innerHTML = rows.map((row) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.45rem 0.6rem;border-radius:8px;background:rgba(255,255,255,0.04);">
+            <span style="font-family:monospace;">${escapeHTML(row.email || row.id)}</span>
+            <button type="button" class="btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" onclick="window.removeReferralAllowlistEmail('${escapeHTML(row.id)}')">${t('admin.ref_allowlist_remove')}</button>
+        </div>
+    `).join('');
+}
+
+window.addReferralAllowlistEmail = async () => {
+    if (!window.__isAdmin) return;
+    const input = document.getElementById('referral-allowlist-input');
+    const email = normalizeReferralAllowlistEmail(input?.value || '');
+    if (!email || !email.includes('@')) {
+        return showToast(t('admin.toast_email_required'));
+    }
+    const { db, doc, setDoc, serverTimestamp } = window.firebase;
+    try {
+        await setDoc(doc(db, 'referralAllowlist', email), {
+            email,
+            addedAt: serverTimestamp(),
+            addedBy: currentUser?.email || '',
+        });
+        if (input) input.value = '';
+        showToast(t('admin.ref_allowlist_added', { email }));
+        if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === email) {
+            window.__referralAllowed = true;
+            updateReferralNavVisibility(true);
+        }
+    } catch (e) {
+        console.error('[Referral] add allowlist:', e);
+        showToast(t('common.error_with_msg', { msg: e.message }));
+    }
+};
+
+window.removeReferralAllowlistEmail = async (emailId) => {
+    if (!window.__isAdmin) return;
+    if (!confirm(t('admin.ref_allowlist_confirm_remove', { email: emailId }))) return;
+    const { db, doc, deleteDoc } = window.firebase;
+    try {
+        await deleteDoc(doc(db, 'referralAllowlist', emailId));
+        showToast(t('admin.ref_allowlist_removed'));
+        if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === emailId) {
+            window.__referralAllowed = false;
+            updateReferralNavVisibility(false);
+        }
+    } catch (e) {
+        showToast(t('common.error_with_msg', { msg: e.message }));
+    }
+};
+
 function subscribeAdminReferrals() {
     const { db, collection, onSnapshot, query, orderBy, limit } = window.firebase;
 
@@ -4326,6 +4445,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminTopups');
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
+        fbUnsub('adminReferralAllowlist');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
         return;
@@ -4359,6 +4479,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
         subscribeAdminReferrals();
+        subscribeAdminReferralAllowlist();
     } else if (adminActiveTab === 'bots') {
         fbUnsub('adminOrders');
         fbUnsub('adminTopups');
@@ -5392,6 +5513,14 @@ async function openReferralPage() {
         showToast(t('common.toast_login_required') || 'Vui lòng đăng nhập');
         return;
     }
+    if (!window.__referralAllowed) {
+        const ok = await refreshReferralAllowance(currentUser);
+        if (!ok) {
+            showToast(t('referral.not_allowed'));
+            showDashboard();
+            return;
+        }
+    }
 
     const linkInput = document.getElementById('referral-link-input');
     const codeDisplay = document.getElementById('referral-code-display');
@@ -5568,6 +5697,11 @@ async function payReferralCommissionClient(topupId, referredUserId, baseCoins, g
     const referrerSnapPre = await getDoc(referrerRef);
     if (!referrerSnapPre.exists()) return;
     const referrerData = referrerSnapPre.data();
+    const allowSnap = await getDoc(doc(db, 'referralAllowlist', normalizeReferralAllowlistEmail(referrerData.email || '')));
+    if (!allowSnap.exists()) {
+        console.log('[Referral] Referrer not on allowlist — skip commission:', referrerData.email);
+        return;
+    }
 
     await runTransaction(db, async (transaction) => {
         const earningInTxn = await transaction.get(earningRef);
