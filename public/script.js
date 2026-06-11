@@ -908,7 +908,25 @@ function normalizeDownloadUrl(url) {
     return url;
 }
 
-window.downloadMedia = async (event, url, filename, mimeType) => {
+function buildNativeDownloadHref(sourceUrl, filename) {
+    const params = new URLSearchParams({
+        url: normalizeDownloadUrl(sourceUrl),
+        name: filename || 'kaling_video.mp4',
+    });
+    return `/api/media-download?${params}`;
+}
+
+function triggerNativeBrowserDownload(sourceUrl, filename) {
+    const href = buildNativeDownloadHref(sourceUrl, filename);
+    const a = document.createElement('a');
+    a.href = href;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+window.downloadMedia = (event, url, filename) => {
     if (event) {
         event.stopPropagation();
         event.preventDefault();
@@ -916,45 +934,16 @@ window.downloadMedia = async (event, url, filename, mimeType) => {
     if (!url) return;
 
     const name = filename || 'kaling_video.mp4';
-    const mime = mimeType || 'video/mp4';
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-        || (navigator.maxTouchPoints > 1 && window.matchMedia('(max-width: 1024px)').matches);
-
-    showToast(t('common.download_preparing'));
-
+    showToast(t('common.download_started'));
     try {
-        const sourceUrl = normalizeDownloadUrl(url);
-        const res = await fetch(`/api/media-download?url=${encodeURIComponent(sourceUrl)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        const file = new File([blob], name, { type: blob.type || mime });
-
-        if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            showToast(t('common.download_share_hint'));
-            await navigator.share({ files: [file], title: name });
-            showToast(t('common.download_done'));
-            return;
-        }
-
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = name;
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        showToast(isMobile ? t('common.download_done_mobile') : t('common.download_done'));
+        triggerNativeBrowserDownload(url, name);
     } catch (err) {
-        if (err && err.name === 'AbortError') return;
         console.error('[downloadMedia]', err);
         try {
             const fallback = normalizeDownloadUrl(url);
             const a = document.createElement('a');
             a.href = fallback;
-            a.target = '_blank';
-            a.download = name;
+            a.rel = 'noopener';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

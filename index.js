@@ -71,7 +71,7 @@ export default {
       });
     }
 
-    // Proxy media download (same-origin) so mobile can fetch blob & save to gallery.
+    // Same-origin download proxy — browser native download UI (Content-Length + attachment).
     if (url.pathname === '/api/media-download' && method === 'GET') {
       const target = url.searchParams.get('url');
       if (!target || !isAllowedMediaUrl(target)) {
@@ -86,9 +86,19 @@ export default {
       headers.set('Content-Type', contentType);
       headers.set('Cache-Control', 'private, max-age=600');
       headers.set('Access-Control-Allow-Origin', '*');
-      const cd = upstream.headers.get('Content-Disposition');
-      headers.set('Content-Disposition', cd || 'attachment; filename="download"');
-      return new Response(upstream.body, { status: 200, headers });
+      const contentLength = upstream.headers.get('Content-Length');
+      if (contentLength) headers.set('Content-Length', contentLength);
+      const acceptRanges = upstream.headers.get('Accept-Ranges');
+      if (acceptRanges) headers.set('Accept-Ranges', acceptRanges);
+      const suggestedName = (url.searchParams.get('name') || '').trim();
+      const safeName = suggestedName.replace(/[^\w.\-()+ ]/g, '_').slice(0, 180);
+      const upstreamCd = upstream.headers.get('Content-Disposition');
+      if (safeName) {
+        headers.set('Content-Disposition', `attachment; filename="${safeName}"`);
+      } else {
+        headers.set('Content-Disposition', upstreamCd || 'attachment; filename="download"');
+      }
+      return new Response(upstream.body, { status: upstream.status, headers });
     }
 
     // Not an API route - let Cloudflare Assets serve static files.
