@@ -174,6 +174,7 @@ window.TRANSLATIONS = {
         pricing: {
             title: "Gói nạp Coin",
             subtitle: "Nạp coin một lần, sử dụng cho mọi dịch vụ.",
+            topup_once_used: "Bạn đã dùng gói này rồi. Vui lòng chọn gói khác.",
             service_title: "Gói dịch vụ Video",
             featured: "Bán chạy nhất",
             select_pkg: "Chọn gói",
@@ -851,6 +852,7 @@ window.TRANSLATIONS = {
         pricing: {
             title: "Coin Packages",
             subtitle: "Top up once, use for all services.",
+            topup_once_used: "You have already used this package. Please choose another one.",
             service_title: "Video Service Packages",
             featured: "Best Seller",
             select_pkg: "Select Package",

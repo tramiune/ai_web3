@@ -11,6 +11,10 @@
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 
+function isStarterTopup(topup) {
+  return Number(topup?.coins) === 10 && Number(topup?.amount) === 10000;
+}
+
 function getServiceAccountFromEnv(env, key) {
   const envSecret = env ? env[key] : null;
   if (!envSecret) throw new Error(`Missing ${key} env var`);
@@ -71,6 +75,20 @@ export async function onRequestPost(context) {
         if (topup) {
            const coins = topup.coins;
            const code = topup.transferContent;
+
+           // Kaling: gói Starter 10k chỉ được nạp 1 lần / user
+           if (prefix === 'KL' && isStarterTopup(topup)) {
+             const usedStarter = await userHasApprovedStarterTopup(state.token, state.cfg.project_id, topup.userId, topup.id);
+             if (usedStarter) {
+               console.warn(`[CẢNH BÁO] User ${topup.userId} đã nạp gói Starter trước đó`);
+               const message = `⚠️ *TỪ CHỐI NẠP TRÙNG GÓI STARTER (KL)*\n\n` +
+                               `👤 Khách: ${topup.userName || 'N/A'}\n` +
+                               `📝 Nội dung: ${code}\n` +
+                               `*Gói 10.000đ chỉ dùng 1 lần — không cộng coin.*`;
+               await notifyTelegram(message);
+               continue;
+             }
+           }
 
            // KIỂM TRA BẢO MẬT: Xác minh số tiền chuyển khoản thực tế có đủ không
            if (topup.amount && amount < topup.amount) {
@@ -177,6 +195,43 @@ async function getAccessToken(email, privateKey) {
   const data = await res.json();
   if (data.error) throw new Error("Google Auth Error: " + (data.error_description || data.error));
   return data.access_token;
+}
+
+async function userHasApprovedStarterTopup(token, projectId, userId, excludeTopupId = '') {
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "topups" }],
+        where: {
+          compositeFilter: {
+            op: "AND",
+            filters: [
+              { fieldFilter: { field: { fieldPath: "userId" }, op: "EQUAL", value: { stringValue: userId } } },
+              { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "approved" } } }
+            ]
+          }
+        },
+        limit: 100
+      }
+    })
+  });
+  const data = await res.json();
+  if (!Array.isArray(data)) return false;
+
+  return data.some((item) => {
+    if (!item.document) return false;
+    const id = item.document.name.split("/").pop();
+    if (excludeTopupId && id === excludeTopupId) return false;
+    const fields = item.document.fields || {};
+    const packageId = fields.packageId?.stringValue || '';
+    if (packageId === 'starter_v2') return true;
+    const coins = parseInt(fields.coins?.integerValue || 0);
+    const amount = parseInt(fields.amount?.integerValue || fields.amount?.doubleValue || 0);
+    return coins === 10 && amount === 10000;
+  });
 }
 
 async function fetchPendingTopups(token, projectId) {
