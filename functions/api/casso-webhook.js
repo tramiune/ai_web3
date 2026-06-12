@@ -345,7 +345,7 @@ async function isReferrerOnAllowlist(token, projectId, referrerEmail) {
 }
 
 /**
- * Pay 10% referral commission in coins to the referrer of `referredUserId`.
+ * Record 10% referral commission (money only — no coin credit to referrer).
  * Idempotent: uses topupId as the referralEarnings doc ID and aborts if it already exists.
  */
 async function payReferralCommission(token, projectId, params) {
@@ -355,11 +355,12 @@ async function payReferralCommission(token, projectId, params) {
   } = params;
   if (!topupId || !referredUserId || !baseCoins || baseCoins <= 0) return;
 
-  const commissionCoins = Math.floor(baseCoins * REFERRAL_COMMISSION_RATE);
-  if (commissionCoins <= 0) return;
-
   const cur = (currency || 'VND').toUpperCase();
-  const commissionAmount = computeCommissionAmount(baseAmount, cur);
+  const effectiveBaseAmount = (baseAmount && baseAmount > 0)
+    ? baseAmount
+    : (cur === 'VND' ? baseCoins * 1000 : 0);
+  const commissionAmount = computeCommissionAmount(effectiveBaseAmount, cur);
+  if (commissionAmount <= 0) return;
 
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   const authHeader = { "Authorization": `Bearer ${token}` };
@@ -396,19 +397,17 @@ async function payReferralCommission(token, projectId, params) {
     referredUserName: { stringValue: referredUserName || referredUserData.fields?.displayName?.stringValue || '' },
     topupId: { stringValue: topupId },
     baseCoins: { integerValue: baseCoins },
-    commissionCoins: { integerValue: commissionCoins },
+    commissionCoins: { integerValue: 0 },
     commissionRate: { doubleValue: REFERRAL_COMMISSION_RATE },
     gateway: { stringValue: gateway || 'unknown' },
     currency: { stringValue: cur },
-    payoutStatus: { stringValue: 'credited' },
+    payoutStatus: { stringValue: 'recorded' },
     createdAt: { timestampValue: new Date().toISOString() }
   };
-  if (baseAmount && baseAmount > 0) {
-    earningsFields.baseAmount = firestoreAmountField(baseAmount, cur);
+  if (effectiveBaseAmount > 0) {
+    earningsFields.baseAmount = firestoreAmountField(effectiveBaseAmount, cur);
   }
-  if (commissionAmount > 0) {
-    earningsFields.commissionAmount = firestoreAmountField(commissionAmount, cur);
-  }
+  earningsFields.commissionAmount = firestoreAmountField(commissionAmount, cur);
 
   const earningsBody = { fields: earningsFields };
 
@@ -428,36 +427,15 @@ async function payReferralCommission(token, projectId, params) {
     throw new Error(`Create referralEarnings failed (${createRes.status}): ${txt}`);
   }
 
-  const currentCoins = parseInt(referrerData.fields?.coins?.integerValue || 0);
-
-  const patchRes = await fetch(`${baseUrl}/users/${referredBy}?updateMask.fieldPaths=coins&updateMask.fieldPaths=updatedAt`, {
-    method: "PATCH",
-    headers: { ...authHeader, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fields: {
-        coins: { integerValue: currentCoins + commissionCoins },
-        updatedAt: { timestampValue: new Date().toISOString() }
-      }
-    })
-  });
-  if (!patchRes.ok) {
-    const txt = await patchRes.text();
-    throw new Error(`Credit referrer coins failed (${patchRes.status}): ${txt}`);
-  }
-
-  console.log(`[Referral] Paid ${commissionCoins} coin + ${commissionAmount} ${cur} commission to ${referredBy} for topup ${topupId} (gateway=${gateway})`);
+  console.log(`[Referral] Recorded ${commissionAmount} ${cur} commission for ${referredBy} (topup ${topupId}, gateway=${gateway})`);
 
   try {
-    const moneyLine = commissionAmount > 0
-      ? `💵 Hoa hồng tiền: ${formatMoneyForTelegram(commissionAmount, cur)}\n`
-      : '';
     await notifyTelegram(
       `🎁 *HOA HỒNG GIỚI THIỆU \\(${gateway}\\)*\n\n` +
       `👤 Người giới thiệu: ${referrerName}\n` +
       `📧 Email: ${referrerEmail}\n` +
-      moneyLine +
-      `🪙 Hoa hồng Coin: +${commissionCoins} Coin\n` +
-      `🛒 Người được mời nạp: ${referredUserName || 'N/A'} (${formatMoneyForTelegram(baseAmount, cur) || baseCoins + ' Coin'})\n` +
+      `💵 Hoa hồng: ${formatMoneyForTelegram(commissionAmount, cur)}\n` +
+      `🛒 Người được mời nạp: ${referredUserName || 'N/A'} (${formatMoneyForTelegram(effectiveBaseAmount, cur) || baseCoins + ' Coin'})\n` +
       `🔑 Topup ID: ${topupId}`
     );
   } catch (e) { /* swallow */ }

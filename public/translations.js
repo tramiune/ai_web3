@@ -57,7 +57,7 @@ window.TRANSLATIONS = {
         referral: {
             title: "Giới thiệu bạn bè - Nhận 10% hoa hồng",
             how_title: "Cách hoạt động",
-            how_desc: "Chia sẻ link cá nhân. Mỗi khi người bạn mời nạp tiền, bạn nhận ngay 10% số tiền họ nạp (và 10% Coin vào ví) — vĩnh viễn, không giới hạn lượt nạp.",
+            how_desc: "Chia sẻ link cá nhân. Mỗi khi người bạn mời nạp tiền, hệ thống ghi nhận 10% hoa hồng tiền mặt — vĩnh viễn, không giới hạn lượt nạp.",
             your_link: "Link giới thiệu của bạn",
             copy_btn: "Sao chép",
             code_hint: "Mã giới thiệu của bạn: <b id=\"referral-code-display\">—</b>",
@@ -746,7 +746,7 @@ window.TRANSLATIONS = {
         referral: {
             title: "Refer Friends - Earn 10% Commission",
             how_title: "How it works",
-            how_desc: "Share your personal link. Every time a friend tops up, you instantly receive 10% of their payment amount (plus 10% Coins to your wallet) - lifetime, unlimited top-ups.",
+            how_desc: "Share your personal link. Every time a friend tops up, the system records a 10% cash commission for you — lifetime, unlimited top-ups.",
             your_link: "Your referral link",
             copy_btn: "Copy",
             code_hint: "Your referral code: <b id=\"referral-code-display\">—</b>",

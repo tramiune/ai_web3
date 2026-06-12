@@ -532,11 +532,12 @@ async function payReferralCommission(token, projectId, params) {
     } = params;
     if (!topupId || !referredUserId || !baseCoins || baseCoins <= 0) return;
 
-    const commissionCoins = Math.floor(baseCoins * REFERRAL_COMMISSION_RATE);
-    if (commissionCoins <= 0) return;
-
     const cur = (currency || 'VND').toUpperCase();
-    const commissionAmount = computeCommissionAmount(baseAmount, cur);
+    const effectiveBaseAmount = (baseAmount && baseAmount > 0)
+        ? baseAmount
+        : (cur === 'VND' ? baseCoins * 1000 : 0);
+    const commissionAmount = computeCommissionAmount(effectiveBaseAmount, cur);
+    if (commissionAmount <= 0) return;
 
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const authHeader = { 'Authorization': `Bearer ${token}` };
@@ -572,19 +573,17 @@ async function payReferralCommission(token, projectId, params) {
         referredUserName:  { stringValue: referredUserName  || referredData.fields?.displayName?.stringValue || '' },
         topupId:           { stringValue: topupId },
         baseCoins:         { integerValue: baseCoins },
-        commissionCoins:   { integerValue: commissionCoins },
+        commissionCoins:   { integerValue: 0 },
         commissionRate:    { doubleValue: REFERRAL_COMMISSION_RATE },
         gateway:           { stringValue: gateway || 'paypal' },
         currency:          { stringValue: cur },
-        payoutStatus:      { stringValue: 'credited' },
+        payoutStatus:      { stringValue: 'recorded' },
         createdAt:         { timestampValue: new Date().toISOString() }
     };
-    if (baseAmount && baseAmount > 0) {
-        earningsFields.baseAmount = firestoreAmountField(baseAmount, cur);
+    if (effectiveBaseAmount > 0) {
+        earningsFields.baseAmount = firestoreAmountField(effectiveBaseAmount, cur);
     }
-    if (commissionAmount > 0) {
-        earningsFields.commissionAmount = firestoreAmountField(commissionAmount, cur);
-    }
+    earningsFields.commissionAmount = firestoreAmountField(commissionAmount, cur);
 
     const createUrl = `${baseUrl}/referralEarnings?documentId=${encodeURIComponent(topupId)}`;
     const createRes = await fetch(createUrl, {
@@ -598,34 +597,13 @@ async function payReferralCommission(token, projectId, params) {
         throw new Error(`Create referralEarnings failed (${createRes.status}): ${txt}`);
     }
 
-    const currentCoins = parseInt(referrerData.fields?.coins?.integerValue || 0);
-
-    const patchRes = await fetch(`${baseUrl}/users/${referredBy}?updateMask.fieldPaths=coins&updateMask.fieldPaths=updatedAt`, {
-        method: 'PATCH',
-        headers: { ...authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            fields: {
-                coins: { integerValue: currentCoins + commissionCoins },
-                updatedAt: { timestampValue: new Date().toISOString() }
-            }
-        })
-    });
-    if (!patchRes.ok) {
-        const txt = await patchRes.text();
-        throw new Error(`Credit referrer coins failed (${patchRes.status}): ${txt}`);
-    }
-
     try {
-        const moneyLine = commissionAmount > 0
-            ? `💵 Hoa hồng tiền: ${formatMoneyForTelegram(commissionAmount, cur)}\n`
-            : '';
         await notifyTelegram(
             `🎁 <b>HOA HỒNG GIỚI THIỆU (${gateway})</b>\n\n` +
             `👤 Người giới thiệu: ${escapeHtml(referrerName)}\n` +
             `📧 Email: ${escapeHtml(referrerEmail)}\n` +
-            moneyLine +
-            `🪙 Hoa hồng Coin: +${commissionCoins} Coin\n` +
-            `🛒 Người được mời: ${escapeHtml(referredUserName || 'N/A')} (${formatMoneyForTelegram(baseAmount, cur) || baseCoins + ' Coin'})\n` +
+            `💵 Hoa hồng: ${formatMoneyForTelegram(commissionAmount, cur)}\n` +
+            `🛒 Người được mời: ${escapeHtml(referredUserName || 'N/A')} (${formatMoneyForTelegram(effectiveBaseAmount, cur) || baseCoins + ' Coin'})\n` +
             `🔑 Topup: ${topupId}`
         );
     } catch (e) { /* swallow */ }

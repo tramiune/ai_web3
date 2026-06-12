@@ -3768,7 +3768,6 @@ function renderAdminReferrals() {
                 referrerEmail: ref.email,
                 vnd: 0,
                 usd: 0,
-                coins: 0,
                 count: 0
             };
         }
@@ -3779,7 +3778,6 @@ function renderAdminReferrals() {
             byReferrer[key].referrerEmail = ref.email;
         }
         byReferrer[key].count += 1;
-        byReferrer[key].coins += d.commissionCoins || 0;
         if (money.currency === 'USD' && money.commissionAmount) {
             byReferrer[key].usd += money.commissionAmount;
         } else if (money.commissionAmount) {
@@ -3800,7 +3798,6 @@ function renderAdminReferrals() {
                                 <th>${t('admin.ref_col_referrer')}</th>
                                 <th>${t('admin.ref_col_total_vnd')}</th>
                                 <th>${t('admin.ref_col_total_usd')}</th>
-                                <th>${t('admin.ref_col_total_coins')}</th>
                                 <th>${t('admin.ref_col_count')}</th>
                             </tr>
                         </thead>
@@ -3813,7 +3810,6 @@ function renderAdminReferrals() {
                                     </td>
                                     <td style="color:#ffde00; font-weight:700;">${formatReferralMoney(r.vnd, 'VND')}</td>
                                     <td>${r.usd > 0 ? formatReferralMoney(r.usd, 'USD') : '—'}</td>
-                                    <td>+${r.coins} Coin</td>
                                     <td>${r.count}</td>
                                 </tr>
                             `).join('')}
@@ -3858,10 +3854,7 @@ function renderAdminReferrals() {
                     <div>${formatReferralMoney(money.baseAmount, money.currency)}</div>
                     <small style="opacity:0.55;">${d.baseCoins || 0} Coin</small>
                 </td>
-                <td style="color:#ffde00; font-weight:700;">
-                    <div>${formatReferralMoney(money.commissionAmount, money.currency)}</div>
-                    <small style="opacity:0.75;">+${d.commissionCoins || 0} Coin</small>
-                </td>
+                <td style="color:#ffde00; font-weight:700;">${formatReferralMoney(money.commissionAmount, money.currency)}</td>
                 <td>${referralGatewayLabel(d.gateway)}</td>
                 <td>${dateStr}</td>
             </tr>
@@ -5516,7 +5509,6 @@ async function openReferralPage() {
     const listEl = document.getElementById('referral-earnings-list');
     const statInvited = document.getElementById('referral-stat-invited');
     const statEarned = document.getElementById('referral-stat-earned');
-    const statEarnedCoins = document.getElementById('referral-stat-earned-coins');
     const statEarnedUsd = document.getElementById('referral-stat-earned-usd');
     const statTopups = document.getElementById('referral-stat-topups');
 
@@ -5556,7 +5548,6 @@ async function openReferralPage() {
             listEl.innerHTML = `<tr><td colspan="5" style="text-align:center; opacity:0.5; padding:2rem;">${t('referral.empty')}</td></tr>`;
             if (statInvited) statInvited.innerText = '0';
             if (statEarned) statEarned.innerText = '0đ';
-            if (statEarnedCoins) statEarnedCoins.innerText = '0 Coin';
             if (statEarnedUsd) statEarnedUsd.style.display = 'none';
             if (statTopups) statTopups.innerText = '0';
             return;
@@ -5565,7 +5556,6 @@ async function openReferralPage() {
         const rows = [];
         const uniqueFriends = new Set();
         let totalCommissionVnd = 0;
-        let totalCommissionCoins = 0;
         let totalCommissionUsd = 0;
         let totalTopups = 0;
 
@@ -5573,7 +5563,6 @@ async function openReferralPage() {
             const d = docSnap.data();
             const money = getReferralMoneyFields(d);
             uniqueFriends.add(d.referredUserId);
-            totalCommissionCoins += d.commissionCoins || 0;
             totalTopups += 1;
             if (money.currency === 'USD' && money.commissionAmount) {
                 totalCommissionUsd += money.commissionAmount;
@@ -5595,10 +5584,7 @@ async function openReferralPage() {
                         <div style="font-weight:600;">${baseMoney}</div>
                         <small style="opacity:0.55;">${d.baseCoins || 0} Coin</small>
                     </td>
-                    <td style="color:#ffde00; font-weight:700;">
-                        <div>${commissionMoney}</div>
-                        <small style="opacity:0.75; font-weight:500;">+${d.commissionCoins || 0} Coin</small>
-                    </td>
+                    <td style="color:#ffde00; font-weight:700;">${commissionMoney}</td>
                     <td>${gatewayLabel}</td>
                     <td>${dateStr}</td>
                 </tr>
@@ -5608,7 +5594,6 @@ async function openReferralPage() {
         listEl.innerHTML = rows.join('');
         if (statInvited) statInvited.innerText = String(uniqueFriends.size);
         if (statEarned) statEarned.innerText = totalCommissionVnd > 0 ? formatReferralMoney(totalCommissionVnd, 'VND') : '0đ';
-        if (statEarnedCoins) statEarnedCoins.innerText = `+${totalCommissionCoins} Coin`;
         if (statEarnedUsd) {
             if (totalCommissionUsd > 0) {
                 statEarnedUsd.style.display = 'block';
@@ -5656,16 +5641,16 @@ window.shareReferralTelegram = () => {
  * Wrapped in try/catch by caller; this function may throw on hard errors.
  */
 async function payReferralCommissionClient(topupId, referredUserId, baseCoins, gateway, snapshotData) {
-    const { db, doc, getDoc, runTransaction, serverTimestamp } = window.firebase;
+    const { db, doc, getDoc, setDoc, serverTimestamp } = window.firebase;
 
     if (!topupId || !referredUserId || !baseCoins || baseCoins <= 0) return;
 
-    const commissionCoins = Math.floor(baseCoins * REFERRAL_COMMISSION_RATE);
-    if (commissionCoins <= 0) return;
-
-    const baseAmount = snapshotData && snapshotData.baseAmount ? Number(snapshotData.baseAmount) : null;
     const currency = (snapshotData && snapshotData.currency) || 'VND';
-    const commissionAmount = computeReferralCommissionAmount(baseAmount, currency);
+    const cur = currency.toUpperCase();
+    const rawBaseAmount = snapshotData && snapshotData.baseAmount ? Number(snapshotData.baseAmount) : 0;
+    const effectiveBaseAmount = rawBaseAmount > 0 ? rawBaseAmount : (cur === 'VND' ? baseCoins * VND_PER_COIN_FALLBACK : 0);
+    const commissionAmount = computeReferralCommissionAmount(effectiveBaseAmount, cur);
+    if (commissionAmount <= 0) return;
 
     const earningRef = doc(db, "referralEarnings", topupId);
     const earningSnap = await getDoc(earningRef);
@@ -5692,43 +5677,30 @@ async function payReferralCommissionClient(topupId, referredUserId, baseCoins, g
         return;
     }
 
-    await runTransaction(db, async (transaction) => {
-        const earningInTxn = await transaction.get(earningRef);
-        if (earningInTxn.exists()) return;
+    const earningPayload = {
+        referrerId: referrerId,
+        referrerName: referrerData.displayName || (referrerData.email ? referrerData.email.split('@')[0] : '') || 'N/A',
+        referrerEmail: referrerData.email || '',
+        referredUserId: referredUserId,
+        referredUserEmail: (snapshotData && snapshotData.userEmail) || referredData.email || '',
+        referredUserName: (snapshotData && snapshotData.userName) || referredData.displayName || '',
+        topupId: topupId,
+        baseCoins: baseCoins,
+        commissionCoins: 0,
+        commissionRate: REFERRAL_COMMISSION_RATE,
+        gateway: gateway || 'unknown',
+        currency: cur,
+        payoutStatus: 'recorded',
+        createdAt: serverTimestamp()
+    };
+    if (effectiveBaseAmount > 0) {
+        earningPayload.baseAmount = effectiveBaseAmount;
+    }
+    earningPayload.commissionAmount = commissionAmount;
 
-        const referrerSnap = await transaction.get(referrerRef);
-        if (!referrerSnap.exists()) return;
-        const currentCoins = referrerSnap.data().coins || 0;
+    await setDoc(earningRef, earningPayload);
 
-        transaction.update(referrerRef, {
-            coins: currentCoins + commissionCoins,
-            updatedAt: serverTimestamp()
-        });
-
-        const earningPayload = {
-            referrerId: referrerId,
-            referrerName: referrerData.displayName || (referrerData.email ? referrerData.email.split('@')[0] : '') || 'N/A',
-            referrerEmail: referrerData.email || '',
-            referredUserId: referredUserId,
-            referredUserEmail: (snapshotData && snapshotData.userEmail) || referredData.email || '',
-            referredUserName: (snapshotData && snapshotData.userName) || referredData.displayName || '',
-            topupId: topupId,
-            baseCoins: baseCoins,
-            commissionCoins: commissionCoins,
-            commissionRate: REFERRAL_COMMISSION_RATE,
-            gateway: gateway || 'unknown',
-            currency: currency,
-            payoutStatus: 'credited',
-            createdAt: serverTimestamp()
-        };
-        if (baseAmount && baseAmount > 0) {
-            earningPayload.baseAmount = baseAmount;
-            earningPayload.commissionAmount = commissionAmount;
-        }
-        transaction.set(earningRef, earningPayload);
-    });
-
-    console.log(`[Referral] Paid ${commissionCoins} coin + ${commissionAmount} ${currency} commission to ${referrerId} for topup ${topupId}`);
+    console.log(`[Referral] Recorded ${commissionAmount} ${cur} commission for ${referrerId} (topup ${topupId})`);
 }
 window.payReferralCommissionClient = payReferralCommissionClient;
 
