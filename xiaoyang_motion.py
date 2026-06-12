@@ -844,17 +844,31 @@ def poll_videoaieasy_orders(orders_to_check):
         nick = order_data.get("videoaieasyAccountEmail") or account_id
         print(f"🧐 VideoAiEasy — job {job_id} (đơn {doc.id}, {nick})...")
         api = None
-        try:
-            api = _get_vae_web_client(account_id or "default")
-            acc = _videoaieasy_account_lookup(account_id)
-            if acc:
-                _ensure_vae_web_session(api, acc["email"], acc["password"])
-            job = api.get_job(job_id)
-        except (VideoAiEasyAuthError, VideoAiEasyError) as e:
-            print(f"❌ Poll VideoAiEasy {job_id}: {e}")
-            if isinstance(e, VideoAiEasyAuthError) and account_id:
-                _reset_vae_web_client(account_id)
-            if api and ("500" in str(e) or "404" in str(e)):
+        acc = _videoaieasy_account_lookup(account_id)
+        job = None
+        last_err = None
+        for attempt in range(2):
+            try:
+                if attempt > 0 and account_id:
+                    _reset_vae_web_client(account_id)
+                api = _get_vae_web_client(account_id or "default")
+                if acc:
+                    _ensure_vae_web_session(api, acc["email"], acc["password"])
+                job = api.get_job(job_id)
+                break
+            except VideoAiEasyAuthError as e:
+                last_err = e
+                if attempt == 0:
+                    print(f"⚠️ Poll VideoAiEasy {job_id}: {e} — thử login lại...")
+                    continue
+                print(f"❌ Poll VideoAiEasy {job_id}: {e}")
+            except VideoAiEasyError as e:
+                last_err = e
+                print(f"❌ Poll VideoAiEasy {job_id}: {e}")
+                break
+        if job is None:
+            e = last_err
+            if api and e and ("500" in str(e) or "404" in str(e)):
                 try:
                     print(f"↪️ Thử download trực tiếp job {job_id}...")
                     local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
