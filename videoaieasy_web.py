@@ -106,6 +106,8 @@ class VideoAiEasyClient:
         r = self.session.request(method, url, timeout=timeout, **kwargs)
         if r.status_code == 401:
             raise VideoAiEasyAuthError("Session hết hạn — login lại")
+        if r.status_code == 403:
+            raise VideoAiEasyAuthError("Session không hợp lệ — login lại")
         try:
             body = r.json() if r.content else {}
         except Exception:
@@ -138,11 +140,19 @@ class VideoAiEasyClient:
         self._save_session()
         return sess
 
+    def _probe_origin_session(self) -> None:
+        """Origin /api/* can reject cookies while Supabase profile still looks valid."""
+        self._api("GET", "/api/jobs", params={"limit": 1}, timeout=30)
+
     def ensure_session(self, email: str | None = None, password: str | None = None) -> dict:
+        email = (email or self._user_email or get_env("VIDEOAIEASY_EMAIL") or "").strip()
+        password = password or get_env("VIDEOAIEASY_PASSWORD")
         try:
+            self._probe_origin_session()
             return self.get_profile()
         except (VideoAiEasyAuthError, VideoAiEasyError):
             self.login(email, password)
+            self._probe_origin_session()
             return self.get_profile()
 
     def get_profile(self) -> dict:
