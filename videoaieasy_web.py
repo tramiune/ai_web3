@@ -282,3 +282,25 @@ class VideoAiEasyClient:
                     if chunk:
                         f.write(chunk)
         return dest_path
+
+    def try_delete_job(self, job_id: str) -> bool:
+        """Xóa job trên VAE sau khi đã trả hàng Kaling (lỗi không chặn luồng chính)."""
+        job_id = str(job_id or "").strip()
+        if not job_id:
+            return False
+        try:
+            self._api("DELETE", f"/api/jobs/{job_id}", timeout=30)
+            print(f"🗑️ VideoAiEasy đã xóa job {job_id}")
+            return True
+        except VideoAiEasyAuthError as e:
+            print(f"⚠️ VideoAiEasy delete job {job_id}: {e}")
+            return False
+        except VideoAiEasyError as e:
+            err = str(e)
+            if "404" in err:
+                return True
+            if "409" in err:
+                print(f"⚠️ VideoAiEasy job {job_id} chưa xóa được: {e}")
+                return False
+            print(f"⚠️ VideoAiEasy delete job {job_id}: {e}")
+            return False

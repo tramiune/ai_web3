@@ -832,6 +832,13 @@ def poll_xiaoyang_orders(orders_to_check):
             print(f"⏳ Task {task_id} vẫn {st}")
 
 
+def _deliver_vae_job(doc, api: VideoAiEasyClient, job_id: str, complete) -> None:
+    """Tải video VAE, trả hàng Kaling; xóa job trên VAE nếu trả hàng thành công."""
+    local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
+    if complete(doc, local_vid):
+        api.try_delete_job(job_id)
+
+
 def poll_videoaieasy_orders(orders_to_check):
     skip_done = _g.get("skip_if_order_done")
     complete = _g["complete_order_with_video"]
@@ -871,8 +878,7 @@ def poll_videoaieasy_orders(orders_to_check):
             if api and e and ("500" in str(e) or "404" in str(e)):
                 try:
                     print(f"↪️ Thử download trực tiếp job {job_id}...")
-                    local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
-                    complete(doc, local_vid)
+                    _deliver_vae_job(doc, api, job_id, complete)
                     continue
                 except Exception as dl_err:
                     print(f"⚠️ Download trực tiếp {job_id} thất bại: {dl_err}")
@@ -885,8 +891,7 @@ def poll_videoaieasy_orders(orders_to_check):
                 continue
             print(f"🎉 VideoAiEasy job {job_id} HOÀN TẤT — tải video...")
             try:
-                local_vid = api.download_job(job_id, f"res_{doc.id}.mp4")
-                complete(doc, local_vid)
+                _deliver_vae_job(doc, api, job_id, complete)
             except Exception as e:
                 print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
         elif status in ("failed", "expired"):
