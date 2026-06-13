@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
 
@@ -148,6 +149,29 @@ def guess_mime(path: Path) -> str:
   return "application/octet-stream"
 
 
+def _filename_from_url(url: str, *, default: str = "media.bin") -> str:
+  parsed = urlparse(url)
+  query = parse_qs(parsed.query, keep_blank_values=True)
+  file_param = (query.get("file") or [None])[0]
+  if file_param:
+    name = Path(unquote(file_param)).name
+    if name:
+      return name
+  name = Path(parsed.path).name
+  if name:
+    return name
+  return default
+
+
+def _suffix_from_url(url: str, *, default: str = ".mp4") -> str:
+  name = _filename_from_url(url, default="")
+  if name:
+    suffix = Path(name).suffix
+    if suffix:
+      return suffix
+  return default
+
+
 def file_to_media_object(path: Path) -> dict[str, str]:
   if not path.is_file():
     raise Tool98ApiError(f"File not found: {path}")
@@ -171,7 +195,11 @@ def load_media_input(source: str, session: requests.Session | None = None) -> di
       raise Tool98ApiError(f"Failed to download {source}: HTTP {response.status_code}")
 
     mime = (response.headers.get("Content-Type") or "").split(";")[0].strip() or "application/octet-stream"
-    name = Path(source.split("?", 1)[0]).name or "media.bin"
+    name = _filename_from_url(source)
+    if mime == "application/octet-stream":
+      guessed = guess_mime(Path(name))
+      if guessed != "application/octet-stream":
+        mime = guessed
     encoded = base64.b64encode(response.content).decode("ascii")
     return {"filename": name, "data": f"data:{mime};base64,{encoded}"}
 
@@ -263,7 +291,7 @@ def probe_video_duration_seconds(source: str, session: requests.Session | None =
         return None
       if response.status_code >= 400:
         return None
-      suffix = Path(source.split("?", 1)[0]).suffix or ".mp4"
+      suffix = _suffix_from_url(source)
       with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
         handle.write(response.content)
         temp_path = Path(handle.name)
@@ -373,7 +401,7 @@ def prepare_motion_video_source(
       raise Tool98ApiError(f"Failed to download {video_source}: {exc}") from exc
     if response.status_code >= 400:
       raise Tool98ApiError(f"Failed to download {video_source}: HTTP {response.status_code}")
-    suffix = Path(video_source.split("?", 1)[0]).suffix or ".mp4"
+    suffix = _suffix_from_url(video_source)
     fd, in_path = tempfile.mkstemp(suffix=suffix)
     os.close(fd)
     temp_in = Path(in_path)

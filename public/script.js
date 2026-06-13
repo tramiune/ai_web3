@@ -108,14 +108,15 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 }
 
 // --- Data Constants ---
-const MODEL_COST_FAST = 3;
+const MODEL_COST_FAST = 4;
 const MODEL_COST_TURBO = 10;
-const MODEL_COST_ECONOMY = 2;
+const MODEL_COST_ECONOMY = 3;
+const DEFAULT_MODEL_KEY = 'economy';
 const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    return checked ? checked.value : 'fast';
+    return checked ? checked.value : DEFAULT_MODEL_KEY;
 }
 
 function getMaxVideoDurationForModel(modelKey) {
@@ -2180,7 +2181,7 @@ function updateFirstOrderUI() {
         const submitText = submitBtn ? submitBtn.querySelector('[data-i18n="hero.cta_create"]') : null;
         const summaryEl = document.getElementById('submit-summary-line');
         const checkedModel = document.querySelector('input[name="model-type"]:checked');
-        const activeModelKey = checkedModel ? checkedModel.value : 'fast';
+        const activeModelKey = checkedModel ? checkedModel.value : DEFAULT_MODEL_KEY;
 
         costEl.innerText = String(modelCoinCost(activeModelKey));
         if (submitBtn) submitBtn.classList.remove('btn-first-offer');
@@ -2846,7 +2847,7 @@ async function setupEventListeners() {
                 let videoFile = document.getElementById('file-video')?.files?.[0];
                 const templateUrl = document.getElementById('selected-template-url')?.value || '';
                 const tiktokUrl = document.getElementById('tiktok-video-url')?.value?.trim() || '';
-                const modelKeySelected = document.querySelector('input[name="model-type"]:checked')?.value || 'fast';
+                const modelKeySelected = document.querySelector('input[name="model-type"]:checked')?.value || DEFAULT_MODEL_KEY;
                 let modelIdOverride = null;
 
                 if (!charFile) {
