@@ -110,16 +110,22 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 // --- Data Constants ---
 const MODEL_COST_FAST = 3;
 const MODEL_COST_TURBO = 10;
+const MODEL_COST_ECONOMY = 1;
+const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
 function modelCoinCost(modelKey) {
-    return modelKey === 'turbo' ? MODEL_COST_TURBO : MODEL_COST_FAST;
+    if (modelKey === 'turbo') return MODEL_COST_TURBO;
+    if (modelKey === 'economy') return MODEL_COST_ECONOMY;
+    return MODEL_COST_FAST;
 }
 
 function syncModelPriceLabels() {
     const fastEl = document.getElementById('model-fast-cost');
     const turboEl = document.getElementById('model-turbo-cost');
+    const economyEl = document.getElementById('model-economy-cost');
     if (fastEl) fastEl.textContent = String(MODEL_COST_FAST);
     if (turboEl) turboEl.textContent = String(MODEL_COST_TURBO);
+    if (economyEl) economyEl.textContent = String(MODEL_COST_ECONOMY);
 }
 
 function normalizeOrderCost(model) {
@@ -244,7 +250,8 @@ function gatewayLabel(gateway) {
 const MODELS = {
     // "Model thường" uses Aidancing model id 124
     fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "124" },
-    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" }
+    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" },
+    economy: { nameKey: "modals.model_economy", cost: MODEL_COST_ECONOMY, timeKey: "modals.model_economy_desc", modelId: "126" }
 };
 
 function localizedModel(key) {
@@ -2784,8 +2791,15 @@ async function setupEventListeners() {
                 if (window.currentVideoSource === 'upload' && videoFile) {
                     const dur = await getVideoDurationSeconds(videoFile);
                     if (typeof dur === 'number') {
-                        if (dur > MAX_VIDEO_DURATION_SEC) {
-                            return showToast(t('modals.video_duration_limit'));
+                        const maxDur = modelKeySelected === 'economy'
+                            ? ECONOMY_MAX_VIDEO_DURATION_SEC
+                            : MAX_VIDEO_DURATION_SEC;
+                        if (dur > maxDur) {
+                            return showToast(
+                                modelKeySelected === 'economy'
+                                    ? t('modals.video_duration_economy_limit')
+                                    : t('modals.video_duration_limit')
+                            );
                         }
                         if (modelKeySelected === 'fast') {
                             modelIdOverride = dur < 10 ? '125' : '124';
@@ -3032,8 +3046,12 @@ function userFacingOrderNote(order) {
     return raw
         .replace(/\bXiaoYang\b/gi, 'hệ thống')
         .replace(/\bAidancing\b/gi, 'hệ thống')
+        .replace(/\bVideoAiEasy\b/gi, 'hệ thống')
+        .replace(/\bKling\b/gi, 'AI')
         .replace(/\baidancing\.net\b/gi, 'hệ thống')
-        .replace(/\bxiaoyang\.online\b/gi, 'hệ thống');
+        .replace(/\bxiaoyang\.online\b/gi, 'hệ thống')
+        .replace(/\bvideoaieasy\.[^\s]+/gi, 'hệ thống')
+        .replace(/\bhdgr\.online\b/gi, 'hệ thống');
 }
 
 function renderMyOrders() {

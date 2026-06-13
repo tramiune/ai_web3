@@ -65,18 +65,27 @@ MIN_RENDER_SEC = int(os.environ.get("BOT_MIN_RENDER_SEC", "600"))
 RENDER_PROVIDER_AIDANCING = "aidancing"
 RENDER_PROVIDER_XIAOYANG = "xiaoyang"
 RENDER_PROVIDER_VIDEOAIEASY = "videoaieasy"
+RENDER_PROVIDER_TOOL98 = "tool98"
 _RENDER_PROVIDERS = (
     RENDER_PROVIDER_AIDANCING,
     RENDER_PROVIDER_XIAOYANG,
     RENDER_PROVIDER_VIDEOAIEASY,
+    RENDER_PROVIDER_TOOL98,
 )
 AIDANCING_TURBO_MODEL_IDS = frozenset({"117"})
 AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
-USER_NOTE_ORDER_FAILED = "Đơn hàng xử lý không thành công, hệ thống đã hoàn lại coin."
-USER_NOTE_SUBMIT_FAILED = "Không thể gửi đơn lên hệ thống xử lý, đã hoàn lại coin."
-USER_NOTE_FILES_INVALID = "Ảnh hoặc video quý khách tải lên không hợp lệ, hệ thống đã hoàn lại coin."
+from user_order_notes import (
+    USER_NOTE_FILES_MISSING,
+    USER_NOTE_ORDER_FAILED,
+    USER_NOTE_SUBMIT_FAILED,
+    USER_NOTE_VIDEO_INVALID,
+    user_note_for_media_validation,
+    user_note_for_render_failure,
+)
+
+USER_NOTE_FILES_INVALID = USER_NOTE_VIDEO_INVALID
 _active_render_provider = RENDER_PROVIDER_XIAOYANG
 _active_render_provider_lock = threading.Lock()
 _processing_cache = {}
@@ -138,6 +147,8 @@ def _order_render_provider(order_data: dict) -> str:
     rp = (order_data.get("renderProvider") or "").strip().lower()
     if rp in _RENDER_PROVIDERS:
         return rp
+    if order_data.get("tool98JobId"):
+        return RENDER_PROVIDER_TOOL98
     if order_data.get("videoaieasyJobId"):
         return RENDER_PROVIDER_VIDEOAIEASY
     if order_data.get("xiaoyangTaskId"):
@@ -301,7 +312,9 @@ def _http_poll_orders(orders_to_check):
             order_data = doc.to_dict()
             err_detail = f'Aidancing job {job_id} {status}: {job.get("errorMessage") or ""}'
             _fail_order_processing(
-                doc, order_data, err_detail, USER_NOTE_ORDER_FAILED, 'render aidancing'
+                doc, order_data, err_detail,
+                user_note_for_render_failure(job.get("errorMessage")),
+                'render aidancing',
             )
         else:
             print(f"⏳ Job {job_id} vẫn {status}")
@@ -403,7 +416,7 @@ def _http_poll_xiaoyang_orders(orders_to_check):
                 doc,
                 order_data,
                 f"XiaoYang task {task_id} FAIL: {err or ''}",
-                USER_NOTE_ORDER_FAILED,
+                user_note_for_render_failure(err),
                 "render xiaoyang",
             )
             api.try_delete_task(task_id)
@@ -511,6 +524,7 @@ def _processing_monitor_state():
     ad_eligible = []
     xy_eligible = []
     vae_eligible = []
+    tool98_eligible = []
     with _processing_cache_lock:
         stale_ids = []
         for oid, doc in _processing_cache.items():
@@ -528,7 +542,10 @@ def _processing_monitor_state():
             if submitted_at and (now - submitted_at).total_seconds() <= MIN_RENDER_SEC:
                 continue
             rp = _order_render_provider(d)
-            if rp == RENDER_PROVIDER_XIAOYANG:
+            if rp == RENDER_PROVIDER_TOOL98:
+                if d.get("tool98JobId"):
+                    tool98_eligible.append(doc)
+            elif rp == RENDER_PROVIDER_XIAOYANG:
                 if d.get("xiaoyangTaskId"):
                     xy_eligible.append(doc)
             elif rp == RENDER_PROVIDER_VIDEOAIEASY:
@@ -538,7 +555,7 @@ def _processing_monitor_state():
                 job_id = d.get("aidancingJobId")
                 if job_id and job_id != "MANUAL":
                     ad_eligible.append(doc)
-    return ad_eligible, xy_eligible, vae_eligible, processing_count
+    return ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing_count
 
 
 def on_processing_orders_snapshot(keys, changes, read_time):
@@ -1273,13 +1290,14 @@ def check_finished_orders_api():
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
-    ad_orders, xy_orders, vae_orders, _ = _processing_monitor_state()
-    if not ad_orders and not xy_orders and not vae_orders:
+    ad_orders, xy_orders, vae_orders, tool98_orders, _ = _processing_monitor_state()
+    if not ad_orders and not xy_orders and not vae_orders and not tool98_orders:
         return
 
     print(
         f"\n🔍 [MONITOR/HTTP] Poll Aidancing={len(ad_orders)} XiaoYang={len(xy_orders)} "
-        f"VideoAiEasy={len(vae_orders)} (sau {MIN_RENDER_SEC // 60}p từ submittedAt)..."
+        f"VideoAiEasy={len(vae_orders)} Tool98={len(tool98_orders)} "
+        f"(sau {MIN_RENDER_SEC // 60}p từ submittedAt)..."
     )
     if ad_orders:
         try:
@@ -1305,6 +1323,11 @@ def check_finished_orders_api():
             xy_motion.poll_videoaieasy_orders(vae_orders)
         except Exception as e:
             print(f"❌ Lỗi monitor VideoAiEasy: {e}")
+    if tool98_orders and xy_motion.enabled_for_bot(BOT_NAME):
+        try:
+            xy_motion.poll_tool98_orders(tool98_orders)
+        except Exception as e:
+            print(f"❌ Lỗi monitor Tool98: {e}")
 
 def _mark_order_processing(
     doc_ref,
@@ -1367,7 +1390,7 @@ def submit_to_xiaoyang(order_id):
                     doc,
                     data,
                     "Thiếu characterImageLink hoặc referenceVideoLink",
-                    "Thiếu ảnh hoặc video tham chiếu, hệ thống đã hoàn lại coin.",
+                    USER_NOTE_FILES_MISSING,
                     "submit xiaoyang",
                 )
                 return
@@ -1428,7 +1451,10 @@ def submit_to_xiaoyang(order_id):
                         _invalidate_xy_key(key_idx)
                     except NameError:
                         pass
-                user_note = USER_NOTE_FILES_INVALID if isinstance(e, MediaValidationError) else USER_NOTE_SUBMIT_FAILED
+                if isinstance(e, MediaValidationError):
+                    user_note = user_note_for_media_validation(str(e))
+                else:
+                    user_note = USER_NOTE_SUBMIT_FAILED
                 _fail_order_processing(doc, data, str(e), user_note, "submit xiaoyang")
     finally:
         with _submitting_orders_lock:
@@ -1488,7 +1514,8 @@ def submit_to_aidancing(order_id, fallback_reason=None):
 
                 doc_ref.update({
                     'status': 'failed',
-                    'adminNote': 'Ảnh hoặc video quý khách tải lên không tồn tại, hệ thống đã hoàn lại coin.',
+                    'adminNote': firestore.DELETE_FIELD,
+                    'systemNote': USER_NOTE_FILES_MISSING,
                     'updatedAt': firestore.SERVER_TIMESTAMP
                 })
 
@@ -1645,7 +1672,7 @@ def check_finished_orders():
         if browser_lock.locked():
             return
 
-        ad_orders, _, _, _ = _processing_monitor_state()
+        ad_orders, _, _, _, _ = _processing_monitor_state()
         if not ad_orders:
             return
 
@@ -1803,7 +1830,8 @@ def check_finished_orders():
 
                             db.collection('orders').document(doc.id).update({
                                 'status': 'failed',
-                                'adminNote': 'Ảnh hoặc video quý khách tải lên không hợp lệ, hệ thống đã hoàn lại coin.',
+                                'adminNote': firestore.DELETE_FIELD,
+                                'systemNote': user_note_for_render_failure(text),
                                 'updatedAt': firestore.SERVER_TIMESTAMP
                             })
 
@@ -1952,12 +1980,13 @@ def start_bot():
 
     def monitor_loop():
         while True:
-            ad_eligible, xy_eligible, vae_eligible, processing = _processing_monitor_state()
+            ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing = _processing_monitor_state()
             if is_bot_enabled():
                 check_finished_orders()
             if use_api_mode():
                 sleep_sec = _monitor_sleep_seconds(
-                    len(ad_eligible) + len(xy_eligible) + len(vae_eligible), processing
+                    len(ad_eligible) + len(xy_eligible) + len(vae_eligible) + len(tool98_eligible),
+                    processing,
                 )
             else:
                 sleep_sec = 60 if processing else int(os.environ.get("BOT_POLL_IDLE_SEC", "300"))

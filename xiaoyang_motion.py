@@ -24,29 +24,37 @@ from videoaieasy_web import (
     MODEL_KLING_26,
     MODEL_KLING_30,
 )
+from tool98_api import (
+    Tool98ApiError,
+    Tool98Client,
+    load_media_input,
+    prepare_motion_video_source,
+    resolve_motion_duration_seconds,
+)
 
 load_project_env()
 
 RENDER_PROVIDER_AIDANCING = "aidancing"
 RENDER_PROVIDER_XIAOYANG = "xiaoyang"
 RENDER_PROVIDER_VIDEOAIEASY = "videoaieasy"
+RENDER_PROVIDER_TOOL98 = "tool98"
 _RENDER_PROVIDERS = (
     RENDER_PROVIDER_AIDANCING,
     RENDER_PROVIDER_XIAOYANG,
     RENDER_PROVIDER_VIDEOAIEASY,
+    RENDER_PROVIDER_TOOL98,
 )
 VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("VIDEOAIEASY_MAX_CONCURRENT", "4"))
 AIDANCING_TURBO_MODEL_IDS = frozenset({"117"})
 AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
+TOOL98_ECONOMY_MODEL_IDS = frozenset({"126"})
+TOOL98_RESOLUTION = "720P"
+TOOL98_ECONOMY_PROFILE = get_env("TOOL98_ECONOMY_PROFILE", "gen_03").strip() or "gen_03"
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 
-USER_NOTE_ORDER_FAILED = (
-    "Ảnh hoặc video có thể nhạy cảm, không vượt qua khâu kiểm duyệt. "
-    "Nếu bạn tin đây là nhầm lẫn thì vui lòng thử lại. Hệ thống đã hoàn lại coin."
-)
-USER_NOTE_FILES_MISSING = "Ảnh hoặc video quý khách tải lên không tồn tại, hệ thống đã hoàn lại coin."
+from user_order_notes import USER_NOTE_FILES_MISSING, user_note_for_render_failure
 
 _g: dict = {}
 _active_render_provider = RENDER_PROVIDER_XIAOYANG
@@ -63,6 +71,8 @@ _vae_inflight: dict = {}
 _vae_inflight_lock = threading.Lock()
 _vae_accounts_cache = None
 _vae_accounts_cache_lock = threading.Lock()
+_tool98_client = None
+_tool98_client_lock = threading.Lock()
 
 
 def wire(**kwargs):
@@ -406,12 +416,34 @@ def _xiaoyang_modal_for_order(order_data: dict) -> tuple[str, str]:
     return modal, get_env("XIAOYANG_OPTION_KEY", "default")
 
 
+def _is_tool98_economy_order(order_data: dict) -> bool:
+    return str((order_data or {}).get("modelId") or "").strip() in TOOL98_ECONOMY_MODEL_IDS
+
+
+def _tool98_enabled() -> bool:
+    return bool(get_env("TOOL98_LICENSE_KEY", "").strip())
+
+
+def _get_tool98_client() -> Tool98Client:
+    global _tool98_client
+    with _tool98_client_lock:
+        if _tool98_client is None:
+            key = get_env("TOOL98_LICENSE_KEY", "").strip()
+            if not key:
+                raise Tool98ApiError("Missing TOOL98_LICENSE_KEY")
+            base = get_env("TOOL98_BASE_URL", "https://ai.tool98.com").strip()
+            _tool98_client = Tool98Client(license_key=key, base_url=base)
+        return _tool98_client
+
+
 def _order_render_provider(order_data: dict) -> str:
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
     rp = (order_data.get("renderProvider") or "").strip().lower()
     if rp in _RENDER_PROVIDERS:
         return rp
+    if order_data.get("tool98JobId"):
+        return RENDER_PROVIDER_TOOL98
     if order_data.get("videoaieasyJobId"):
         return RENDER_PROVIDER_VIDEOAIEASY
     if order_data.get("xiaoyangTaskId"):
@@ -424,6 +456,7 @@ def split_monitor_state(processing_cache: dict, min_render_sec: int):
     ad_eligible = []
     xy_eligible = []
     vae_eligible = []
+    tool98_eligible = []
     for doc in processing_cache.values():
         d = doc.to_dict() or {}
         if d.get("status") != "processing":
@@ -432,7 +465,9 @@ def split_monitor_state(processing_cache: dict, min_render_sec: int):
         if submitted_at and (now - submitted_at).total_seconds() <= min_render_sec:
             continue
         rp = _order_render_provider(d)
-        if rp == RENDER_PROVIDER_XIAOYANG and d.get("xiaoyangTaskId"):
+        if rp == RENDER_PROVIDER_TOOL98 and d.get("tool98JobId"):
+            tool98_eligible.append(doc)
+        elif rp == RENDER_PROVIDER_XIAOYANG and d.get("xiaoyangTaskId"):
             xy_eligible.append(doc)
         elif rp == RENDER_PROVIDER_VIDEOAIEASY and d.get("videoaieasyJobId"):
             vae_eligible.append(doc)
@@ -440,7 +475,7 @@ def split_monitor_state(processing_cache: dict, min_render_sec: int):
             job_id = d.get("aidancingJobId")
             if job_id and job_id != "MANUAL":
                 ad_eligible.append(doc)
-    return ad_eligible, xy_eligible, vae_eligible
+    return ad_eligible, xy_eligible, vae_eligible, tool98_eligible
 
 
 def _fail_order_processing(doc, order_data, err_detail, system_note, context: str):
@@ -493,6 +528,8 @@ def _mark_order_processing(
             payload["videoaieasyAccount"] = str(videoaieasy_account)
         if videoaieasy_account_email:
             payload["videoaieasyAccountEmail"] = str(videoaieasy_account_email)
+    elif provider == RENDER_PROVIDER_TOOL98:
+        payload["tool98JobId"] = str(job_id)
     else:
         payload["aidancingJobId"] = str(job_id)
     doc_ref.update(payload)
@@ -751,8 +788,127 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
     return submit_to_videoaieasy(order_id, account)
 
 
+def submit_to_tool98(order_id: str) -> bool:
+    """Model tiết kiệm (126) — chỉ Tool98 720P, không fallback."""
+    if not _g["is_bot_enabled"]():
+        return False
+    if _g["pending_submit_backoff_active"](order_id):
+        return False
+    submitting_lock = _g["submitting_orders_lock"]
+    submitting = _g["submitting_orders"]
+    with submitting_lock:
+        if order_id in submitting:
+            return False
+        submitting.add(order_id)
+
+    success = False
+    temp_trimmed = None
+    try:
+        with _g["browser_lock"]:
+            db = _g["db"]
+            doc_ref = db.collection("orders").document(order_id)
+            doc = doc_ref.get()
+            if not doc.exists:
+                return False
+            data = doc.to_dict() or {}
+            if data.get("status") != "pending":
+                return False
+            if not _is_tool98_economy_order(data):
+                return False
+
+            print(f"\n⚡ [NẠP ĐƠN / Tool98 tiết kiệm] {order_id}...")
+            img_url = (data.get("characterImageLink") or "").strip()
+            vid_url = (data.get("referenceVideoLink") or "").strip()
+            if not img_url or not vid_url:
+                _fail_order_processing(
+                    doc, data,
+                    "Thiếu characterImageLink hoặc referenceVideoLink",
+                    USER_NOTE_FILES_MISSING,
+                    "submit tool98",
+                )
+                return False
+
+            if not _tool98_enabled():
+                _fail_order_processing(
+                    doc, data,
+                    "Chưa cấu hình TOOL98_LICENSE_KEY",
+                    user_note_for_render_failure("Hệ thống chưa sẵn sàng cho model tiết kiệm"),
+                    "submit tool98",
+                )
+                return False
+
+            try:
+                client = _get_tool98_client()
+                upload_video_source, temp_trimmed = prepare_motion_video_source(
+                    vid_url,
+                    resolution=TOOL98_RESOLUTION,
+                    session=client.session,
+                )
+                duration = resolve_motion_duration_seconds(
+                    upload_video_source,
+                    resolution=TOOL98_RESOLUTION,
+                    session=client.session,
+                )
+                aspect = (data.get("aspectRatio") or "").strip() or None
+                print(
+                    f"🚀 [Tool98] 720P profile={TOOL98_ECONOMY_PROFILE} "
+                    f"duration={duration}s..."
+                )
+                image_obj = load_media_input(img_url, session=client.session)
+                video_obj = load_media_input(upload_video_source, session=client.session)
+                created = client.motion_copy(
+                    image_obj,
+                    video_obj,
+                    resolution=TOOL98_RESOLUTION,
+                    duration_seconds=duration,
+                    aspect_ratio=aspect,
+                    profile=TOOL98_ECONOMY_PROFILE,
+                )
+                job_id = str(created.get("job_id") or "").strip()
+                if not job_id:
+                    raise Tool98ApiError(f"Không nhận được job_id: {created}")
+                print(f"🆔 [Tool98] job: {job_id}")
+                _mark_order_processing(doc_ref, job_id, provider=RENDER_PROVIDER_TOOL98)
+                _g.get("session_error_backoff", {}).pop(order_id, None)
+                print(f"✅ Đơn {order_id} → processing (Tool98 tiết kiệm)")
+                try:
+                    short_id = order_id[-6:].upper()
+                    _g["send_telegram_message"](
+                        f"⚙️ <b>ĐƠN HÀNG ĐANG XỬ LÝ</b> (Tool98 720P)\n\n"
+                        f"🆔 Mã đơn: #{short_id}\n"
+                        f"🤖 Job: <code>{job_id}</code>\n"
+                        f"⏳ Poll sau {_g['min_render_sec'] // 60} phút..."
+                    )
+                except Exception:
+                    pass
+                success = True
+            except (requests.RequestException, Tool98ApiError) as e:
+                print(f"❌ Nạp Tool98 thất bại {order_id}: {e}")
+                _g["notify_internal_error_telegram"](order_id, data, str(e), "submit tool98")
+                _fail_order_processing(
+                    doc, data,
+                    f"Tool98 submit failed: {e}",
+                    user_note_for_render_failure(str(e)),
+                    "submit tool98",
+                )
+    finally:
+        if temp_trimmed is not None:
+            temp_trimmed.unlink(missing_ok=True)
+        with submitting_lock:
+            submitting.discard(order_id)
+    return success
+
+
 def submit_order(order_id: str):
     """Nạp đơn theo renderProvider (Admin). Đơn processing giữ engine cũ."""
+    db = _g["db"]
+    doc = db.collection("orders").document(order_id).get()
+    if doc.exists:
+        data = doc.to_dict() or {}
+        if _is_tool98_economy_order(data):
+            submit_to_tool98(order_id)
+            return
+
     provider = get_active_render_provider()
 
     if provider == RENDER_PROVIDER_AIDANCING:
@@ -825,7 +981,7 @@ def poll_xiaoyang_orders(orders_to_check):
             _fail_order_processing(
                 doc, order_data,
                 f"XiaoYang task {task_id} FAIL: {err or ''}",
-                USER_NOTE_ORDER_FAILED,
+                user_note_for_render_failure(err),
                 "render xiaoyang",
             )
         else:
@@ -898,11 +1054,64 @@ def poll_videoaieasy_orders(orders_to_check):
             _fail_order_processing(
                 doc, order_data,
                 f"VideoAiEasy job {job_id} {status}: {err or ''}",
-                USER_NOTE_ORDER_FAILED,
+                user_note_for_render_failure(err),
                 "render videoaieasy",
             )
         else:
             print(f"⏳ Job {job_id} vẫn {status}")
+
+
+def poll_tool98_orders(orders_to_check):
+    skip_done = _g.get("skip_if_order_done")
+    complete = _g["complete_order_with_video"]
+    try:
+        client = _get_tool98_client()
+    except Tool98ApiError as e:
+        print(f"❌ Tool98 client: {e}")
+        return
+    for doc in orders_to_check:
+        order_data = doc.to_dict() or {}
+        job_id = str(order_data.get("tool98JobId") or "").strip()
+        if not job_id:
+            continue
+        print(f"🧐 Tool98 — job {job_id} (đơn {doc.id})...")
+        try:
+            job = client.jobs_get(job_id)
+        except Tool98ApiError as e:
+            print(f"❌ Poll Tool98 {job_id}: {e}")
+            continue
+        status = str(job.get("status") or "").lower()
+        err = job.get("error_message")
+        print(f"   status={status}" + (f" — {err}" if err else ""))
+        if status == "completed":
+            results = job.get("results") or []
+            if not results:
+                _fail_order_processing(
+                    doc, order_data,
+                    f"Tool98 job {job_id} completed nhưng không có results",
+                    user_note_for_render_failure("Không có video kết quả"),
+                    "render tool98",
+                )
+                continue
+            if skip_done and skip_done(doc.id, "đã completed"):
+                continue
+            print(f"🎉 Tool98 job {job_id} HOÀN TẤT — tải video...")
+            local_vid = f"res_{doc.id}.mp4"
+            try:
+                from pathlib import Path
+                client.download_media(results[0], Path(local_vid))
+                complete(doc, local_vid)
+            except Exception as e:
+                print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
+        elif status in ("failed", "canceled", "cancelled"):
+            _fail_order_processing(
+                doc, order_data,
+                f"Tool98 job {job_id} {status}: {err or ''}",
+                user_note_for_render_failure(err),
+                "render tool98",
+            )
+        else:
+            print(f"⏳ Tool98 job {job_id} vẫn {status}")
 
 
 def log_accounts_on_startup():
@@ -940,3 +1149,13 @@ def log_accounts_on_startup():
                 )
             except Exception as e:
                 print(f"  ⚠️  {acc['email']}: {e}")
+    if _tool98_enabled():
+        try:
+            client = _get_tool98_client()
+            client.jobs_list(include_params=False)
+            print(
+                f"✅ Tool98 Internal API — {client.base_url} "
+                f"(profile tiết kiệm: {TOOL98_ECONOMY_PROFILE} @ {TOOL98_RESOLUTION})"
+            )
+        except Exception as e:
+            print(f"  ⚠️  Tool98: {e}")

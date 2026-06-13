@@ -246,6 +246,48 @@ def r2_direct_configured() -> bool:
     return all(os.environ.get(k, "").strip() for k in keys)
 
 
+def worker_result_download_url(object_key: str) -> str:
+    from xiaoyang_media import WORKER_BASE
+
+    return f"{WORKER_BASE}/?file={quote(object_key.lstrip('/'))}"
+
+
+def _url_is_downloadable(url: str, *, timeout: int = 30) -> bool:
+    url = (url or "").strip()
+    if not url:
+        return False
+    try:
+        r = requests.head(url, allow_redirects=True, timeout=timeout)
+        if r.status_code == 200:
+            return True
+        if r.status_code == 405:
+            r = requests.get(
+                url,
+                stream=True,
+                timeout=timeout,
+                headers={"Range": "bytes=0-0"},
+            )
+            return r.status_code in (200, 206)
+    except Exception:
+        pass
+    return False
+
+
+def _resolve_public_result_url(object_key: str, pub_url: str | None = None) -> str:
+    """Chỉ trả Worker ?file= — pub-xxx.r2.dev hay 404 dù boto3 upload R2 OK."""
+    del pub_url  # không dùng làm link khách
+    worker_url = worker_result_download_url(object_key)
+    for wait_sec, timeout in ((0, 30), (2, 60), (4, 90)):
+        if wait_sec:
+            time.sleep(wait_sec)
+        if _url_is_downloadable(worker_url, timeout=timeout):
+            print(f"✅ Link tải khách (Worker): {worker_url[:100]}...")
+            return worker_url
+    raise DirectMediaError(
+        f"Upload xong nhưng Worker chưa phục vụ được file. key={object_key.lstrip('/')}"
+    )
+
+
 def _upload_via_motion_worker(file_path: str, object_key: str, content_type: str) -> str | None:
     from xiaoyang_media import WORKER_BASE
 
@@ -259,12 +301,11 @@ def _upload_via_motion_worker(file_path: str, object_key: str, content_type: str
     with open(file_path, "rb") as f:
         response = requests.post(url, data=f, headers={"Content-Type": content_type}, timeout=timeout)
     if response.status_code == 200:
-        body = response.json() if response.content else {}
-        out = (body.get("url") or "").strip()
-        if out:
-            return out
-        print(f"❌ Worker upload không trả url: {(response.text or '')[:200]}")
-        return None
+        try:
+            return _resolve_public_result_url(object_key)
+        except DirectMediaError as e:
+            print(f"❌ {e}")
+            return None
     if response.status_code == 413:
         print("⚠️ Worker 413 Payload Too Large (>~100MB Cloudflare)")
         return None
@@ -274,7 +315,7 @@ def _upload_via_motion_worker(file_path: str, object_key: str, content_type: str
 
 def upload_result_file(file_path: str, folder: str = "results", content_type: str = "video/mp4") -> str:
     """
-    Upload video kết quả lên R2 public URL.
+    Upload video kết quả; trả URL khách tải được (Worker ?file=, verify HEAD).
     File ≤ R2_WORKER_MAX_BYTES: Worker. File lớn hoặc 413 → upload direct R2 (boto3).
     """
     if not os.path.isfile(file_path):
@@ -296,7 +337,8 @@ def upload_result_file(file_path: str, folder: str = "results", content_type: st
 
     if r2_direct_configured():
         print(f"📤 Upload direct R2 ({size / (1024 * 1024):.1f} MB)...")
-        return upload_file_to_r2_public(file_path, object_key, content_type)
+        pub_url = upload_file_to_r2_public(file_path, object_key, content_type)
+        return _resolve_public_result_url(object_key, pub_url)
 
     raise DirectMediaError(
         "Worker từ chối file lớn (>~100MB) — cần cấu hình R2_* trong .env để upload direct."
