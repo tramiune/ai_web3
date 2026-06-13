@@ -113,6 +113,23 @@ const MODEL_COST_TURBO = 10;
 const MODEL_COST_ECONOMY = 2;
 const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
+function getSelectedModelKey() {
+    const checked = document.querySelector('input[name="model-type"]:checked');
+    return checked ? checked.value : 'fast';
+}
+
+function getMaxVideoDurationForModel(modelKey) {
+    return modelKey === 'economy' ? ECONOMY_MAX_VIDEO_DURATION_SEC : MAX_VIDEO_DURATION_SEC;
+}
+
+function getActiveMaxVideoDurationSec() {
+    return getMaxVideoDurationForModel(getSelectedModelKey());
+}
+
+function videoDurationLimitToastKey(modelKey) {
+    return modelKey === 'economy' ? 'modals.video_duration_economy_limit' : 'modals.video_duration_limit';
+}
+
 function modelCoinCost(modelKey) {
     if (modelKey === 'turbo') return MODEL_COST_TURBO;
     if (modelKey === 'economy') return MODEL_COST_ECONOMY;
@@ -1778,7 +1795,8 @@ window.switchVideoSource = (type) => {
             renderVideoFilePreview('preview-video-container', existing, {
                 inputId: 'file-video',
                 changeKey: 'modals.video_change',
-                maxDurationSec: MAX_VIDEO_DURATION_SEC
+                maxDurationSec: getActiveMaxVideoDurationSec(),
+                durationToastKey: videoDurationLimitToastKey(getSelectedModelKey())
             });
         }
     } else if (type === 'tiktok') {
@@ -2150,19 +2168,47 @@ function updateFirstOrderUI() {
     if (guestOfferBar) guestOfferBar.style.display = 'none';
     if (modelGroupEl) modelGroupEl.style.display = 'block';
 
+    const modelKey = getSelectedModelKey();
+    const economyNote = document.getElementById('economy-video-limit-note');
+    if (economyNote) {
+        economyNote.style.display = modelKey === 'economy' ? 'block' : 'none';
+        if (modelKey === 'economy') economyNote.innerText = t('modals.model_economy_limit_note');
+    }
+
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
         const submitText = submitBtn ? submitBtn.querySelector('[data-i18n="hero.cta_create"]') : null;
         const summaryEl = document.getElementById('submit-summary-line');
         const checkedModel = document.querySelector('input[name="model-type"]:checked');
-        const modelKey = checkedModel ? checkedModel.value : 'fast';
+        const activeModelKey = checkedModel ? checkedModel.value : 'fast';
 
-        costEl.innerText = String(modelCoinCost(modelKey));
+        costEl.innerText = String(modelCoinCost(activeModelKey));
         if (submitBtn) submitBtn.classList.remove('btn-first-offer');
         if (submitText) submitText.innerText = t('hero.cta_create');
         if (summaryEl) {
-            summaryEl.innerText = t(`modals.model_${modelKey}_desc`);
-            summaryEl.style.color = '';
+            summaryEl.innerText = t(`modals.model_${activeModelKey}_desc`);
+            summaryEl.style.color = activeModelKey === 'economy' ? '#ff9100' : '';
+        }
+    }
+
+    refreshVideoForSelectedModel();
+}
+
+function refreshVideoForSelectedModel() {
+    const modelKey = getSelectedModelKey();
+    const maxDur = getMaxVideoDurationForModel(modelKey);
+    const toastKey = videoDurationLimitToastKey(modelKey);
+
+    if (window.currentVideoSource === 'upload') {
+        const fileInput = document.getElementById('file-video');
+        const existing = fileInput?.files?.[0];
+        if (existing?.type?.startsWith('video/')) {
+            renderVideoFilePreview('preview-video-container', existing, {
+                inputId: 'file-video',
+                changeKey: 'modals.video_change',
+                maxDurationSec: maxDur,
+                durationToastKey: toastKey
+            });
         }
     }
 }
@@ -2392,8 +2438,82 @@ async function trimVideoBlobToMaxSec(blob, maxSec = MAX_VIDEO_DURATION_SEC) {
     };
 }
 
+function setFileInputFromFile(inputId, file) {
+    const input = document.getElementById(inputId);
+    if (!input || !file) return false;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    return true;
+}
+
+async function trimUploadFileToMaxSec(file, maxDurationSec) {
+    const { blob, trimmed } = await trimVideoBlobToMaxSec(file, maxDurationSec);
+    if (!trimmed) return { file, trimmed: false };
+    const baseName = (file.name || 'video').replace(/\.[^.]+$/, '') || 'video';
+    return {
+        file: new File([blob], `${baseName}.mp4`, { type: 'video/mp4' }),
+        trimmed: true
+    };
+}
+
+function showVideoTrimLoading(container, maxDurationSec) {
+    container.innerHTML = '';
+    const loading = document.createElement('div');
+    loading.className = 'video-trim-loading';
+    loading.style.cssText = 'padding:1rem;text-align:center;color:var(--accent);font-size:0.85rem;line-height:1.4;';
+    loading.textContent = t('modals.video_trimming', { max: maxDurationSec });
+    container.appendChild(loading);
+    syncUploadZonePreviewState(container);
+}
+
+function renderVideoPreviewContent(container, file, options = {}) {
+    container.innerHTML = '';
+    const previewVideo = document.createElement('video');
+    const previewUrl = URL.createObjectURL(file);
+    previewVideo.src = previewUrl;
+    previewVideo.muted = true;
+    previewVideo.loop = true;
+    previewVideo.playsInline = true;
+    previewVideo.setAttribute('playsinline', '');
+    previewVideo.setAttribute('webkit-playsinline', '');
+    previewVideo.preload = 'metadata';
+    previewVideo.controls = false;
+    previewVideo.disablePictureInPicture = true;
+    previewVideo.style.width = '100%';
+    previewVideo.style.height = '100%';
+    previewVideo.style.objectFit = 'cover';
+    previewVideo.style.borderRadius = '8px';
+    previewVideo.addEventListener('loadeddata', () => {
+        try {
+            previewVideo.pause();
+            previewVideo.currentTime = 0;
+        } catch (_) { /* ignore */ }
+    }, { once: true });
+
+    container.appendChild(previewVideo);
+
+    if (options.onChange) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preview-change-btn btn-primary order-upload-btn';
+        btn.textContent = t(options.changeKey || 'modals.video_change');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            options.onChange();
+        });
+        container.appendChild(btn);
+    } else if (options.inputId) {
+        appendPreviewChangeButton(container, options.inputId, options.changeKey || 'modals.video_change');
+    }
+
+    syncUploadZonePreviewState(container);
+}
+
 async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
     const { onProgress } = options;
+    const maxDurationSec = options.maxDurationSec ?? getActiveMaxVideoDurationSec();
+    const durationToastKey = options.durationToastKey ?? videoDurationLimitToastKey(getSelectedModelKey());
     const { blob: initialBlob, duration: metaDuration } = await downloadTikTokVideoBlob(pageUrl);
     let blob = initialBlob;
     if (blob.size > MAX_VIDEO_FILE_BYTES) {
@@ -2408,12 +2528,12 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
             blobDuration = MAX_VIDEO_DURATION_SEC + 1;
         }
     }
-    const needsTrim = blobDuration > MAX_VIDEO_DURATION_SEC + 0.15;
+    const needsTrim = blobDuration > maxDurationSec + 0.15;
 
     if (needsTrim) {
         onProgress?.('trimming');
         try {
-            const trimmed = await trimVideoBlobToMaxSec(blob, MAX_VIDEO_DURATION_SEC);
+            const trimmed = await trimVideoBlobToMaxSec(blob, maxDurationSec);
             blob = trimmed.blob;
         } catch (trimErr) {
             console.error('[TikTok] trim failed:', trimErr);
@@ -2425,9 +2545,7 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
     const fileInput = document.getElementById('file-video');
     if (!fileInput) throw Object.assign(new Error(t('common.error')), { code: 'fetch_failed' });
 
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
+    setFileInputFromFile('file-video', file);
 
     const templateInput = document.getElementById('selected-template-url');
     if (templateInput) templateInput.value = '';
@@ -2435,7 +2553,9 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
 
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
-        maxDurationSec: MAX_VIDEO_DURATION_SEC,
+        maxDurationSec,
+        durationToastKey,
+        autoTrim: false,
         onChange: () => {
             fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
@@ -2490,6 +2610,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     if (!container || !file) return;
 
     const maxDurationSec = options.maxDurationSec ?? MAX_VIDEO_DURATION_SEC;
+    const autoTrim = options.autoTrim !== false;
 
     if (file.size > MAX_VIDEO_FILE_BYTES) {
         showToast(t('modals.video_size_limit'));
@@ -2507,11 +2628,35 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     probe.muted = true;
     probe.playsInline = true;
     const probeUrl = URL.createObjectURL(file);
-    probe.onloadedmetadata = () => {
+    probe.onloadedmetadata = async () => {
         const duration = probe.duration;
         URL.revokeObjectURL(probeUrl);
         if (duration > maxDurationSec + 0.15) {
-            showToast(t('modals.video_duration_limit'));
+            if (autoTrim) {
+                showVideoTrimLoading(container, maxDurationSec);
+                try {
+                    const { file: trimmedFile, trimmed } = await trimUploadFileToMaxSec(file, maxDurationSec);
+                    if (trimmed) {
+                        if (options.inputId) setFileInputFromFile(options.inputId, trimmedFile);
+                        showToast(t('modals.video_trimmed', { max: maxDurationSec }));
+                    }
+                    renderVideoFilePreview(containerId, trimmedFile, { ...options, autoTrim: false });
+                } catch (trimErr) {
+                    console.error('[Upload] trim failed:', trimErr);
+                    showToast(t('modals.tiktok_trim_failed'));
+                    if (options.inputId) {
+                        const input = document.getElementById(options.inputId);
+                        if (input) input.value = '';
+                    }
+                    container.innerHTML = '';
+                    syncUploadZonePreviewState(container);
+                }
+                return;
+            }
+
+            showToast(t(options.durationToastKey || videoDurationLimitToastKey(
+                maxDurationSec <= ECONOMY_MAX_VIDEO_DURATION_SEC ? 'economy' : 'fast'
+            )));
             if (options.inputId) {
                 const input = document.getElementById(options.inputId);
                 if (input) input.value = '';
@@ -2521,46 +2666,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
             return;
         }
 
-        container.innerHTML = '';
-        const previewVideo = document.createElement('video');
-        const previewUrl = URL.createObjectURL(file);
-        previewVideo.src = previewUrl;
-        previewVideo.muted = true;
-        previewVideo.loop = true;
-        previewVideo.playsInline = true;
-        previewVideo.setAttribute('playsinline', '');
-        previewVideo.setAttribute('webkit-playsinline', '');
-        previewVideo.preload = 'metadata';
-        previewVideo.controls = false;
-        previewVideo.disablePictureInPicture = true;
-        previewVideo.style.width = '100%';
-        previewVideo.style.height = '100%';
-        previewVideo.style.objectFit = 'cover';
-        previewVideo.style.borderRadius = '8px';
-        previewVideo.addEventListener('loadeddata', () => {
-            try {
-                previewVideo.pause();
-                previewVideo.currentTime = 0;
-            } catch (_) { /* ignore */ }
-        }, { once: true });
-
-        container.appendChild(previewVideo);
-
-        if (options.onChange) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'preview-change-btn btn-primary order-upload-btn';
-            btn.textContent = t(options.changeKey || 'modals.video_change');
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                options.onChange();
-            });
-            container.appendChild(btn);
-        } else if (options.inputId) {
-            appendPreviewChangeButton(container, options.inputId, options.changeKey || 'modals.video_change');
-        }
-
-        syncUploadZonePreviewState(container);
+        renderVideoPreviewContent(container, file, options);
     };
     probe.onerror = () => {
         URL.revokeObjectURL(probeUrl);
@@ -2606,10 +2712,12 @@ window.handlePreview = (input, containerId) => {
         appendPreviewChangeButton(container, meta.inputId, meta.changeKey);
         syncUploadZonePreviewState(container);
     } else if (file.type.startsWith('video/')) {
+        const modelKey = getSelectedModelKey();
         renderVideoFilePreview(containerId, file, {
             inputId: meta.inputId,
             changeKey: meta.changeKey,
-            maxDurationSec: MAX_VIDEO_DURATION_SEC
+            maxDurationSec: getMaxVideoDurationForModel(modelKey),
+            durationToastKey: videoDurationLimitToastKey(modelKey)
         });
     }
 };
@@ -2789,21 +2897,28 @@ async function setupEventListeners() {
                 // <10s  -> 125
                 // 10-30 -> 124
                 if (window.currentVideoSource === 'upload' && videoFile) {
-                    const dur = await getVideoDurationSeconds(videoFile);
-                    if (typeof dur === 'number') {
-                        const maxDur = modelKeySelected === 'economy'
-                            ? ECONOMY_MAX_VIDEO_DURATION_SEC
-                            : MAX_VIDEO_DURATION_SEC;
-                        if (dur > maxDur) {
-                            return showToast(
-                                modelKeySelected === 'economy'
-                                    ? t('modals.video_duration_economy_limit')
-                                    : t('modals.video_duration_limit')
-                            );
+                    let dur = await getVideoDurationSeconds(videoFile);
+                    const maxDur = getMaxVideoDurationForModel(modelKeySelected);
+                    if (typeof dur === 'number' && dur > maxDur + 0.15) {
+                        try {
+                            showToast(t('modals.video_trimming', { max: maxDur }));
+                            const { file: trimmedFile, trimmed } = await trimUploadFileToMaxSec(videoFile, maxDur);
+                            if (trimmed) {
+                                setFileInputFromFile('file-video', trimmedFile);
+                                videoFile = trimmedFile;
+                                showToast(t('modals.video_trimmed', { max: maxDur }));
+                            }
+                            dur = await getVideoDurationSeconds(videoFile);
+                        } catch (trimErr) {
+                            console.error('[Submit] trim failed:', trimErr);
+                            return showToast(t('modals.tiktok_trim_failed'));
                         }
-                        if (modelKeySelected === 'fast') {
-                            modelIdOverride = dur < 10 ? '125' : '124';
-                        }
+                    }
+                    if (typeof dur === 'number' && dur > maxDur + 0.15) {
+                        return showToast(t(videoDurationLimitToastKey(modelKeySelected)));
+                    }
+                    if (typeof dur === 'number' && modelKeySelected === 'fast') {
+                        modelIdOverride = dur < 10 ? '125' : '124';
                     }
                 }
 
