@@ -363,6 +363,9 @@ def start_render_provider_listener():
 
 
 def _fail_order_processing(doc, order_data, err_detail, system_note, context: str):
+    if xy_motion.enabled_for_bot(BOT_NAME):
+        if xy_motion.fail_or_tool98_fallback(doc, order_data, err_detail, system_note, context):
+            return
     notify_internal_error_telegram(doc.id, order_data, err_detail, context)
     cost_coins = order_data.get("costCoins", 0)
     user_id = order_data.get("userId")
@@ -1947,6 +1950,7 @@ def start_bot():
             complete_order_with_video=_complete_order_with_video,
             min_render_sec=MIN_RENDER_SEC,
             skip_if_order_done=_skip_if_order_done,
+            pop_processing_cache=_pop_processing_cache,
         )
 
     start_bot_control_listener()

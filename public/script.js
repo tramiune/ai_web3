@@ -110,9 +110,7 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 // --- Data Constants ---
 const MODEL_COST_FAST = 4;
 const MODEL_COST_TURBO = 10;
-const MODEL_COST_ECONOMY = 3;
 const DEFAULT_MODEL_KEY = 'fast';
-const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
@@ -120,30 +118,27 @@ function getSelectedModelKey() {
 }
 
 function getMaxVideoDurationForModel(modelKey) {
-    return modelKey === 'economy' ? ECONOMY_MAX_VIDEO_DURATION_SEC : MAX_VIDEO_DURATION_SEC;
+    return MAX_VIDEO_DURATION_SEC;
 }
 
 function getActiveMaxVideoDurationSec() {
-    return getMaxVideoDurationForModel(getSelectedModelKey());
+    return MAX_VIDEO_DURATION_SEC;
 }
 
 function videoDurationLimitToastKey(modelKey) {
-    return modelKey === 'economy' ? 'modals.video_duration_economy_limit' : 'modals.video_duration_limit';
+    return 'modals.video_duration_limit';
 }
 
 function modelCoinCost(modelKey) {
     if (modelKey === 'turbo') return MODEL_COST_TURBO;
-    if (modelKey === 'economy') return MODEL_COST_ECONOMY;
     return MODEL_COST_FAST;
 }
 
 function syncModelPriceLabels() {
     const fastEl = document.getElementById('model-fast-cost');
     const turboEl = document.getElementById('model-turbo-cost');
-    const economyEl = document.getElementById('model-economy-cost');
     if (fastEl) fastEl.textContent = String(MODEL_COST_FAST);
     if (turboEl) turboEl.textContent = String(MODEL_COST_TURBO);
-    if (economyEl) economyEl.textContent = String(MODEL_COST_ECONOMY);
 }
 
 function normalizeOrderCost(model) {
@@ -268,8 +263,7 @@ function gatewayLabel(gateway) {
 const MODELS = {
     // "Model thường" uses Aidancing model id 124
     fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "124" },
-    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" },
-    economy: { nameKey: "modals.model_economy", cost: MODEL_COST_ECONOMY, timeKey: "modals.model_economy_desc", modelId: "126" }
+    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" }
 };
 
 function localizedModel(key) {
@@ -2170,11 +2164,6 @@ function updateFirstOrderUI() {
     if (modelGroupEl) modelGroupEl.style.display = 'block';
 
     const modelKey = getSelectedModelKey();
-    const economyNote = document.getElementById('economy-video-limit-note');
-    if (economyNote) {
-        economyNote.style.display = modelKey === 'economy' ? 'block' : 'none';
-        if (modelKey === 'economy') economyNote.innerText = t('modals.model_economy_limit_note');
-    }
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
@@ -2188,7 +2177,7 @@ function updateFirstOrderUI() {
         if (submitText) submitText.innerText = t('hero.cta_create');
         if (summaryEl) {
             summaryEl.innerText = t(`modals.model_${activeModelKey}_desc`);
-            summaryEl.style.color = activeModelKey === 'economy' ? '#ff9100' : '';
+            summaryEl.style.color = '';
         }
     }
 
@@ -2655,9 +2644,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
                 return;
             }
 
-            showToast(t(options.durationToastKey || videoDurationLimitToastKey(
-                maxDurationSec <= ECONOMY_MAX_VIDEO_DURATION_SEC ? 'economy' : 'fast'
-            )));
+            showToast(t(options.durationToastKey || videoDurationLimitToastKey('fast')));
             if (options.inputId) {
                 const input = document.getElementById(options.inputId);
                 if (input) input.value = '';

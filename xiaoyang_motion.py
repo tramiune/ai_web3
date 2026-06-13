@@ -29,6 +29,7 @@ from tool98_api import (
     Tool98Client,
     load_media_input,
     prepare_motion_video_source,
+    probe_video_duration_seconds,
     resolve_motion_duration_seconds,
 )
 
@@ -50,6 +51,8 @@ AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 TOOL98_ECONOMY_MODEL_IDS = frozenset({"126"})
 TOOL98_RESOLUTION = "720P"
 TOOL98_ECONOMY_PROFILE = get_env("TOOL98_ECONOMY_PROFILE", "gen_03").strip() or "gen_03"
+TOOL98_FALLBACK_MIN_COMPLETED_ORDERS = 3
+TOOL98_FALLBACK_MAX_VIDEO_SEC = 15.0
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
@@ -418,6 +421,121 @@ def _xiaoyang_modal_for_order(order_data: dict) -> tuple[str, str]:
 
 def _is_tool98_economy_order(order_data: dict) -> bool:
     return str((order_data or {}).get("modelId") or "").strip() in TOOL98_ECONOMY_MODEL_IDS
+
+
+def _should_route_tool98(order_data: dict) -> bool:
+    return _is_tool98_economy_order(order_data) or bool((order_data or {}).get("tool98Fallback"))
+
+
+def _is_fast_order(order_data: dict) -> bool:
+    model_id = str((order_data or {}).get("modelId") or "").strip()
+    return model_id in AIDANCING_FAST_MODEL_IDS or not model_id
+
+
+def _user_has_min_completed_orders(user_id: str, minimum: int = TOOL98_FALLBACK_MIN_COMPLETED_ORDERS) -> bool:
+    user_id = (user_id or "").strip()
+    if not user_id or minimum <= 0:
+        return False
+    db = _g["db"]
+    q = (
+        db.collection("orders")
+        .where(filter=FieldFilter("userId", "==", user_id))
+        .where(filter=FieldFilter("status", "==", "completed"))
+        .limit(minimum)
+    )
+    return len(list(q.stream())) >= minimum
+
+
+def _order_video_duration_sec(order_data: dict) -> float | None:
+    vid_url = (order_data.get("referenceVideoLink") or "").strip()
+    if not vid_url:
+        return None
+    session = None
+    if _tool98_enabled():
+        try:
+            session = _get_tool98_client().session
+        except Tool98ApiError:
+            session = None
+    return probe_video_duration_seconds(vid_url, session=session)
+
+
+def _order_video_under_tool98_max(order_data: dict) -> bool:
+    duration = _order_video_duration_sec(order_data)
+    if duration is None:
+        return False
+    return duration <= TOOL98_FALLBACK_MAX_VIDEO_SEC + 0.25
+
+
+def _can_tool98_fallback(order_data: dict) -> bool:
+    if not _tool98_enabled():
+        return False
+    if (order_data or {}).get("tool98Fallback"):
+        return False
+    if not _is_fast_order(order_data):
+        return False
+    user_id = (order_data.get("userId") or "").strip()
+    if not _user_has_min_completed_orders(user_id):
+        return False
+    if not _order_video_under_tool98_max(order_data):
+        return False
+    img_url = (order_data.get("characterImageLink") or "").strip()
+    vid_url = (order_data.get("referenceVideoLink") or "").strip()
+    return bool(img_url and vid_url)
+
+
+def _prepare_order_for_tool98_fallback(doc_ref) -> None:
+    payload = {
+        "status": "pending",
+        "tool98Fallback": True,
+        "renderProvider": firestore.DELETE_FIELD,
+        "xiaoyangTaskId": firestore.DELETE_FIELD,
+        "xiaoyangAccount": firestore.DELETE_FIELD,
+        "xiaoyangAccountEmail": firestore.DELETE_FIELD,
+        "xiaoyangSubmitMode": firestore.DELETE_FIELD,
+        "videoaieasyJobId": firestore.DELETE_FIELD,
+        "videoaieasyAccount": firestore.DELETE_FIELD,
+        "videoaieasyAccountEmail": firestore.DELETE_FIELD,
+        "aidancingJobId": firestore.DELETE_FIELD,
+        "tool98JobId": firestore.DELETE_FIELD,
+        "submittedAt": firestore.DELETE_FIELD,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    doc_ref.update(payload)
+    pop = _g.get("pop_processing_cache")
+    if pop:
+        pop(doc_ref.id)
+
+
+def fail_or_tool98_fallback(doc, order_data, err_detail, system_note, context: str) -> bool:
+    """Return True when fallback started or order was failed after fallback attempt."""
+    if not _can_tool98_fallback(order_data):
+        return False
+    order_id = doc.id
+    print(
+        f"↪️ [Tool98 fallback] Đơn {order_id} — {context}: "
+        f"{str(err_detail)[:160]}"
+    )
+    db = _g["db"]
+    doc_ref = db.collection("orders").document(order_id)
+    _prepare_order_for_tool98_fallback(doc_ref)
+    if submit_to_tool98(order_id):
+        return True
+    fresh_doc = doc_ref.get()
+    fresh_data = fresh_doc.to_dict() or order_data
+    _fail_order_processing(
+        fresh_doc,
+        fresh_data,
+        f"Tool98 fallback submit failed after: {err_detail}",
+        system_note,
+        context,
+    )
+    return True
+
+
+def _fail_or_tool98_fallback(doc, order_data, err_detail, system_note, context: str):
+    if fail_or_tool98_fallback(doc, order_data, err_detail, system_note, context):
+        return
+    _fail_order_processing(doc, order_data, err_detail, system_note, context)
 
 
 def _tool98_enabled() -> bool:
@@ -789,7 +907,7 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
 
 
 def submit_to_tool98(order_id: str) -> bool:
-    """Model tiết kiệm (126) — chỉ Tool98 720P, không fallback."""
+    """Tool98 720P — legacy model 126 hoặc fallback ẩn sau khi engine chính fail."""
     if not _g["is_bot_enabled"]():
         return False
     if _g["pending_submit_backoff_active"](order_id):
@@ -813,10 +931,12 @@ def submit_to_tool98(order_id: str) -> bool:
             data = doc.to_dict() or {}
             if data.get("status") != "pending":
                 return False
-            if not _is_tool98_economy_order(data):
+            if not _should_route_tool98(data):
                 return False
 
-            print(f"\n⚡ [NẠP ĐƠN / Tool98 tiết kiệm] {order_id}...")
+            fallback = bool(data.get("tool98Fallback"))
+            label = "Tool98 fallback" if fallback else "Tool98 tiết kiệm"
+            print(f"\n⚡ [NẠP ĐƠN / {label}] {order_id}...")
             img_url = (data.get("characterImageLink") or "").strip()
             vid_url = (data.get("referenceVideoLink") or "").strip()
             if not img_url or not vid_url:
@@ -870,7 +990,7 @@ def submit_to_tool98(order_id: str) -> bool:
                 print(f"🆔 [Tool98] job: {job_id}")
                 _mark_order_processing(doc_ref, job_id, provider=RENDER_PROVIDER_TOOL98)
                 _g.get("session_error_backoff", {}).pop(order_id, None)
-                print(f"✅ Đơn {order_id} → processing (Tool98 tiết kiệm)")
+                print(f"✅ Đơn {order_id} → processing ({label})")
                 try:
                     short_id = order_id[-6:].upper()
                     _g["send_telegram_message"](
@@ -899,13 +1019,36 @@ def submit_to_tool98(order_id: str) -> bool:
     return success
 
 
+def _try_tool98_fallback_after_submit_exhausted(order_id: str) -> None:
+    doc = _g["db"].collection("orders").document(order_id).get()
+    if not doc.exists:
+        return
+    data = doc.to_dict() or {}
+    if data.get("status") != "pending":
+        return
+    if (
+        data.get("xiaoyangTaskId")
+        or data.get("videoaieasyJobId")
+        or data.get("aidancingJobId")
+        or data.get("tool98JobId")
+    ):
+        return
+    fail_or_tool98_fallback(
+        doc,
+        data,
+        "Không nạp được qua engine chính",
+        user_note_for_render_failure(None),
+        "submit exhausted",
+    )
+
+
 def submit_order(order_id: str):
     """Nạp đơn theo renderProvider (Admin). Đơn processing giữ engine cũ."""
     db = _g["db"]
     doc = db.collection("orders").document(order_id).get()
     if doc.exists:
         data = doc.to_dict() or {}
-        if _is_tool98_economy_order(data):
+        if _should_route_tool98(data):
             submit_to_tool98(order_id)
             return
 
@@ -913,9 +1056,7 @@ def submit_order(order_id: str):
 
     if provider == RENDER_PROVIDER_AIDANCING:
         _g["submit_to_aidancing"](order_id)
-        return
-
-    if provider == RENDER_PROVIDER_XIAOYANG:
+    elif provider == RENDER_PROVIDER_XIAOYANG:
         if _try_submit_xiaoyang(order_id):
             return
         print(f"⚠️ XiaoYang không nạp được {order_id} → thử VideoAiEasy")
@@ -923,9 +1064,7 @@ def submit_order(order_id: str):
             return
         print(f"⚠️ VideoAiEasy không nạp được {order_id} → chuyển Aidancing")
         _g["submit_to_aidancing"](order_id, fallback_reason="xiaoyang_fail")
-        return
-
-    if provider == RENDER_PROVIDER_VIDEOAIEASY:
+    elif provider == RENDER_PROVIDER_VIDEOAIEASY:
         if _try_submit_videoaieasy(order_id):
             return
         print(f"⚠️ VideoAiEasy không nạp được {order_id} → thử XiaoYang")
@@ -933,9 +1072,10 @@ def submit_order(order_id: str):
             return
         print(f"⚠️ XiaoYang không nạp được {order_id} → chuyển Aidancing")
         _g["submit_to_aidancing"](order_id, fallback_reason="videoaieasy_fail")
-        return
+    else:
+        _g["submit_to_aidancing"](order_id)
 
-    _g["submit_to_aidancing"](order_id)
+    _try_tool98_fallback_after_submit_exhausted(order_id)
 
 
 def poll_xiaoyang_orders(orders_to_check):
@@ -978,7 +1118,7 @@ def poll_xiaoyang_orders(orders_to_check):
             except Exception as e:
                 print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
         elif st == "FAIL":
-            _fail_order_processing(
+            _fail_or_tool98_fallback(
                 doc, order_data,
                 f"XiaoYang task {task_id} FAIL: {err or ''}",
                 user_note_for_render_failure(err),
@@ -1051,7 +1191,7 @@ def poll_videoaieasy_orders(orders_to_check):
             except Exception as e:
                 print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
         elif status in ("failed", "expired"):
-            _fail_order_processing(
+            _fail_or_tool98_fallback(
                 doc, order_data,
                 f"VideoAiEasy job {job_id} {status}: {err or ''}",
                 user_note_for_render_failure(err),
