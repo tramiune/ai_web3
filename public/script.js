@@ -110,7 +110,7 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 // --- Data Constants ---
 const MODEL_COST_FAST = 3;
 const MODEL_COST_TURBO = 10;
-const MODEL_COST_ECONOMY = 1;
+const MODEL_COST_ECONOMY = 2;
 const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
 function modelCoinCost(modelKey) {
