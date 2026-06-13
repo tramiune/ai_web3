@@ -111,7 +111,7 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 const MODEL_COST_FAST = 4;
 const MODEL_COST_TURBO = 10;
 const MODEL_COST_ECONOMY = 3;
-const DEFAULT_MODEL_KEY = 'economy';
+const DEFAULT_MODEL_KEY = 'fast';
 const ECONOMY_MAX_VIDEO_DURATION_SEC = 15;
 
 function getSelectedModelKey() {
