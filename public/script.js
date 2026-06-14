@@ -3354,10 +3354,10 @@ window.viewFullImage = (url) => {
     modal.style.display = 'flex';
 };
 
-// --- Maintenance (one-time upgrade 14/06 20:30 → 15/06 05:00 VN) ---
+// --- Maintenance (one-time upgrade 14/06 20:30 → 15/06 23:59 VN) ---
 const UPGRADE_MAINTENANCE = {
     start: { y: 2026, m: 6, d: 14, h: 20, min: 30 },
-    end: { y: 2026, m: 6, d: 15, h: 5, min: 0 },
+    end: { y: 2026, m: 6, d: 15, h: 23, min: 59 },
 };
 
 function getVietnamDateParts(date = new Date()) {
@@ -3413,7 +3413,7 @@ window.isUpgradeMaintenanceBlocked = () => isUpgradeMaintenanceActive();
 
 function blockIfUpgradeMaintenance() {
     if (!window.isUpgradeMaintenanceBlocked()) return false;
-    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến 05:00 sáng mai. Vui lòng quay lại sau đó.');
+    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến hết hôm nay (23:59). Vui lòng quay lại sau đó.');
     return true;
 }
 
