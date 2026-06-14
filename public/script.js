@@ -3354,11 +3354,10 @@ window.viewFullImage = (url) => {
     modal.style.display = 'flex';
 };
 
-// --- Maintenance (nightly + one-time upgrade 03/06/2026 20:30–22:30 VN) ---
+// --- Maintenance (nightly + one-time upgrade 03/06 20:30 → 04/06 05:00 VN) ---
 const UPGRADE_MAINTENANCE = {
-    date: { y: 2026, m: 6, d: 3 },
-    startMin: 20 * 60 + 30,
-    endMin: 22 * 60 + 30,
+    start: { y: 2026, m: 6, d: 3, h: 20, min: 30 },
+    end: { y: 2026, m: 6, d: 4, h: 5, min: 0 },
 };
 
 function getVietnamDateParts(date = new Date()) {
@@ -3384,28 +3383,37 @@ function getVietnamDateParts(date = new Date()) {
     };
 }
 
-function isUpgradeMaintenanceDay(vp) {
-    const d = UPGRADE_MAINTENANCE.date;
-    return vp.year === d.y && vp.month === d.m && vp.day === d.d;
+function vietnamTimestamp(point) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const h = point.h ?? point.hour ?? 0;
+    const min = point.min ?? point.minute ?? 0;
+    return new Date(
+        `${point.y}-${pad(point.m)}-${pad(point.d)}T${pad(h)}:${pad(min)}:00+07:00`
+    ).getTime();
 }
 
-function isUpgradeMaintenanceActive(vp = getVietnamDateParts()) {
-    return isUpgradeMaintenanceDay(vp)
-        && vp.totalMinutes >= UPGRADE_MAINTENANCE.startMin
-        && vp.totalMinutes < UPGRADE_MAINTENANCE.endMin;
+function currentVietnamTimestamp() {
+    const vp = getVietnamDateParts();
+    return vietnamTimestamp({ y: vp.year, m: vp.month, d: vp.day, h: vp.hour, min: vp.minute });
 }
 
-function isUpgradeMaintenanceNotice(vp = getVietnamDateParts()) {
-    return isUpgradeMaintenanceDay(vp)
-        && vp.totalMinutes < UPGRADE_MAINTENANCE.endMin
-        && !isUpgradeMaintenanceActive(vp);
+function isUpgradeMaintenanceActive() {
+    const now = currentVietnamTimestamp();
+    return now >= vietnamTimestamp(UPGRADE_MAINTENANCE.start)
+        && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
+}
+
+function isUpgradeMaintenanceNotice() {
+    const now = currentVietnamTimestamp();
+    return now < vietnamTimestamp(UPGRADE_MAINTENANCE.start)
+        && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
 }
 
 window.isUpgradeMaintenanceBlocked = () => isUpgradeMaintenanceActive();
 
 function blockIfUpgradeMaintenance() {
     if (!window.isUpgradeMaintenanceBlocked()) return false;
-    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp. Vui lòng quay lại sau 22:30.');
+    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến 05:00 sáng mai. Vui lòng quay lại sau đó.');
     return true;
 }
 
@@ -3425,12 +3433,12 @@ function checkMaintenance() {
 
     const notice = document.getElementById('upgrade-maintenance-notice');
     if (notice) {
-        notice.hidden = !isUpgradeMaintenanceNotice(vp);
+        notice.hidden = !isUpgradeMaintenanceNotice();
     }
 
     const blockModal = document.getElementById('upgrade-maintenance-block');
     if (blockModal) {
-        const active = isUpgradeMaintenanceActive(vp);
+        const active = isUpgradeMaintenanceActive();
         blockModal.hidden = !active;
         document.body.classList.toggle('upgrade-maintenance-locked', active);
         if (active) {
