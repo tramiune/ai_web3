@@ -317,6 +317,9 @@ let isFirstTimeUser = false; // true when 1-coin promo is still available
 let promo1CoinStats = { eligible: false, totalUsed: 0, usedToday: false, remainingTotal: 0, todayKey: '' };
 let orderCount = 0; // Track total orders
 let initialCoinsBeforeTopup = 0; // Để theo dõi số dư trước khi nạp
+let upgradeMaintenanceBlockEngaged = false;
+let awaitingTopupForMaintenanceBlock = false;
+let lastKnownCoinBalance = null;
 let referralEarningsUnsubscribe = null; // Cleanup handle for referralEarnings onSnapshot (legacy - giờ dùng FB_LISTENERS)
 let referralCurrentCode = null; // User's referral code, populated when opening referral page
 window.__referralAllowed = false;
@@ -1282,6 +1285,9 @@ async function handleUserLoggedIn(user) {
             const data = snapshot.data();
             window.__currentUserData = data;
             const currentCoins = data.coins || 0;
+            const prevCoins = lastKnownCoinBalance ?? currentCoins;
+            maybeShowMaintenanceBlockAfterTopup(prevCoins, currentCoins);
+            lastKnownCoinBalance = currentCoins;
             if (FB_CACHE.myOrders) {
                 syncPromo1CoinState(FB_CACHE.myOrders, data);
                 ensureUserPromoFieldsSynced(FB_CACHE.myOrders, data);
@@ -1337,6 +1343,7 @@ async function handleUserLoggedIn(user) {
                 });
 
                 sendTelegramMessage(`💰 <b>NẠP COIN THÀNH CÔNG!</b>\n👤 Khách: ${escapeHTML(data.displayName)}\n📧 Email: ${escapeHTML(data.email)}\n✨ Đã cộng: +${addedCoins} Coin\n💰 Số dư mới: ${currentCoins} Coin`);
+                maybeShowMaintenanceBlockAfterTopup(initialCoinsBeforeTopup, currentCoins);
             }
 
             document.querySelectorAll('.coin-balance-text').forEach(el => el.innerText = currentCoins);
@@ -1950,12 +1957,10 @@ window.closeModal = (id) => {
 };
 
 window.openTopupModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     window.openPricingModal();
 };
 
 window.openPricingModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     if (!currentUser) return login();
     renderPricing();
     window.openModal('pricing-modal');
@@ -1989,6 +1994,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
     selectedPaymentMethod = 'vietqr';
 
     initialCoinsBeforeTopup = parseInt((document.getElementById('coin-balance') || document.querySelector('.coin-balance-text'))?.innerText) || 0;
+    markAwaitingTopupForMaintenanceBlock();
 
     closeModal('pricing-modal');
     showPaymentPanel('vietqr');
@@ -2125,7 +2131,6 @@ window.selectTopup = async (id, method = 'vietqr') => {
 };
 
 window.openOrderModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     updateFirstOrderUI();
     window.switchVideoSource('upload');
     window.openModal('order-modal');
@@ -3409,7 +3414,39 @@ function isUpgradeMaintenanceNotice() {
         && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
 }
 
-window.isUpgradeMaintenanceBlocked = () => isUpgradeMaintenanceActive();
+function markAwaitingTopupForMaintenanceBlock() {
+    if (isUpgradeMaintenanceActive()) {
+        awaitingTopupForMaintenanceBlock = true;
+    }
+}
+
+function showUpgradeMaintenanceBlockAfterTopup() {
+    if (upgradeMaintenanceBlockEngaged || !isUpgradeMaintenanceActive()) return;
+    upgradeMaintenanceBlockEngaged = true;
+    awaitingTopupForMaintenanceBlock = false;
+
+    const blockModal = document.getElementById('upgrade-maintenance-block');
+    if (!blockModal) return;
+
+    blockModal.hidden = false;
+    document.body.classList.add('upgrade-maintenance-locked');
+    document.querySelectorAll('.modal-overlay, .auth-modal-overlay').forEach((el) => {
+        el.style.display = 'none';
+    });
+}
+
+function maybeShowMaintenanceBlockAfterTopup(previousCoins, currentCoins) {
+    if (
+        !upgradeMaintenanceBlockEngaged &&
+        awaitingTopupForMaintenanceBlock &&
+        isUpgradeMaintenanceActive() &&
+        currentCoins > previousCoins
+    ) {
+        showUpgradeMaintenanceBlockAfterTopup();
+    }
+}
+
+window.isUpgradeMaintenanceBlocked = () => upgradeMaintenanceBlockEngaged;
 
 function blockIfUpgradeMaintenance() {
     if (!window.isUpgradeMaintenanceBlocked()) return false;
@@ -3433,19 +3470,13 @@ function checkMaintenance() {
 
     const notice = document.getElementById('upgrade-maintenance-notice');
     if (notice) {
-        notice.hidden = !isUpgradeMaintenanceNotice();
+        notice.hidden = upgradeMaintenanceBlockEngaged || !isUpgradeMaintenanceNotice();
     }
 
     const blockModal = document.getElementById('upgrade-maintenance-block');
     if (blockModal) {
-        const active = isUpgradeMaintenanceActive();
-        blockModal.hidden = !active;
-        document.body.classList.toggle('upgrade-maintenance-locked', active);
-        if (active) {
-            document.querySelectorAll('.modal-overlay, .auth-modal-overlay').forEach((el) => {
-                el.style.display = 'none';
-            });
-        }
+        blockModal.hidden = !upgradeMaintenanceBlockEngaged;
+        document.body.classList.toggle('upgrade-maintenance-locked', upgradeMaintenanceBlockEngaged);
     }
 }
 
@@ -5417,6 +5448,7 @@ function loadPaypalSdk(clientId, currency) {
 
 async function mountPaypalButtons(pkg) {
     if (!pkg) return;
+    markAwaitingTopupForMaintenanceBlock();
     if (!currentUser) {
         setPaypalStatus(t('payment.paypal_login_required'), '#ff6b6b');
         return;
