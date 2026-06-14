@@ -1286,6 +1286,7 @@ async function handleUserLoggedIn(user) {
             window.__currentUserData = data;
             const currentCoins = data.coins || 0;
             const prevCoins = lastKnownCoinBalance ?? currentCoins;
+            maybeEngageMaintenanceBlockForExistingUser(currentCoins);
             maybeShowMaintenanceBlockAfterTopup(prevCoins, currentCoins);
             lastKnownCoinBalance = currentCoins;
             if (FB_CACHE.myOrders) {
@@ -1957,10 +1958,12 @@ window.closeModal = (id) => {
 };
 
 window.openTopupModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     window.openPricingModal();
 };
 
 window.openPricingModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     if (!currentUser) return login();
     renderPricing();
     window.openModal('pricing-modal');
@@ -2131,6 +2134,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
 };
 
 window.openOrderModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     updateFirstOrderUI();
     window.switchVideoSource('upload');
     window.openModal('order-modal');
@@ -3415,12 +3419,13 @@ function isUpgradeMaintenanceNotice() {
 }
 
 function markAwaitingTopupForMaintenanceBlock() {
-    if (isUpgradeMaintenanceActive()) {
+    const coins = lastKnownCoinBalance ?? 0;
+    if (isUpgradeMaintenanceActive() && coins <= 0) {
         awaitingTopupForMaintenanceBlock = true;
     }
 }
 
-function showUpgradeMaintenanceBlockAfterTopup() {
+function engageUpgradeMaintenanceBlock() {
     if (upgradeMaintenanceBlockEngaged || !isUpgradeMaintenanceActive()) return;
     upgradeMaintenanceBlockEngaged = true;
     awaitingTopupForMaintenanceBlock = false;
@@ -3433,6 +3438,22 @@ function showUpgradeMaintenanceBlockAfterTopup() {
     document.querySelectorAll('.modal-overlay, .auth-modal-overlay').forEach((el) => {
         el.style.display = 'none';
     });
+}
+
+function maybeEngageMaintenanceBlockForExistingUser(coins) {
+    if (
+        upgradeMaintenanceBlockEngaged ||
+        !isUpgradeMaintenanceActive() ||
+        coins <= 0 ||
+        awaitingTopupForMaintenanceBlock
+    ) {
+        return;
+    }
+    engageUpgradeMaintenanceBlock();
+}
+
+function showUpgradeMaintenanceBlockAfterTopup() {
+    engageUpgradeMaintenanceBlock();
 }
 
 function maybeShowMaintenanceBlockAfterTopup(previousCoins, currentCoins) {
@@ -3477,6 +3498,13 @@ function checkMaintenance() {
     if (blockModal) {
         blockModal.hidden = !upgradeMaintenanceBlockEngaged;
         document.body.classList.toggle('upgrade-maintenance-locked', upgradeMaintenanceBlockEngaged);
+    }
+
+    if (!upgradeMaintenanceBlockEngaged && isUpgradeMaintenanceActive() && currentUser) {
+        const coins = lastKnownCoinBalance
+            ?? parseInt((document.getElementById('coin-balance') || document.querySelector('.coin-balance-text'))?.innerText, 10)
+            || 0;
+        maybeEngageMaintenanceBlockForExistingUser(coins);
     }
 }
 
