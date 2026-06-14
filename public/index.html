@@ -71,6 +71,27 @@
 
 <body>
 
+    <div id="upgrade-maintenance-notice" class="upgrade-maintenance-notice" hidden>
+        <span class="upgrade-maintenance-notice__icon" aria-hidden="true">🛠️</span>
+        <span data-i18n="dashboard.maintenance_upgrade_notice">Hệ thống sẽ bảo trì nâng cấp từ 20:30 đến 22:30 tối nay (03/06). Vui lòng quay lại sau 22:30.</span>
+    </div>
+
+    <div id="upgrade-maintenance-block" class="upgrade-maintenance-block" hidden role="dialog" aria-modal="true"
+        aria-labelledby="upgrade-maintenance-block-title">
+        <div class="upgrade-maintenance-block__backdrop" aria-hidden="true"></div>
+        <div class="upgrade-maintenance-block__card">
+            <div class="upgrade-maintenance-block__icon" aria-hidden="true">🛠️</div>
+            <h2 id="upgrade-maintenance-block-title" class="upgrade-maintenance-block__title"
+                data-i18n="dashboard.maintenance_upgrade_title">Đang bảo trì nâng cấp</h2>
+            <p class="upgrade-maintenance-block__text" data-i18n="dashboard.maintenance_upgrade_block_msg">
+                Hệ thống đang bảo trì nâng cấp từ 20:30 đến 22:30. Vui lòng quay lại sau 22:30.
+            </p>
+            <p class="upgrade-maintenance-block__sub" data-i18n="dashboard.maintenance_upgrade_block_detail">
+                Chúng tôi đang nâng cấp hệ thống để phục vụ bạn tốt hơn. Mọi thao tác tạm thời bị tạm ngừng trong khung giờ này.
+            </p>
+        </div>
+    </div>
+
     <div id="inapp-browser-modal" class="inapp-browser-modal" hidden role="dialog" aria-modal="true"
         aria-labelledby="inapp-browser-modal-title">
         <div class="inapp-browser-modal__backdrop" aria-hidden="true"></div>

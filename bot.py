@@ -62,6 +62,8 @@ _pending_worker_started = False
 _submitting_orders = set()
 _submitting_orders_lock = threading.Lock()
 MIN_RENDER_SEC = int(os.environ.get("BOT_MIN_RENDER_SEC", "600"))
+VIDEOAIEASY_MIN_RENDER_SEC = int(os.environ.get("VIDEOAIEASY_MIN_RENDER_SEC", "600"))
+VIDEOAIEASY_POLL_INTERVAL_SEC = int(os.environ.get("VIDEOAIEASY_POLL_INTERVAL_SEC", "60"))
 RENDER_PROVIDER_AIDANCING = "aidancing"
 RENDER_PROVIDER_XIAOYANG = "xiaoyang"
 RENDER_PROVIDER_VIDEOAIEASY = "videoaieasy"
@@ -521,13 +523,20 @@ def _reset_persistent_api():
     run_playwright(_api_pool.reset)
 
 
+def _min_render_sec_for_order(order_data: dict) -> int:
+    if _order_render_provider(order_data) == RENDER_PROVIDER_VIDEOAIEASY:
+        return VIDEOAIEASY_MIN_RENDER_SEC
+    return MIN_RENDER_SEC
+
+
 def _processing_monitor_state():
-    """Đọc từ RAM — poll sau MIN_RENDER_SEC từ submittedAt."""
+    """Đọc từ RAM — poll sau min_render theo từng engine (VAE: 10p mặc định)."""
     now = datetime.now(timezone.utc)
     ad_eligible = []
     xy_eligible = []
     vae_eligible = []
     tool98_eligible = []
+    vae_processing_count = 0
     with _processing_cache_lock:
         stale_ids = []
         for oid, doc in _processing_cache.items():
@@ -541,10 +550,13 @@ def _processing_monitor_state():
             d = doc.to_dict() or {}
             if d.get("status") != "processing":
                 continue
-            submitted_at = d.get("submittedAt")
-            if submitted_at and (now - submitted_at).total_seconds() <= MIN_RENDER_SEC:
-                continue
             rp = _order_render_provider(d)
+            if rp == RENDER_PROVIDER_VIDEOAIEASY and d.get("videoaieasyJobId"):
+                vae_processing_count += 1
+            submitted_at = d.get("submittedAt")
+            min_render_sec = _min_render_sec_for_order(d)
+            if submitted_at and (now - submitted_at).total_seconds() <= min_render_sec:
+                continue
             if rp == RENDER_PROVIDER_TOOL98:
                 if d.get("tool98JobId"):
                     tool98_eligible.append(doc)
@@ -558,7 +570,7 @@ def _processing_monitor_state():
                 job_id = d.get("aidancingJobId")
                 if job_id and job_id != "MANUAL":
                     ad_eligible.append(doc)
-    return ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing_count
+    return ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing_count, vae_processing_count
 
 
 def on_processing_orders_snapshot(keys, changes, read_time):
@@ -614,13 +626,15 @@ def _maybe_refresh_processing_cache():
         print(f"⚠️ Refresh processing cache: {e}")
 
 
-def _monitor_sleep_seconds(eligible_count, processing_count):
-    """Không có webhook aidancing — chỉ poll; interval dài khi không có việc."""
+def _monitor_sleep_seconds(eligible_count, processing_count, *, vae_processing_count=0):
+    """Không có webhook aidancing — chỉ poll; VAE: 1p/lần khi có đơn VAE đang chạy."""
     idle = int(os.environ.get("BOT_POLL_IDLE_SEC", "300"))
     wait_render = int(os.environ.get("BOT_POLL_WAIT_RENDER_SEC", "120"))
     active = int(os.environ.get("BOT_POLL_ACTIVE_SEC", "90"))
     if processing_count == 0:
         return idle
+    if vae_processing_count > 0:
+        return VIDEOAIEASY_POLL_INTERVAL_SEC
     if eligible_count == 0:
         return wait_render
     return active
@@ -1293,14 +1307,15 @@ def check_finished_orders_api():
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
-    ad_orders, xy_orders, vae_orders, tool98_orders, _ = _processing_monitor_state()
+    ad_orders, xy_orders, vae_orders, tool98_orders, _, _ = _processing_monitor_state()
     if not ad_orders and not xy_orders and not vae_orders and not tool98_orders:
         return
 
     print(
         f"\n🔍 [MONITOR/HTTP] Poll Aidancing={len(ad_orders)} XiaoYang={len(xy_orders)} "
         f"VideoAiEasy={len(vae_orders)} Tool98={len(tool98_orders)} "
-        f"(sau {MIN_RENDER_SEC // 60}p từ submittedAt)..."
+        f"(VAE: sau {VIDEOAIEASY_MIN_RENDER_SEC // 60}p, mỗi {VIDEOAIEASY_POLL_INTERVAL_SEC}s; "
+        f"khác: sau {MIN_RENDER_SEC // 60}p)..."
     )
     if ad_orders:
         try:
@@ -1675,7 +1690,7 @@ def check_finished_orders():
         if browser_lock.locked():
             return
 
-        ad_orders, _, _, _, _ = _processing_monitor_state()
+        ad_orders, _, _, _, _, _ = _processing_monitor_state()
         if not ad_orders:
             return
 
@@ -1949,6 +1964,7 @@ def start_bot():
             submit_to_aidancing=submit_to_aidancing,
             complete_order_with_video=_complete_order_with_video,
             min_render_sec=MIN_RENDER_SEC,
+            vae_min_render_sec=VIDEOAIEASY_MIN_RENDER_SEC,
             skip_if_order_done=_skip_if_order_done,
             pop_processing_cache=_pop_processing_cache,
         )
@@ -1984,13 +2000,14 @@ def start_bot():
 
     def monitor_loop():
         while True:
-            ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing = _processing_monitor_state()
+            ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing, vae_processing = _processing_monitor_state()
             if is_bot_enabled():
                 check_finished_orders()
             if use_api_mode():
                 sleep_sec = _monitor_sleep_seconds(
                     len(ad_eligible) + len(xy_eligible) + len(vae_eligible) + len(tool98_eligible),
                     processing,
+                    vae_processing_count=vae_processing,
                 )
             else:
                 sleep_sec = 60 if processing else int(os.environ.get("BOT_POLL_IDLE_SEC", "300"))

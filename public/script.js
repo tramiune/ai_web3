@@ -1950,10 +1950,12 @@ window.closeModal = (id) => {
 };
 
 window.openTopupModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     window.openPricingModal();
 };
 
 window.openPricingModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     if (!currentUser) return login();
     renderPricing();
     window.openModal('pricing-modal');
@@ -2123,6 +2125,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
 };
 
 window.openOrderModal = () => {
+    if (blockIfUpgradeMaintenance()) return;
     updateFirstOrderUI();
     window.switchVideoSource('upload');
     window.openModal('order-modal');
@@ -2817,6 +2820,8 @@ async function setupEventListeners() {
         orderForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            if (blockIfUpgradeMaintenance()) return;
+
             if (!currentUser) {
                 // Nếu chưa đăng nhập thì hiện Auth Modal
                 const authModal = document.getElementById('auth-modal');
@@ -3349,26 +3354,95 @@ window.viewFullImage = (url) => {
     modal.style.display = 'flex';
 };
 
+// --- Maintenance (nightly + one-time upgrade 03/06/2026 20:30–22:30 VN) ---
+const UPGRADE_MAINTENANCE = {
+    date: { y: 2026, m: 6, d: 3 },
+    startMin: 20 * 60 + 30,
+    endMin: 22 * 60 + 30,
+};
+
+function getVietnamDateParts(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(date);
+    const get = (type) => parts.find((p) => p.type === type)?.value || '0';
+    const hour = +get('hour');
+    const minute = +get('minute');
+    return {
+        year: +get('year'),
+        month: +get('month'),
+        day: +get('day'),
+        hour,
+        minute,
+        totalMinutes: hour * 60 + minute,
+    };
+}
+
+function isUpgradeMaintenanceDay(vp) {
+    const d = UPGRADE_MAINTENANCE.date;
+    return vp.year === d.y && vp.month === d.m && vp.day === d.d;
+}
+
+function isUpgradeMaintenanceActive(vp = getVietnamDateParts()) {
+    return isUpgradeMaintenanceDay(vp)
+        && vp.totalMinutes >= UPGRADE_MAINTENANCE.startMin
+        && vp.totalMinutes < UPGRADE_MAINTENANCE.endMin;
+}
+
+function isUpgradeMaintenanceNotice(vp = getVietnamDateParts()) {
+    return isUpgradeMaintenanceDay(vp)
+        && vp.totalMinutes < UPGRADE_MAINTENANCE.endMin
+        && !isUpgradeMaintenanceActive(vp);
+}
+
+window.isUpgradeMaintenanceBlocked = () => isUpgradeMaintenanceActive();
+
+function blockIfUpgradeMaintenance() {
+    if (!window.isUpgradeMaintenanceBlocked()) return false;
+    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp. Vui lòng quay lại sau 22:30.');
+    return true;
+}
+
 function checkMaintenance() {
-    const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const totalMinutes = hour * 60 + minute;
+    const vp = getVietnamDateParts();
+    const totalMinutes = vp.totalMinutes;
 
-    // Maintenance from 00:30 to 07:00
-    const maintenanceStart = 0 * 60 + 30; // 00:30
-    const maintenanceEnd = 7 * 60; // 07:00
-
-    const isMaintenance = totalMinutes >= maintenanceStart && totalMinutes < maintenanceEnd;
+    // Nightly maintenance from 00:30 to 07:00
+    const maintenanceStart = 0 * 60 + 30;
+    const maintenanceEnd = 7 * 60;
+    const isNightlyMaintenance = totalMinutes >= maintenanceStart && totalMinutes < maintenanceEnd;
 
     const banner = document.getElementById('maintenance-banner');
     if (banner) {
-        banner.style.display = isMaintenance ? 'flex' : 'none';
+        banner.style.display = isNightlyMaintenance ? 'flex' : 'none';
+    }
+
+    const notice = document.getElementById('upgrade-maintenance-notice');
+    if (notice) {
+        notice.hidden = !isUpgradeMaintenanceNotice(vp);
+    }
+
+    const blockModal = document.getElementById('upgrade-maintenance-block');
+    if (blockModal) {
+        const active = isUpgradeMaintenanceActive(vp);
+        blockModal.hidden = !active;
+        document.body.classList.toggle('upgrade-maintenance-locked', active);
+        if (active) {
+            document.querySelectorAll('.modal-overlay, .auth-modal-overlay').forEach((el) => {
+                el.style.display = 'none';
+            });
+        }
     }
 }
 
-// Check every minute
-setInterval(checkMaintenance, 60000);
+// Check every 30s so popup/block activates on time
+setInterval(checkMaintenance, 30000);
 
 // --- Admin Dashboard Logic ---
 window.switchAdminTab = (tabName) => {

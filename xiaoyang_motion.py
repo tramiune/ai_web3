@@ -57,7 +57,7 @@ XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 
-from user_order_notes import USER_NOTE_FILES_MISSING, user_note_for_render_failure
+from user_order_notes import USER_NOTE_FILES_MISSING, user_note_for_render_failure, user_note_for_videoaieasy_failure
 
 _g: dict = {}
 _active_render_provider = RENDER_PROVIDER_XIAOYANG
@@ -569,20 +569,22 @@ def _order_render_provider(order_data: dict) -> str:
     return RENDER_PROVIDER_AIDANCING
 
 
-def split_monitor_state(processing_cache: dict, min_render_sec: int):
+def split_monitor_state(processing_cache: dict, min_render_sec: int, *, vae_min_render_sec: int | None = None):
     now = datetime.now(timezone.utc)
     ad_eligible = []
     xy_eligible = []
     vae_eligible = []
     tool98_eligible = []
+    vae_wait = vae_min_render_sec if vae_min_render_sec is not None else min_render_sec
     for doc in processing_cache.values():
         d = doc.to_dict() or {}
         if d.get("status") != "processing":
             continue
-        submitted_at = d.get("submittedAt")
-        if submitted_at and (now - submitted_at).total_seconds() <= min_render_sec:
-            continue
         rp = _order_render_provider(d)
+        wait_sec = vae_wait if rp == RENDER_PROVIDER_VIDEOAIEASY else min_render_sec
+        submitted_at = d.get("submittedAt")
+        if submitted_at and (now - submitted_at).total_seconds() <= wait_sec:
+            continue
         if rp == RENDER_PROVIDER_TOOL98 and d.get("tool98JobId"):
             tool98_eligible.append(doc)
         elif rp == RENDER_PROVIDER_XIAOYANG and d.get("xiaoyangTaskId"):
@@ -862,7 +864,8 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                         f"🆔 Mã đơn: #{short_id}\n"
                         f"📧 Nick: {nick_label}\n"
                         f"🤖 Job: <code>{job_id}</code>\n"
-                        f"⏳ Poll sau {_g['min_render_sec'] // 60} phút..."
+                        f"⏳ Poll sau {_g.get('vae_min_render_sec', _g['min_render_sec']) // 60} phút, mỗi "
+                        f"{int(get_env('VIDEOAIEASY_POLL_INTERVAL_SEC', '60'))}s..."
                     )
                 except Exception:
                     pass
@@ -1194,7 +1197,7 @@ def poll_videoaieasy_orders(orders_to_check):
             _fail_or_tool98_fallback(
                 doc, order_data,
                 f"VideoAiEasy job {job_id} {status}: {err or ''}",
-                user_note_for_render_failure(err),
+                user_note_for_videoaieasy_failure(err),
                 "render videoaieasy",
             )
         else:

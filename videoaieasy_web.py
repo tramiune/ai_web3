@@ -5,6 +5,7 @@ Video AI Easy (videoaieasy.hdgr.online) — web session cho kaling (web3) bot.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import mimetypes
 import os
@@ -87,6 +88,23 @@ class VideoAiEasyClient:
         }
         self.session_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
+    def _decode_auth_cookie(self, raw: str) -> dict:
+        if not raw.startswith("base64-"):
+            raise VideoAiEasyAuthError("Chưa có session cookie")
+        try:
+            return json.loads(base64.b64decode(raw[7:], validate=False).decode("utf-8"))
+        except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise VideoAiEasyAuthError(f"Cookie session hỏng — login lại ({exc})") from exc
+
+    def _clear_session(self) -> None:
+        self.session.cookies.clear()
+        self._user_email = None
+        if self.session_file.is_file():
+            try:
+                self.session_file.unlink()
+            except OSError:
+                pass
+
     def _load_session(self) -> None:
         if not self.session_file.is_file():
             return
@@ -95,10 +113,11 @@ class VideoAiEasyClient:
             name = data.get("cookie_name") or AUTH_COOKIE
             value = data.get("cookie_value") or ""
             if value:
+                self._decode_auth_cookie(value)
                 self.session.cookies.set(name, value, domain="videoaieasy.hdgr.online", path="/")
             self._user_email = data.get("email")
         except Exception:
-            pass
+            self._clear_session()
 
     def _api(self, method: str, path: str, **kwargs) -> dict:
         timeout = kwargs.pop("timeout", 120)
@@ -150,7 +169,8 @@ class VideoAiEasyClient:
         try:
             self._probe_origin_session()
             return self.get_profile()
-        except (VideoAiEasyAuthError, VideoAiEasyError):
+        except (VideoAiEasyAuthError, VideoAiEasyError, binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
+            self._clear_session()
             self.login(email, password)
             self._probe_origin_session()
             return self.get_profile()
@@ -175,9 +195,7 @@ class VideoAiEasyClient:
 
     def _access_token(self) -> str:
         raw = self.session.cookies.get(AUTH_COOKIE, "")
-        if not raw.startswith("base64-"):
-            raise VideoAiEasyAuthError("Chưa có session cookie")
-        payload = json.loads(base64.b64decode(raw[7:]).decode("utf-8"))
+        payload = self._decode_auth_cookie(raw)
         token = payload.get("access_token")
         if not token:
             raise VideoAiEasyAuthError("Cookie không có access_token")
@@ -185,9 +203,7 @@ class VideoAiEasyClient:
 
     def _current_user(self) -> dict:
         raw = self.session.cookies.get(AUTH_COOKIE, "")
-        if not raw.startswith("base64-"):
-            raise VideoAiEasyAuthError("Chưa đăng nhập")
-        payload = json.loads(base64.b64decode(raw[7:]).decode("utf-8"))
+        payload = self._decode_auth_cookie(raw)
         user = payload.get("user") or {}
         if not user.get("id"):
             raise VideoAiEasyAuthError("Cookie không hợp lệ")
