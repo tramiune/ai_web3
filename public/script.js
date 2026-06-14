@@ -3354,10 +3354,10 @@ window.viewFullImage = (url) => {
     modal.style.display = 'flex';
 };
 
-// --- Maintenance (nightly + one-time upgrade 03/06 20:30 → 04/06 05:00 VN) ---
+// --- Maintenance (one-time upgrade 14/06 20:30 → 15/06 05:00 VN) ---
 const UPGRADE_MAINTENANCE = {
-    start: { y: 2026, m: 6, d: 3, h: 20, min: 30 },
-    end: { y: 2026, m: 6, d: 4, h: 5, min: 0 },
+    start: { y: 2026, m: 6, d: 14, h: 20, min: 30 },
+    end: { y: 2026, m: 6, d: 15, h: 5, min: 0 },
 };
 
 function getVietnamDateParts(date = new Date()) {
