@@ -124,17 +124,8 @@ function getMaxVideoDurationForModel(modelKey) {
     return VAE_DURATION_FAST_SEC;
 }
 
-function getActiveMaxVideoDurationSec() {
-    return getMaxVideoDurationForModel(getSelectedModelKey());
-}
-
 function vaeDurationSecForModel(modelKey) {
     return getMaxVideoDurationForModel(modelKey);
-}
-
-function videoDurationLimitToastKey(modelKey) {
-    if (modelKey === 'turbo') return 'modals.video_duration_limit_turbo';
-    return 'modals.video_duration_limit_fast';
 }
 
 function modelCoinCost(modelKey) {
@@ -288,35 +279,6 @@ const SERVICE_PACKAGES = [
     { id: 'plus', name: 'Plus', cost: MODEL_COST_FAST, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
     { id: 'viral', name: 'Viral', cost: MODEL_COST_TURBO, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
 ];
-
-async function getVideoDurationSeconds(file) {
-    if (!file) return null;
-    try {
-        const url = URL.createObjectURL(file);
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        const duration = await new Promise((resolve, reject) => {
-            const cleanup = () => {
-                try { URL.revokeObjectURL(url); } catch { }
-                video.removeAttribute('src');
-                video.load();
-            };
-            video.onloadedmetadata = () => {
-                const d = Number(video.duration);
-                cleanup();
-                resolve(Number.isFinite(d) ? d : null);
-            };
-            video.onerror = () => {
-                cleanup();
-                reject(new Error('metadata error'));
-            };
-            video.src = url;
-        });
-        return duration;
-    } catch {
-        return null;
-    }
-}
 
 let currentUser = null;
 let selectedTopupPackage = null;
@@ -1799,9 +1761,7 @@ window.switchVideoSource = (type) => {
         if (existing?.type?.startsWith('video/')) {
             renderVideoFilePreview('preview-video-container', existing, {
                 inputId: 'file-video',
-                changeKey: 'modals.video_change',
-                maxDurationSec: getActiveMaxVideoDurationSec(),
-                durationToastKey: videoDurationLimitToastKey(getSelectedModelKey())
+                changeKey: 'modals.video_change'
             });
         }
     } else if (type === 'tiktok') {
@@ -2194,26 +2154,7 @@ function updateFirstOrderUI() {
         }
     }
 
-    refreshVideoForSelectedModel();
-}
-
-function refreshVideoForSelectedModel() {
-    const modelKey = getSelectedModelKey();
-    const maxDur = getMaxVideoDurationForModel(modelKey);
-    const toastKey = videoDurationLimitToastKey(modelKey);
-
-    if (window.currentVideoSource === 'upload') {
-        const fileInput = document.getElementById('file-video');
-        const existing = fileInput?.files?.[0];
-        if (existing?.type?.startsWith('video/')) {
-            renderVideoFilePreview('preview-video-container', existing, {
-                inputId: 'file-video',
-                changeKey: 'modals.video_change',
-                maxDurationSec: maxDur,
-                durationToastKey: toastKey
-            });
-        }
-    }
+    // Bot cắt video theo gói — web không cần xử lý lại khi đổi model.
 }
 
 window.closeOfferBar = () => {
@@ -2258,7 +2199,6 @@ function appendPreviewChangeButton(container, inputId, labelKey) {
 }
 
 const TIKWM_API = 'https://www.tikwm.com/api/';
-let _ffmpegLoadPromise = null;
 
 function isTikTokPageUrl(raw) {
     try {
@@ -2279,8 +2219,7 @@ function tiktokErrorMessage(code) {
         fetch_failed: 'modals.tiktok_fetch_failed',
         video_download: 'modals.tiktok_fetch_failed',
         tikwm_parse: 'modals.tiktok_fetch_failed',
-        no_video: 'modals.tiktok_fetch_failed',
-        trim_failed: 'modals.tiktok_trim_failed'
+        no_video: 'modals.tiktok_fetch_failed'
     }[code] || 'modals.tiktok_fetch_failed';
     return t(msgKey);
 }
@@ -2356,91 +2295,6 @@ async function downloadTikTokVideoBlob(pageUrl) {
     }
 }
 
-async function getBlobVideoDurationSec(blob) {
-    const url = URL.createObjectURL(blob);
-    try {
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        video.muted = true;
-        video.playsInline = true;
-        video.setAttribute('playsinline', '');
-        video.setAttribute('webkit-playsinline', '');
-        video.src = url;
-        await new Promise((resolve, reject) => {
-            video.onloadedmetadata = () => resolve();
-            video.onerror = () => reject(new Error('metadata'));
-        });
-        return video.duration;
-    } finally {
-        URL.revokeObjectURL(url);
-    }
-}
-
-async function loadFfmpegForTrim() {
-    if (!_ffmpegLoadPromise) {
-        _ffmpegLoadPromise = (async () => {
-            const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-            const { toBlobURL, fetchFile } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
-            const ffmpeg = new FFmpeg();
-            const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-            await ffmpeg.load({
-                coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
-                wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm')
-            });
-            return { ffmpeg, fetchFile };
-        })().catch((err) => {
-            _ffmpegLoadPromise = null;
-            throw err;
-        });
-    }
-    return _ffmpegLoadPromise;
-}
-
-async function trimVideoBlobToMaxSec(blob, maxSec = MAX_VIDEO_DURATION_SEC) {
-    let duration;
-    try {
-        duration = await getBlobVideoDurationSec(blob);
-    } catch (_) {
-        duration = Infinity;
-    }
-    if (isFinite(duration) && duration <= maxSec + 0.15) {
-        return { blob, trimmed: false };
-    }
-
-    const { ffmpeg, fetchFile } = await loadFfmpegForTrim();
-    const inputName = 'tiktok_in.mp4';
-    const outputName = 'tiktok_out.mp4';
-    await ffmpeg.writeFile(inputName, await fetchFile(blob));
-
-    try {
-        await ffmpeg.exec(['-i', inputName, '-t', String(maxSec), '-c', 'copy', '-movflags', '+faststart', outputName]);
-    } catch (_) {
-        await ffmpeg.exec([
-            '-i', inputName,
-            '-t', String(maxSec),
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-crf', '28',
-            '-c:a', 'aac',
-            '-b:a', '96k',
-            '-movflags', '+faststart',
-            outputName
-        ]);
-    }
-
-    const outData = await ffmpeg.readFile(outputName);
-    try {
-        await ffmpeg.deleteFile(inputName);
-        await ffmpeg.deleteFile(outputName);
-    } catch (_) { /* ignore */ }
-
-    const outBytes = outData instanceof Uint8Array ? outData : new Uint8Array(outData);
-    return {
-        blob: new Blob([outBytes], { type: 'video/mp4' }),
-        trimmed: true
-    };
-}
-
 function setFileInputFromFile(inputId, file) {
     const input = document.getElementById(inputId);
     if (!input || !file) return false;
@@ -2448,26 +2302,6 @@ function setFileInputFromFile(inputId, file) {
     dt.items.add(file);
     input.files = dt.files;
     return true;
-}
-
-async function trimUploadFileToMaxSec(file, maxDurationSec) {
-    const { blob, trimmed } = await trimVideoBlobToMaxSec(file, maxDurationSec);
-    if (!trimmed) return { file, trimmed: false };
-    const baseName = (file.name || 'video').replace(/\.[^.]+$/, '') || 'video';
-    return {
-        file: new File([blob], `${baseName}.mp4`, { type: 'video/mp4' }),
-        trimmed: true
-    };
-}
-
-function showVideoTrimLoading(container, maxDurationSec) {
-    container.innerHTML = '';
-    const loading = document.createElement('div');
-    loading.className = 'video-trim-loading';
-    loading.style.cssText = 'padding:1rem;text-align:center;color:var(--accent);font-size:0.85rem;line-height:1.4;';
-    loading.textContent = t('modals.video_trimming', { max: maxDurationSec });
-    container.appendChild(loading);
-    syncUploadZonePreviewState(container);
 }
 
 function renderVideoPreviewContent(container, file, options = {}) {
@@ -2513,35 +2347,10 @@ function renderVideoPreviewContent(container, file, options = {}) {
     syncUploadZonePreviewState(container);
 }
 
-async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
-    const { onProgress } = options;
-    const maxDurationSec = options.maxDurationSec ?? getActiveMaxVideoDurationSec();
-    const durationToastKey = options.durationToastKey ?? videoDurationLimitToastKey(getSelectedModelKey());
-    const { blob: initialBlob, duration: metaDuration } = await downloadTikTokVideoBlob(pageUrl);
-    let blob = initialBlob;
+async function applyTikTokVideoFromUrl(pageUrl) {
+    const { blob } = await downloadTikTokVideoBlob(pageUrl);
     if (blob.size > MAX_VIDEO_FILE_BYTES) {
         throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
-    }
-
-    let blobDuration = metaDuration;
-    if (!isFinite(blobDuration)) {
-        try {
-            blobDuration = await getBlobVideoDurationSec(blob);
-        } catch (_) {
-            blobDuration = MAX_VIDEO_DURATION_SEC + 1;
-        }
-    }
-    const needsTrim = blobDuration > maxDurationSec + 0.15;
-
-    if (needsTrim) {
-        onProgress?.('trimming');
-        try {
-            const trimmed = await trimVideoBlobToMaxSec(blob, maxDurationSec);
-            blob = trimmed.blob;
-        } catch (trimErr) {
-            console.error('[TikTok] trim failed:', trimErr);
-            throw Object.assign(new Error(t('modals.tiktok_trim_failed')), { code: 'trim_failed' });
-        }
     }
 
     const file = new File([blob], 'tiktok_video.mp4', { type: 'video/mp4' });
@@ -2556,9 +2365,6 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
 
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
-        maxDurationSec,
-        durationToastKey,
-        autoTrim: false,
         onChange: () => {
             fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
@@ -2570,7 +2376,7 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
         }
     });
 
-    return { file, trimmed: needsTrim };
+    return { file };
 }
 
 window.fetchTikTokVideo = async () => {
@@ -2589,13 +2395,8 @@ window.fetchTikTokVideo = async () => {
     showToast(t('modals.tiktok_fetching'));
 
     try {
-        const { trimmed } = await applyTikTokVideoFromUrl(pageUrl, {
-            onProgress: (phase) => {
-                if (phase === 'trimming' && btn) btn.textContent = t('modals.tiktok_trimming');
-                if (phase === 'trimming') showToast(t('modals.tiktok_trimming'));
-            }
-        });
-        showToast(trimmed ? t('modals.tiktok_fetch_trimmed') : t('modals.tiktok_fetch_success'));
+        await applyTikTokVideoFromUrl(pageUrl);
+        showToast(t('modals.tiktok_fetch_success'));
     } catch (e) {
         console.error('[TikTok] fetch failed:', e);
         showToast(e.code ? tiktokErrorMessage(e.code) : (e.message || t('modals.tiktok_fetch_failed')));
@@ -2612,9 +2413,6 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     const container = document.getElementById(containerId);
     if (!container || !file) return;
 
-    const maxDurationSec = options.maxDurationSec ?? MAX_VIDEO_DURATION_SEC;
-    const autoTrim = options.autoTrim !== false;
-
     if (file.size > MAX_VIDEO_FILE_BYTES) {
         showToast(t('modals.video_size_limit'));
         if (options.inputId) {
@@ -2626,54 +2424,8 @@ function renderVideoFilePreview(containerId, file, options = {}) {
         return;
     }
 
-    const probe = document.createElement('video');
-    probe.preload = 'metadata';
-    probe.muted = true;
-    probe.playsInline = true;
-    const probeUrl = URL.createObjectURL(file);
-    probe.onloadedmetadata = async () => {
-        const duration = probe.duration;
-        URL.revokeObjectURL(probeUrl);
-        if (duration > maxDurationSec + 0.15) {
-            if (autoTrim) {
-                showVideoTrimLoading(container, maxDurationSec);
-                try {
-                    const { file: trimmedFile, trimmed } = await trimUploadFileToMaxSec(file, maxDurationSec);
-                    if (trimmed) {
-                        if (options.inputId) setFileInputFromFile(options.inputId, trimmedFile);
-                        showToast(t('modals.video_trimmed', { max: maxDurationSec }));
-                    }
-                    renderVideoFilePreview(containerId, trimmedFile, { ...options, autoTrim: false });
-                } catch (trimErr) {
-                    console.error('[Upload] trim failed:', trimErr);
-                    showToast(t('modals.tiktok_trim_failed'));
-                    if (options.inputId) {
-                        const input = document.getElementById(options.inputId);
-                        if (input) input.value = '';
-                    }
-                    container.innerHTML = '';
-                    syncUploadZonePreviewState(container);
-                }
-                return;
-            }
-
-            showToast(t(options.durationToastKey || videoDurationLimitToastKey('fast')));
-            if (options.inputId) {
-                const input = document.getElementById(options.inputId);
-                if (input) input.value = '';
-            }
-            container.innerHTML = '';
-            syncUploadZonePreviewState(container);
-            return;
-        }
-
-        renderVideoPreviewContent(container, file, options);
-    };
-    probe.onerror = () => {
-        URL.revokeObjectURL(probeUrl);
-        showToast(t('modals.tiktok_fetch_failed'));
-    };
-    probe.src = probeUrl;
+    container.innerHTML = '';
+    renderVideoPreviewContent(container, file, options);
 }
 
 window.handlePreview = (input, containerId) => {
@@ -2713,12 +2465,9 @@ window.handlePreview = (input, containerId) => {
         appendPreviewChangeButton(container, meta.inputId, meta.changeKey);
         syncUploadZonePreviewState(container);
     } else if (file.type.startsWith('video/')) {
-        const modelKey = getSelectedModelKey();
         renderVideoFilePreview(containerId, file, {
             inputId: meta.inputId,
-            changeKey: meta.changeKey,
-            maxDurationSec: getMaxVideoDurationForModel(modelKey),
-            durationToastKey: videoDurationLimitToastKey(modelKey)
+            changeKey: meta.changeKey
         });
     }
 };
@@ -2874,14 +2623,7 @@ async function setupEventListeners() {
                     if (mainTextFetch) mainTextFetch.innerText = t('modals.tiktok_fetching');
                     showToast(t('modals.tiktok_fetch_on_submit'));
                     try {
-                        const result = await applyTikTokVideoFromUrl(tiktokUrl, {
-                            maxDurationSec: getMaxVideoDurationForModel(modelKeySelected),
-                            onProgress: (phase) => {
-                                if (phase === 'trimming' && mainTextFetch) {
-                                    mainTextFetch.innerText = t('modals.tiktok_trimming');
-                                }
-                            }
-                        });
+                        const result = await applyTikTokVideoFromUrl(tiktokUrl);
                         videoFile = result.file;
                     } catch (tiktokErr) {
                         console.error('[TikTok] auto fetch on submit:', tiktokErr);
@@ -2894,30 +2636,6 @@ async function setupEventListeners() {
 
                 if (window.currentVideoSource === 'upload' && !videoFile) {
                     return showToast(t('modals.video_upload_required'));
-                }
-
-                // Trim video theo gói: Nhanh 5s · Turbo 10s
-                if (window.currentVideoSource === 'upload' && videoFile) {
-                    let dur = await getVideoDurationSeconds(videoFile);
-                    const maxDur = getMaxVideoDurationForModel(modelKeySelected);
-                    if (typeof dur === 'number' && dur > maxDur + 0.15) {
-                        try {
-                            showToast(t('modals.video_trimming', { max: maxDur }));
-                            const { file: trimmedFile, trimmed } = await trimUploadFileToMaxSec(videoFile, maxDur);
-                            if (trimmed) {
-                                setFileInputFromFile('file-video', trimmedFile);
-                                videoFile = trimmedFile;
-                                showToast(t('modals.video_trimmed', { max: maxDur }));
-                            }
-                            dur = await getVideoDurationSeconds(videoFile);
-                        } catch (trimErr) {
-                            console.error('[Submit] trim failed:', trimErr);
-                            return showToast(t('modals.tiktok_trim_failed'));
-                        }
-                    }
-                    if (typeof dur === 'number' && dur > maxDur + 0.15) {
-                        return showToast(t(videoDurationLimitToastKey(modelKeySelected)));
-                    }
                 }
 
                 // Kiểm tra lại lần cuối trước khi upload
