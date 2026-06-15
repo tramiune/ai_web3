@@ -9,7 +9,7 @@ import queue
 import requests
 import firebase_admin
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from playwright.sync_api import sync_playwright
@@ -59,6 +59,63 @@ _processing_cache_refresh_at = 0.0
 _pending_order_queue = []
 _pending_queue_lock = threading.Lock()
 _pending_worker_started = False
+
+# Bảo trì nâng cấp — khớp public/script.js UPGRADE_MAINTENANCE (admin test bypass)
+_VN_TZ = timezone(timedelta(hours=7))
+_UPGRADE_MAINTENANCE_START = datetime(2026, 6, 14, 20, 30, tzinfo=_VN_TZ)
+_UPGRADE_MAINTENANCE_END = datetime(2026, 6, 15, 23, 59, tzinfo=_VN_TZ)
+_ADMIN_ROLES = frozenset({"admin", "super-admin"})
+_SUPER_ADMIN_EMAILS = frozenset({
+    "traderfinn0312@gmail.com",
+    "dinhhoangvan.hh@gmail.com",
+})
+_admin_role_cache = {}
+_admin_role_cache_lock = threading.Lock()
+
+
+def _is_upgrade_maintenance_active() -> bool:
+    now = datetime.now(_VN_TZ)
+    return _UPGRADE_MAINTENANCE_START <= now < _UPGRADE_MAINTENANCE_END
+
+
+def _is_admin_order(order_data: dict) -> bool:
+    email = (order_data.get("userEmail") or "").strip().lower()
+    if email in _SUPER_ADMIN_EMAILS:
+        return True
+    user_id = (order_data.get("userId") or "").strip()
+    if not user_id:
+        return False
+    with _admin_role_cache_lock:
+        if user_id in _admin_role_cache:
+            return _admin_role_cache[user_id]
+    is_admin = False
+    try:
+        doc = db.collection("users").document(user_id).get()
+        role = (doc.to_dict() or {}).get("role") if doc.exists else None
+        is_admin = role in _ADMIN_ROLES
+    except Exception as e:
+        print(f"⚠️ Đọc role user {user_id}: {e}")
+    with _admin_role_cache_lock:
+        _admin_role_cache[user_id] = is_admin
+    return is_admin
+
+
+def _should_bot_process_order(order_id: str) -> bool:
+    """Trong cửa sổ bảo trì: bot chỉ nạp đơn của admin (test)."""
+    if not _is_upgrade_maintenance_active():
+        return True
+    try:
+        doc = db.collection("orders").document(order_id).get()
+        if not doc.exists:
+            return False
+        if not _is_admin_order(doc.to_dict() or {}):
+            print(f"⏸️ [{BOT_NAME}] Bảo trì test — bỏ qua đơn {order_id} (không phải admin)")
+            return False
+    except Exception as e:
+        print(f"⚠️ Kiểm tra admin đơn {order_id}: {e}")
+        return False
+    return True
+
 _submitting_orders = set()
 _submitting_orders_lock = threading.Lock()
 MIN_RENDER_SEC = int(os.environ.get("BOT_MIN_RENDER_SEC", "600"))
@@ -691,6 +748,8 @@ def _pending_order_worker():
             if _pending_order_queue:
                 order_id = _pending_order_queue.pop(0)
         if order_id:
+            if not _should_bot_process_order(order_id):
+                continue
             try:
                 if xy_motion.enabled_for_bot(BOT_NAME):
                     xy_motion.submit_order(order_id)
@@ -1887,6 +1946,8 @@ def on_pending_orders_snapshot(keys, changes, read_time):
             with _submitting_orders_lock:
                 if oid in _submitting_orders:
                     continue
+            if not _should_bot_process_order(oid):
+                continue
             if oid not in _pending_order_queue:
                 _pending_order_queue.append(oid)
                 print(f"📋 Xếp hàng nạp đơn: {oid} (còn {len(_pending_order_queue)} trong queue)")
@@ -1909,6 +1970,8 @@ def _enqueue_pending_rescan():
                 with _submitting_orders_lock:
                     if oid in _submitting_orders:
                         continue
+                if not _should_bot_process_order(oid):
+                    continue
                 if oid not in _pending_order_queue:
                     _pending_order_queue.append(oid)
                     print(f"🔄 Hàng đợi thử lại đơn pending: {oid}")

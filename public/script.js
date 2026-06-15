@@ -1355,6 +1355,7 @@ async function handleUserLoggedIn(user) {
             window.__currentUserData = data;
             window.__isAdmin = isAdmin;
             window.__isSuperAdmin = isSuperAdmin;
+            checkMaintenance();
 
             if (isAdmin) {
                 const adminProfileItem = document.getElementById('admin-dropdown-item-profile');
@@ -1486,6 +1487,7 @@ function handleUserLoggedOut() {
     updateReferralNavVisibility(false);
     window.__isSuperAdmin = false;
     window.__currentUserData = null;
+    checkMaintenance();
     adminSubscribedOrderStatus = null;
     adminSubscribedTopupStatus = null;
     Object.keys(FB_CACHE).forEach(k => { delete FB_CACHE[k]; });
@@ -3409,11 +3411,12 @@ function isUpgradeMaintenanceNotice() {
         && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
 }
 
-window.isUpgradeMaintenanceBlocked = () => isUpgradeMaintenanceActive();
+window.isUpgradeMaintenanceBlocked = () =>
+    isUpgradeMaintenanceActive() && !window.__isAdmin;
 
 function blockIfUpgradeMaintenance() {
     if (!window.isUpgradeMaintenanceBlocked()) return false;
-    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến hết hôm nay (23:59). Vui lòng quay lại sau đó.');
+    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến hết ngày 15/06 (23:59). Vui lòng quay lại sau đó.');
     return true;
 }
 
@@ -3438,7 +3441,7 @@ function checkMaintenance() {
 
     const blockModal = document.getElementById('upgrade-maintenance-block');
     if (blockModal) {
-        const active = isUpgradeMaintenanceActive();
+        const active = isUpgradeMaintenanceActive() && !window.__isAdmin;
         blockModal.hidden = !active;
         document.body.classList.toggle('upgrade-maintenance-locked', active);
         if (active) {
