@@ -494,6 +494,98 @@ def concat_video_files(parts: list[Path], output: Path) -> Path:
       pass
 
 
+def _media_has_audio(path: Path) -> bool:
+  ffmpeg = _ffmpeg_executable()
+  if not ffmpeg or not path.is_file():
+    return False
+  result = subprocess.run(
+    [ffmpeg, "-i", str(path), "-hide_banner"],
+    capture_output=True,
+    text=True,
+  )
+  return "Audio:" in (result.stderr or "")
+
+
+def mux_reference_audio_into_video(
+  video_path: str | Path,
+  audio_source_path: str | Path,
+  *,
+  max_audio_sec: float | None = None,
+  output: Path | None = None,
+) -> Path:
+  """Ghép audio từ video mẫu vào video kết quả (Kling XiaoYang không có tiếng)."""
+  video_path = Path(video_path)
+  audio_source_path = Path(audio_source_path)
+  if not video_path.is_file():
+    raise Tool98ApiError(f"Video kết quả không tồn tại: {video_path}")
+  if not audio_source_path.is_file():
+    raise Tool98ApiError(f"Video mẫu không tồn tại: {audio_source_path}")
+  if not _media_has_audio(audio_source_path):
+    return video_path
+
+  ffmpeg = _ffmpeg_executable()
+  if not ffmpeg:
+    raise Tool98ApiError("Cần ffmpeg hoặc imageio-ffmpeg để ghép âm thanh")
+
+  out_path = output
+  if out_path is None:
+    fd, path = tempfile.mkstemp(suffix=video_path.suffix or ".mp4")
+    os.close(fd)
+    out_path = Path(path)
+
+  audio_input = str(audio_source_path)
+  if max_audio_sec is not None and max_audio_sec > 0:
+    fd, trimmed = tempfile.mkstemp(suffix=audio_source_path.suffix or ".mp4")
+    os.close(fd)
+    trim_video_to_seconds(
+      audio_source_path,
+      max_seconds=max_audio_sec,
+      output=Path(trimmed),
+    )
+    audio_input = trimmed
+
+  try:
+    cmd_copy = [
+      ffmpeg, "-y",
+      "-i", str(video_path),
+      "-i", audio_input,
+      "-map", "0:v:0",
+      "-map", "1:a:0",
+      "-c:v", "copy",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-shortest",
+      "-movflags", "+faststart",
+      str(out_path),
+    ]
+    _run_ffmpeg(cmd_copy, err_label="Không ghép âm thanh (copy)")
+  except Tool98ApiError:
+    cmd_reencode = [
+      ffmpeg, "-y",
+      "-i", str(video_path),
+      "-i", audio_input,
+      "-map", "0:v:0",
+      "-map", "1:a:0",
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-crf", "18",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-shortest",
+      "-movflags", "+faststart",
+      str(out_path),
+    ]
+    _run_ffmpeg(cmd_reencode, err_label="Không ghép âm thanh")
+  finally:
+    if audio_input != str(audio_source_path):
+      try:
+        os.remove(audio_input)
+      except OSError:
+        pass
+
+  return out_path
+
+
 def prepare_motion_video_source(
   video_source: str,
   *,

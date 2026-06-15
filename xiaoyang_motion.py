@@ -39,6 +39,7 @@ from tool98_api import (
     trim_video_to_seconds,
     extract_video_segment,
     concat_video_files,
+    mux_reference_audio_into_video,
 )
 
 load_project_env()
@@ -231,6 +232,64 @@ def _vae_duration_for_order(order_data: dict) -> int:
     if model_id in AIDANCING_TURBO_MODEL_IDS:
         return VAE_DURATION_TURBO_SEC
     return VAE_DURATION_FAST_SEC
+
+
+def _kaling_xy_enhance_4k() -> bool:
+    if enabled_for_bot(_g.get("bot_name")):
+        return get_env("KALING_XY_ENHANCE_4K", "0").strip().lower() not in ("0", "false", "no")
+    return get_env("XIAOYANG_ENHANCE_4K", "1").strip().lower() not in ("0", "false", "no")
+
+
+def _deliver_xiaoyang_motion_with_audio(doc, local_silent_vid: str) -> bool:
+    """Tải video mẫu, ghép audio vào kết quả Kling (silent) rồi trả khách."""
+    complete = _g["complete_order_with_video"]
+    download_file = _g["download_file"]
+    order_data = doc.to_dict() or {}
+    order_id = doc.id
+    ref_url = (order_data.get("referenceVideoLink") or "").strip()
+    max_sec = _vae_duration_for_order(order_data)
+
+    delivered = False
+    ref_path = None
+    muxed_path = None
+    try:
+        if not ref_url:
+            print(f"⚠️ Không có referenceVideoLink — trả video không tiếng {order_id}")
+            return complete(doc, local_silent_vid)
+
+        ref_path = download_file(ref_url, f"ref_audio_{order_id}.mp4")
+        if not ref_path:
+            print(f"⚠️ Không tải được video mẫu — trả video không tiếng {order_id}")
+            return complete(doc, local_silent_vid)
+
+        print(f"🔊 Ghép âm thanh từ video mẫu ({max_sec}s) → {order_id}...")
+        muxed_path = str(
+            mux_reference_audio_into_video(
+                local_silent_vid,
+                ref_path,
+                max_audio_sec=max_sec,
+            )
+        )
+        if muxed_path != local_silent_vid and os.path.exists(local_silent_vid):
+            os.remove(local_silent_vid)
+        delivered = complete(doc, muxed_path)
+        return delivered
+    except Exception as e:
+        print(f"⚠️ Ghép âm thanh thất bại {order_id}: {e} — trả video không tiếng")
+        _g.get("notify_internal_error_telegram")(
+            order_id, order_data, str(e), "mux audio xiaoyang"
+        )
+        return complete(doc, local_silent_vid)
+    finally:
+        if ref_path and os.path.exists(ref_path):
+            os.remove(ref_path)
+        if (
+            muxed_path
+            and muxed_path != local_silent_vid
+            and os.path.exists(muxed_path)
+            and not delivered
+        ):
+            os.remove(muxed_path)
 
 
 def _is_vae_split_order(order_data: dict | None) -> bool:
@@ -865,6 +924,8 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
 
             char_path = None
             vid_path = None
+            vid_upload_path = None
+            vid_trim_tmp = None
             download_file = _g["download_file"]
             try:
                 modal, option = _xiaoyang_modal_for_order(data)
@@ -872,7 +933,8 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
                     "XIAOYANG_PROMPT", "Follow the reference motion naturally"
                 )).strip()
                 tier = "Turbo/v3.0" if modal == XIAOYANG_MODAL_TURBO else "Thường/v2.6"
-                enhance_4k = get_env("XIAOYANG_ENHANCE_4K", "1").strip().lower() not in ("0", "false", "no")
+                enhance_4k = _kaling_xy_enhance_4k()
+                max_sec = _vae_duration_for_order(data)
                 hd = " + HD 2K" if enhance_4k else ""
                 api = _get_xy_web_client(account_id)
                 _ensure_xy_web_session(api, account_email, account.get("password"))
@@ -890,10 +952,21 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
                     time.sleep(2)
                 if not char_path or not vid_path:
                     raise XiaoyangWebError("Không tải được ảnh/video từ link đơn hàng")
+                vid_upload_path = vid_path
+                dur = probe_video_duration_seconds(vid_path)
+                if dur is None or dur > max_sec + 0.25:
+                    fd, outp = tempfile.mkstemp(suffix=".mp4")
+                    os.close(fd)
+                    trim_video_to_seconds(
+                        Path(vid_path), max_seconds=max_sec, output=Path(outp)
+                    )
+                    vid_upload_path = outp
+                    vid_trim_tmp = outp
+                    print(f"✂️ Cắt video motion → {max_sec}s (XiaoYang/Kling)")
                 print("📤 Upload ảnh lên xiaoyang.online...")
                 image_token = api.upload_file(char_path)
                 print("📤 Upload video motion...")
-                video_token = api.upload_file(vid_path)
+                video_token = api.upload_file(vid_upload_path)
                 resp = api.create_motion_task(
                     image_token=image_token,
                     video_token=video_token,
@@ -933,6 +1006,8 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
                     _reset_xy_web_client(account_id)
                 _g["notify_internal_error_telegram"](order_id, data, str(e), f"submit xiaoyang/{nick_label}")
             finally:
+                if vid_trim_tmp and os.path.exists(vid_trim_tmp):
+                    os.remove(vid_trim_tmp)
                 if char_path and os.path.exists(char_path):
                     os.remove(char_path)
                 if vid_path and os.path.exists(vid_path):
@@ -1330,7 +1405,6 @@ def submit_order(order_id: str):
 
 def poll_xiaoyang_orders(orders_to_check):
     skip_done = _g.get("skip_if_order_done")
-    complete = _g["complete_order_with_video"]
     for doc in orders_to_check:
         order_data = doc.to_dict() or {}
         task_id = str(order_data.get("xiaoyangTaskId") or "").strip()
@@ -1364,7 +1438,7 @@ def poll_xiaoyang_orders(orders_to_check):
             print(f"🎉 XiaoYang task {task_id} HOÀN TẤT — tải video...")
             try:
                 local_vid = api.download_task_file(task_id, f"res_{doc.id}.mp4")
-                complete(doc, local_vid)
+                _deliver_xiaoyang_motion_with_audio(doc, local_vid)
             except Exception as e:
                 print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
         elif st == "FAIL":
@@ -1646,7 +1720,7 @@ def poll_tool98_orders(orders_to_check):
 
 def log_accounts_on_startup():
     accounts = load_xiaoyang_accounts()
-    hd = "bật" if get_env("XIAOYANG_ENHANCE_4K", "1").strip().lower() not in ("0", "false", "no") else "tắt"
+    hd = "bật" if _kaling_xy_enhance_4k() else "tắt"
     print(
         f"👥 XiaoYang accounts: {len(accounts)} nick | "
         f"max {XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick | HD 2K: {hd}"
