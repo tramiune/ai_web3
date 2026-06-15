@@ -381,6 +381,119 @@ def trim_video_to_seconds(source: Path, *, max_seconds: float, output: Path | No
   return out_path
 
 
+def _run_ffmpeg(cmd: list[str], *, err_label: str) -> None:
+  result = subprocess.run(cmd, capture_output=True, text=True)
+  if result.returncode != 0:
+    raise Tool98ApiError(
+      f"{err_label}: {(result.stderr or result.stdout)[-400:]}"
+    )
+
+
+def extract_video_segment(
+  source: Path,
+  *,
+  start_sec: float,
+  duration_sec: float,
+  output: Path | None = None,
+) -> Path:
+  """Cắt đoạn video [start_sec, start_sec + duration_sec]."""
+  if not source.is_file():
+    raise Tool98ApiError(f"File not found: {source}")
+  ffmpeg = _ffmpeg_executable()
+  if not ffmpeg:
+    raise Tool98ApiError("Cần ffmpeg hoặc imageio-ffmpeg để cắt video (pip install imageio-ffmpeg)")
+
+  out_path = output
+  if out_path is None:
+    fd, path = tempfile.mkstemp(suffix=source.suffix or ".mp4")
+    os.close(fd)
+    out_path = Path(path)
+
+  start_sec = max(0.0, float(start_sec))
+  duration_sec = max(0.1, float(duration_sec))
+  cmd = [
+    ffmpeg, "-y",
+    "-ss", str(start_sec),
+    "-i", str(source),
+    "-t", str(duration_sec),
+    "-c", "copy",
+    "-movflags", "+faststart",
+    str(out_path),
+  ]
+  try:
+    _run_ffmpeg(cmd, err_label="Không cắt được đoạn video")
+  except Tool98ApiError:
+    cmd = [
+      ffmpeg, "-y",
+      "-ss", str(start_sec),
+      "-i", str(source),
+      "-t", str(duration_sec),
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-crf", "18",
+      "-c:a", "aac",
+      "-movflags", "+faststart",
+      str(out_path),
+    ]
+    _run_ffmpeg(cmd, err_label="Không cắt được đoạn video")
+  return out_path
+
+
+def concat_video_files(parts: list[Path], output: Path) -> Path:
+  """Ghép nhiều MP4 thành một file (ffmpeg concat demuxer)."""
+  if len(parts) < 2:
+    raise Tool98ApiError("Cần ít nhất 2 file để ghép")
+  for p in parts:
+    if not p.is_file():
+      raise Tool98ApiError(f"File không tồn tại: {p}")
+
+  ffmpeg = _ffmpeg_executable()
+  if not ffmpeg:
+    raise Tool98ApiError("Cần ffmpeg hoặc imageio-ffmpeg để ghép video")
+
+  fd, list_path = tempfile.mkstemp(suffix=".txt")
+  os.close(fd)
+  list_file = Path(list_path)
+  try:
+    lines = []
+    for p in parts:
+      safe = str(p.resolve()).replace("'", "'\\''")
+      lines.append(f"file '{safe}'")
+    list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    cmd = [
+      ffmpeg, "-y",
+      "-f", "concat",
+      "-safe", "0",
+      "-i", str(list_file),
+      "-c", "copy",
+      "-movflags", "+faststart",
+      str(output),
+    ]
+    try:
+      _run_ffmpeg(cmd, err_label="Không ghép được video")
+    except Tool98ApiError:
+      cmd = [
+        ffmpeg, "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(list_file),
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "18",
+        "-c:a", "aac",
+        "-movflags", "+faststart",
+        str(output),
+      ]
+      _run_ffmpeg(cmd, err_label="Không ghép được video")
+    return output
+  finally:
+    try:
+      list_file.unlink(missing_ok=True)
+    except OSError:
+      pass
+
+
 def prepare_motion_video_source(
   video_source: str,
   *,

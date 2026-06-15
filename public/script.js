@@ -546,6 +546,7 @@ window.switchLanguage = (lang) => {
         else if (adminActiveTab === 'users') renderAdminUsers();
         else if (adminActiveTab === 'referrals') renderAdminReferrals();
         else if (adminActiveTab === 'bots') renderAdminBots();
+        else if (adminActiveTab === 'split-test') renderAdminSplitTests();
     }
 };
 
@@ -4257,7 +4258,7 @@ window.deleteTopup = async (event, topupId) => {
 //   5) Switch tab (orders/topups/users) -> unsub các tab khác (Mức 3: subscribe per active tab).
 //   6) Tất cả query admin có orderBy('createdAt','desc') + limit(100) (Mức 2).
 
-let adminActiveTab = 'orders';            // 'orders' | 'topups' | 'users' | 'referrals' | 'bots'
+let adminActiveTab = 'orders';            // 'orders' | 'topups' | 'users' | 'referrals' | 'bots' | 'split-test'
 let adminSubscribedOrderStatus = null;    // status đang sub cho orders
 let adminSubscribedTopupStatus = null;    // status đang sub cho topups
 let adminSearchDebounceTimer = null;
@@ -4330,6 +4331,7 @@ function setupAdminSearchInputOnce() {
             else if (adminActiveTab === 'users') renderAdminUsers();
             else if (adminActiveTab === 'referrals') renderAdminReferrals();
             else if (adminActiveTab === 'bots') renderAdminBots();
+        else if (adminActiveTab === 'split-test') renderAdminSplitTests();
         }, 300);
     });
     window.adminSearchInited = true;
@@ -4341,6 +4343,7 @@ function loadAdminPanel() {
     console.log("Loading Admin Panel...");
     if (!window.__isAdmin) return;
     setupAdminSearchInputOnce();
+    setupAdminSplitTestFormOnce();
     refreshActiveAdminSubscription();
 }
 
@@ -4354,6 +4357,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferralAllowlist');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
+        fbUnsub('adminSplitTests');
         return;
     }
 
@@ -4363,6 +4367,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
+        fbUnsub('adminSplitTests');
         subscribeAdminOrders();
     } else if (adminActiveTab === 'topups') {
         fbUnsub('adminOrders');
@@ -4370,6 +4375,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
+        fbUnsub('adminSplitTests');
         subscribeAdminTopups();
     } else if (adminActiveTab === 'users') {
         fbUnsub('adminOrders');
@@ -4377,6 +4383,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
+        fbUnsub('adminSplitTests');
         subscribeAdminUsers();
     } else if (adminActiveTab === 'referrals') {
         fbUnsub('adminOrders');
@@ -4384,6 +4391,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminUsers');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
+        fbUnsub('adminSplitTests');
         subscribeAdminReferrals();
         subscribeAdminReferralAllowlist();
     } else if (adminActiveTab === 'bots') {
@@ -4391,8 +4399,147 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminTopups');
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
+        fbUnsub('adminSplitTests');
         subscribeAdminBots();
+    } else if (adminActiveTab === 'split-test') {
+        fbUnsub('adminOrders');
+        fbUnsub('adminTopups');
+        fbUnsub('adminUsers');
+        fbUnsub('adminReferrals');
+        fbUnsub('adminBots');
+        fbUnsub('adminRenderProvider');
+        subscribeAdminSplitTests();
     }
+}
+
+// ----- SPLIT TEST (Turbo 10s = 2×5s VAE) -----
+let adminSplitTestFormInited = false;
+
+function setupAdminSplitTestFormOnce() {
+    if (adminSplitTestFormInited) return;
+    const form = document.getElementById('admin-split-test-form');
+    if (!form) return;
+    adminSplitTestFormInited = true;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!window.__isAdmin || !currentUser) return;
+
+        const charFile = document.getElementById('split-test-char')?.files?.[0];
+        const videoFile = document.getElementById('split-test-video')?.files?.[0];
+        const aspect = document.getElementById('split-test-aspect')?.value || '9:16';
+        const btn = document.getElementById('split-test-submit-btn');
+        if (!charFile || !videoFile) return showToast(t('common.error'));
+
+        try {
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = t('admin.split_test_creating');
+            }
+            const charUrl = await uploadFile(charFile, 'characters');
+            const videoUrl = await uploadFile(videoFile, 'motions');
+            const { db, doc, collection, setDoc, serverTimestamp } = window.firebase;
+            const orderRef = doc(collection(db, 'orders'));
+            await setDoc(orderRef, {
+                userId: currentUser.uid,
+                userEmail: currentUser.email,
+                userName: currentUser.displayName || 'Admin',
+                packageName: 'Turbo Split Test',
+                modelId: '117',
+                serviceType: 'copy-motion-photo',
+                serviceLabel: SERVICE_TYPE_MAP()['copy-motion-photo'] || 'copy-motion-photo',
+                costCoins: 0,
+                promo1Coin: false,
+                characterImageLink: charUrl,
+                referenceVideoLink: videoUrl,
+                aspectRatio: aspect,
+                vaeDurationSec: 10,
+                vaeResolution: '720p',
+                vaeSplitMode: 'dual_5s',
+                renderProvider: 'videoaieasy',
+                adminTest: true,
+                status: 'pending',
+                resultLink: '',
+                adminNote: 'split 2x5s test',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            showToast(t('admin.split_test_created'));
+            form.reset();
+            switchAdminTab('split-test');
+        } catch (err) {
+            console.error('[SplitTest]', err);
+            showToast(err.message || t('common.error'));
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                applyTranslations();
+            }
+        }
+    });
+}
+
+function subscribeAdminSplitTests() {
+    const { db, collection, query, where, onSnapshot, limit } = window.firebase;
+    if (fbHas('adminSplitTests')) {
+        renderAdminSplitTests();
+        return;
+    }
+    const q = query(
+        collection(db, 'orders'),
+        where('vaeSplitMode', '==', 'dual_5s'),
+        limit(25)
+    );
+    fbSub('adminSplitTests', onSnapshot(q, (snapshot) => {
+        FB_CACHE.adminSplitTests = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => {
+                const ta = a.createdAt?.toMillis?.() ?? 0;
+                const tb = b.createdAt?.toMillis?.() ?? 0;
+                return tb - ta;
+            });
+        renderAdminSplitTests();
+    }, (error) => {
+        console.error('Split test snapshot error:', error);
+        showToast(error.message || t('common.error'));
+    }));
+}
+
+function renderAdminSplitTests() {
+    const el = document.getElementById('admin-split-test-list');
+    if (!el) return;
+    const docs = FB_CACHE.adminSplitTests || [];
+    if (!docs.length) {
+        el.innerHTML = `<p style="opacity:0.6;text-align:center;padding:2rem;">${t('admin.split_test_empty')}</p>`;
+        return;
+    }
+    el.innerHTML = docs.map((d) => {
+        const shortId = d.id.slice(-6).toUpperCase();
+        const stage = d.vaeSplitStage || d.status || 'pending';
+        const part = d.vaeSplitPart != null ? ` · part ${d.vaeSplitPart}` : '';
+        const created = safeToDate(d.createdAt);
+        const dateStr = created ? created.toLocaleString('vi-VN') : '';
+        const statusColor = d.status === 'completed' ? '#4ade80' : d.status === 'failed' ? '#f87171' : '#fbbf24';
+        const resultBlock = d.resultLink ? `
+            <div style="margin-top:0.75rem;">
+                <video src="${d.resultLink}" controls playsinline style="width:100%;max-width:360px;border-radius:8px;background:#000;"></video>
+                <a href="${d.resultLink}" target="_blank" rel="noopener" class="btn-secondary" style="margin-top:0.5rem;display:inline-block;font-size:0.8rem;">${t('admin.split_test_view_result')}</a>
+            </div>` : '';
+        return `
+            <div class="glass-card" style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                    <div>
+                        <strong style="font-family:monospace;color:var(--accent);">#${shortId}</strong>
+                        <span style="margin-left:0.5rem;font-size:0.85rem;color:${statusColor};">${escapeHTML(d.status)}</span>
+                    </div>
+                    <small style="opacity:0.6;">${dateStr}</small>
+                </div>
+                <div style="font-size:0.8rem;opacity:0.75;margin-top:0.35rem;">
+                    ${t('admin.split_test_stage')}: <code>${escapeHTML(String(stage))}</code>${part}
+                </div>
+                ${resultBlock}
+                <button type="button" class="btn-secondary" style="margin-top:0.5rem;font-size:0.75rem;padding:4px 10px;" onclick="window.openAdminDetail('${d.id}')">${t('admin.update_btn')}</button>
+            </div>`;
+    }).join('');
 }
 
 // ----- TOPUPS -----

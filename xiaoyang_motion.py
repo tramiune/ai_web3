@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -35,6 +37,8 @@ from tool98_api import (
     probe_video_duration_seconds,
     resolve_motion_duration_seconds,
     trim_video_to_seconds,
+    extract_video_segment,
+    concat_video_files,
 )
 
 load_project_env()
@@ -62,6 +66,8 @@ XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 VAE_DURATION_FAST_SEC = 5
 VAE_DURATION_TURBO_SEC = 10
+VAE_SPLIT_SEGMENT_SEC = 5
+VAE_SPLIT_MODE_DUAL_5S = "dual_5s"
 
 from user_order_notes import USER_NOTE_FILES_MISSING, user_note_for_render_failure, user_note_for_videoaieasy_failure
 
@@ -225,6 +231,148 @@ def _vae_duration_for_order(order_data: dict) -> int:
     if model_id in AIDANCING_TURBO_MODEL_IDS:
         return VAE_DURATION_TURBO_SEC
     return VAE_DURATION_FAST_SEC
+
+
+def _is_vae_split_order(order_data: dict | None) -> bool:
+    return (order_data or {}).get("vaeSplitMode") == VAE_SPLIT_MODE_DUAL_5S
+
+
+def _vae_split_part_path(order_id: str, part: int) -> str:
+    return os.path.join(
+        tempfile.gettempdir(),
+        f"kaling_vae_split_{order_id}_part{int(part)}.mp4",
+    )
+
+
+def _mark_vae_split_processing(
+    doc_ref,
+    job_id: str,
+    *,
+    part: int,
+    videoaieasy_account: str,
+    videoaieasy_account_email: str,
+):
+    payload = {
+        "status": "processing",
+        "renderProvider": RENDER_PROVIDER_VIDEOAIEASY,
+        "videoaieasyJobId": str(job_id),
+        "vaeSplitMode": VAE_SPLIT_MODE_DUAL_5S,
+        "vaeSplitPart": int(part),
+        "vaeSplitStage": f"part{int(part)}_processing",
+        "vaeSplitJobIds": firestore.ArrayUnion([str(job_id)]),
+        "videoaieasyAccount": str(videoaieasy_account),
+        "videoaieasyAccountEmail": str(videoaieasy_account_email),
+        "submittedAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    doc_ref.update(payload)
+
+
+def _submit_vae_split_part(order_id: str, part: int, account: dict) -> bool:
+    """Nạp 1 phần (0 hoặc 1) của đơn split 2×5s."""
+    account_id = account["id"]
+    account_email = account.get("email", "")
+    nick_label = account_email or account_id
+    seg = VAE_SPLIT_SEGMENT_SEC
+    start = part * seg
+
+    db = _g["db"]
+    doc_ref = db.collection("orders").document(order_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return False
+    data = doc.to_dict() or {}
+    if data.get("status") not in ("pending", "processing"):
+        return False
+
+    img_url = (data.get("characterImageLink") or "").strip()
+    vid_url = (data.get("referenceVideoLink") or "").strip()
+    if not img_url or not vid_url:
+        print(f"❌ Split thiếu link ảnh/video — {order_id}")
+        return False
+
+    char_path = None
+    vid_path = None
+    vae_char_path = None
+    vae_char_is_tmp = False
+    seg_path = None
+    seg_is_tmp = False
+    download_file = _g["download_file"]
+
+    try:
+        print(
+            f"\n⚡ [VAE Split part {part}] {order_id} — nick {nick_label} "
+            f"({start}s–{start + seg}s)..."
+        )
+        api = _get_vae_web_client(account_id)
+        _ensure_vae_web_session(api, account_email, account.get("password"))
+
+        for attempt in range(1, 3):
+            if attempt > 1:
+                print(f"🔄 Thử tải file lần {attempt}...")
+            char_path = download_file(img_url, f"char_{order_id}.png")
+            vid_path = download_file(vid_url, f"vid_{order_id}.mp4")
+            if char_path and vid_path:
+                break
+            time.sleep(2)
+        if not char_path or not vid_path:
+            raise VideoAiEasyError("Không tải được ảnh/video từ link đơn hàng")
+
+        aspect = (data.get("aspectRatio") or "9:16").strip()
+        vae_char_path, vae_char_is_tmp = prepare_character_image_for_vae(
+            char_path, aspect_ratio=aspect
+        )
+
+        fd, seg_out = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
+        seg_path = extract_video_segment(
+            Path(vid_path),
+            start_sec=start,
+            duration_sec=seg,
+            output=Path(seg_out),
+        )
+        seg_is_tmp = True
+        print(f"✂️ Đoạn motion part {part}: {start}s → {start + seg}s")
+
+        prompt = (data.get("prompt") or get_env(
+            "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
+        )).strip()
+        image_url = api.upload_file(vae_char_path, kind="image")
+        video_url = api.upload_file(str(seg_path), kind="video")
+        job_id = api.create_motion_job(
+            input_image_url=image_url,
+            driving_video_url=video_url,
+            prompt=prompt,
+            model_id=MODEL_KLING_26,
+            resolution=resolution_for_order(data),
+        )
+        print(f"🆔 [VAE Split/{nick_label}] part {part} job: {job_id}")
+        _mark_vae_split_processing(
+            doc_ref,
+            job_id,
+            part=part,
+            videoaieasy_account=account_id,
+            videoaieasy_account_email=account_email,
+        )
+        _g.get("session_error_backoff", {}).pop(order_id, None)
+        return True
+    except (requests.RequestException, VideoAiEasyAuthError, VideoAiEasyError) as e:
+        print(f"❌ VAE Split part {part} thất bại {order_id}: {e}")
+        if isinstance(e, VideoAiEasyAuthError):
+            _reset_vae_web_client(account_id)
+        _g["notify_internal_error_telegram"](
+            order_id, data, str(e), f"submit vae split part{part}/{nick_label}"
+        )
+        return False
+    finally:
+        if vae_char_is_tmp and vae_char_path and os.path.exists(vae_char_path):
+            os.remove(vae_char_path)
+        if seg_is_tmp and seg_path and os.path.exists(seg_path):
+            os.remove(seg_path)
+        if char_path and os.path.exists(char_path):
+            os.remove(char_path)
+        if vid_path and os.path.exists(vid_path):
+            os.remove(vid_path)
 
 
 def _videoaieasy_account_id(email: str) -> str:
@@ -938,6 +1086,41 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
     return success
 
 
+def submit_to_videoaieasy_split(order_id: str, account: dict) -> bool:
+    """Đơn test 2×5s: nạp part 0 (pending) hoặc part 1 (part1_pending)."""
+    if not _g["is_bot_enabled"]():
+        return False
+    if _g["pending_submit_backoff_active"](order_id):
+        return False
+    submitting_lock = _g["submitting_orders_lock"]
+    submitting = _g["submitting_orders"]
+    with submitting_lock:
+        if order_id in submitting:
+            return False
+        submitting.add(order_id)
+
+    _vae_inflight_inc(account["id"])
+    success = False
+    try:
+        with _submit_engine_lock():
+            db = _g["db"]
+            doc = db.collection("orders").document(order_id).get()
+            if not doc.exists:
+                return False
+            data = doc.to_dict() or {}
+            status = data.get("status")
+            stage = data.get("vaeSplitStage")
+            if status == "pending":
+                success = _submit_vae_split_part(order_id, 0, account)
+            elif status == "processing" and stage == "part1_pending":
+                success = _submit_vae_split_part(order_id, 1, account)
+    finally:
+        _vae_inflight_dec(account["id"])
+        with submitting_lock:
+            submitting.discard(order_id)
+    return success
+
+
 def _try_submit_xiaoyang(order_id: str) -> bool:
     account = _pick_xiaoyang_account()
     if not account:
@@ -955,6 +1138,11 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
     if not account:
         print(f"📊 Không có nick VideoAiEasy hoặc đầy slot — {order_id}")
         return False
+    db = _g["db"]
+    doc = db.collection("orders").document(order_id).get()
+    data = doc.to_dict() if doc.exists else {}
+    if _is_vae_split_order(data):
+        return submit_to_videoaieasy_split(order_id, account)
     return submit_to_videoaieasy(order_id, account)
 
 
@@ -1197,11 +1385,151 @@ def _deliver_vae_job(doc, api: VideoAiEasyClient, job_id: str, complete) -> None
         api.try_delete_job(job_id)
 
 
+def _submit_vae_split_part_locked(order_id: str, part: int, account: dict) -> bool:
+    submitting_lock = _g["submitting_orders_lock"]
+    submitting = _g["submitting_orders"]
+    with submitting_lock:
+        if order_id in submitting:
+            return False
+        submitting.add(order_id)
+    try:
+        with _submit_engine_lock():
+            return _submit_vae_split_part(order_id, part, account)
+    finally:
+        with submitting_lock:
+            submitting.discard(order_id)
+
+
+def _poll_vae_split_order(doc, order_data, api, job_id: str, complete, skip_done) -> None:
+    """Poll job VAE cho đơn split; part0 xong → nạp part1; part1 xong → ghép 10s."""
+    part = int(order_data.get("vaeSplitPart") or 0)
+    try:
+        job = api.get_job(job_id)
+    except VideoAiEasyError as e:
+        print(f"❌ Poll VAE Split {job_id}: {e}")
+        return
+
+    status = (job.get("status") or "").lower()
+    err = job.get("error_message")
+    print(f"   [split part {part}] status={status}" + (f" — {err}" if err else ""))
+
+    if status == "done":
+        if skip_done and skip_done(doc.id, "đã completed"):
+            return
+        try:
+            if part == 0:
+                local = api.download_job(job_id, f"split_{doc.id}_p0.mp4")
+                dest = _vae_split_part_path(doc.id, 0)
+                shutil.move(local, dest)
+                api.try_delete_job(job_id)
+                print(f"✅ Split part 0 lưu → {dest}")
+                db = _g["db"]
+                db.collection("orders").document(doc.id).update({
+                    "videoaieasyJobId": firestore.DELETE_FIELD,
+                    "vaeSplitStage": "part1_pending",
+                    "vaeSplitPart": 1,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                })
+                acc_id = (order_data.get("videoaieasyAccount") or "").strip()
+                acc = _videoaieasy_account_lookup(acc_id) if acc_id else None
+                if not acc:
+                    acc = _pick_videoaieasy_account()
+                if acc:
+                    _submit_vae_split_part_locked(doc.id, 1, acc)
+                else:
+                    print(f"⚠️ Không có nick VAE để nạp split part 1 — {doc.id}")
+            elif part == 1:
+                local1 = api.download_job(job_id, f"split_{doc.id}_p1.mp4")
+                part0 = _vae_split_part_path(doc.id, 0)
+                part1 = _vae_split_part_path(doc.id, 1)
+                shutil.move(local1, part1)
+                api.try_delete_job(job_id)
+                fd, merged = tempfile.mkstemp(suffix=".mp4")
+                os.close(fd)
+                merged_path = Path(merged)
+                print(f"🔗 Ghép split part0 + part1 → 10s...")
+                concat_video_files([Path(part0), Path(part1)], merged_path)
+                order_data = doc.to_dict() or {}
+                order_data["vaeSplitStage"] = "merged"
+                complete(doc, str(merged_path))
+                for p in (part0, part1, str(merged_path)):
+                    if p and os.path.exists(p):
+                        try:
+                            os.remove(p)
+                        except OSError:
+                            pass
+        except Exception as e:
+            print(f"⚠️ Lỗi xử lý split {doc.id} part {part}: {e}")
+            _g["notify_internal_error_telegram"](
+                doc.id, order_data, str(e), f"split deliver part{part}"
+            )
+    elif status in ("failed", "expired"):
+        _fail_order_processing(
+            doc,
+            order_data,
+            f"VAE Split part {part} job {job_id} {status}: {err or ''}",
+            user_note_for_videoaieasy_failure(err),
+            f"render vae split part{part}",
+        )
+        for p in (0, 1):
+            path = _vae_split_part_path(doc.id, p)
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+
 def poll_videoaieasy_orders(orders_to_check):
     skip_done = _g.get("skip_if_order_done")
     complete = _g["complete_order_with_video"]
     for doc in orders_to_check:
         order_data = doc.to_dict() or {}
+
+        if _is_vae_split_order(order_data):
+            stage = order_data.get("vaeSplitStage")
+            job_id = str(order_data.get("videoaieasyJobId") or "").strip()
+            if stage == "part1_pending" and not job_id:
+                account_id = (order_data.get("videoaieasyAccount") or "").strip()
+                acc = _videoaieasy_account_lookup(account_id) if account_id else None
+                if not acc:
+                    acc = _pick_videoaieasy_account()
+                if acc:
+                    print(f"⏩ Split part1_pending — nạp part 1 cho {doc.id}")
+                    submit_to_videoaieasy_split(doc.id, acc)
+                continue
+            if not job_id:
+                continue
+            account_id = (order_data.get("videoaieasyAccount") or "").strip()
+            nick = order_data.get("videoaieasyAccountEmail") or account_id
+            part = order_data.get("vaeSplitPart", 0)
+            print(
+                f"🧐 VideoAiEasy Split part {part} — job {job_id} "
+                f"(đơn {doc.id}, {nick})..."
+            )
+            api = None
+            acc = _videoaieasy_account_lookup(account_id)
+            for attempt in range(2):
+                try:
+                    if attempt > 0 and account_id:
+                        _reset_vae_web_client(account_id)
+                    api = _get_vae_web_client(account_id or "default")
+                    if acc:
+                        _ensure_vae_web_session(api, acc["email"], acc["password"])
+                    break
+                except VideoAiEasyAuthError as e:
+                    if attempt == 0:
+                        print(f"⚠️ Poll VAE Split {job_id}: {e} — thử login lại...")
+                        continue
+                    print(f"❌ Poll VAE Split {job_id}: {e}")
+                except VideoAiEasyError as e:
+                    print(f"❌ Poll VAE Split {job_id}: {e}")
+                    break
+            if not api:
+                continue
+            _poll_vae_split_order(doc, order_data, api, job_id, complete, skip_done)
+            continue
+
         job_id = str(order_data.get("videoaieasyJobId") or "").strip()
         if not job_id:
             continue

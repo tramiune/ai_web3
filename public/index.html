@@ -625,6 +625,7 @@
             <button class="admin-tab-btn" onclick="switchAdminTab('topups')" data-i18n="admin.tab_topups">Nạp Coin</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('referrals')" data-i18n="admin.tab_referrals">Hoa hồng GT</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('bots')" data-i18n="admin.tab_bots">Bots</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('split-test')" data-i18n="admin.tab_split_test">Test 2×5s</button>
             <button id="tab-users" class="admin-tab-btn" onclick="switchAdminTab('users')"
                 style="display: none;" data-i18n="admin.tab_users">Thành viên</button>
         </div>
@@ -772,6 +773,38 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- Tab: Split test (Turbo 10s = 2×5s VAE) -->
+        <div id="admin-tab-split-test" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 2rem;">
+                <h2 style="margin: 0 0 0.5rem 0;" data-i18n="admin.split_test_title">Test Turbo 10s (2×5s ghép)</h2>
+                <p style="margin: 0 0 1.25rem 0; opacity: 0.65; font-size: 0.9rem;" data-i18n="admin.split_test_desc">
+                    Tạo đơn thử: bot cắt video 0–5s và 5–10s, chạy 2 job VAE (Kling 2.6), ghép lại thành 10s. Chỉ admin — không trừ coin.
+                </p>
+                <form id="admin-split-test-form" class="glass-card" style="padding: 1.25rem; max-width: 560px; display: grid; gap: 1rem;">
+                    <div class="form-group">
+                        <label data-i18n="modals.char_label">Ảnh nhân vật</label>
+                        <input type="file" id="split-test-char" accept="image/*" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="modals.video_label">Video motion (~10s)</label>
+                        <input type="file" id="split-test-video" accept="video/*" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="admin.detail_aspect">Tỉ lệ</label>
+                        <select id="split-test-aspect" class="form-control">
+                            <option value="9:16">9:16 (dọc)</option>
+                            <option value="16:9">16:9 (ngang)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" id="split-test-submit-btn" data-i18n="admin.split_test_submit">Tạo task test</button>
+                </form>
+            </div>
+            <div class="admin-section">
+                <h3 style="margin: 0 0 1rem 0;" data-i18n="admin.split_test_list_title">Kết quả test gần đây</h3>
+                <div id="admin-split-test-list" style="display: grid; gap: 1rem;"></div>
             </div>
         </div>
 
