@@ -17,12 +17,15 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 from project_env import get_env, load_project_env
 from xiaoyang_web import XiaoyangAuthError, XiaoyangWebClient, XiaoyangWebError
+from pathlib import Path
 from videoaieasy_web import (
     VideoAiEasyClient,
     VideoAiEasyAuthError,
     VideoAiEasyError,
     MODEL_KLING_26,
     MODEL_KLING_30,
+    prepare_character_image_for_vae,
+    resolution_for_order,
 )
 from tool98_api import (
     Tool98ApiError,
@@ -31,6 +34,7 @@ from tool98_api import (
     prepare_motion_video_source,
     probe_video_duration_seconds,
     resolve_motion_duration_seconds,
+    trim_video_to_seconds,
 )
 
 load_project_env()
@@ -56,11 +60,13 @@ TOOL98_FALLBACK_MAX_VIDEO_SEC = 15.0
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
+VAE_DURATION_FAST_SEC = 5
+VAE_DURATION_TURBO_SEC = 10
 
 from user_order_notes import USER_NOTE_FILES_MISSING, user_note_for_render_failure, user_note_for_videoaieasy_failure
 
 _g: dict = {}
-_active_render_provider = RENDER_PROVIDER_XIAOYANG
+_active_render_provider = RENDER_PROVIDER_VIDEOAIEASY
 _active_render_provider_lock = threading.Lock()
 _xy_web_clients: dict = {}
 _xy_web_clients_lock = threading.Lock()
@@ -97,10 +103,10 @@ def get_active_render_provider():
 
 def apply_render_provider_from_bot_data(data: dict, source=""):
     global _active_render_provider
-    p = (data.get("activeRenderProvider") or data.get("activeProvider") or RENDER_PROVIDER_XIAOYANG)
+    p = (data.get("activeRenderProvider") or data.get("activeProvider") or RENDER_PROVIDER_VIDEOAIEASY)
     p = p.strip().lower()
     if p not in _RENDER_PROVIDERS:
-        p = RENDER_PROVIDER_XIAOYANG
+        p = RENDER_PROVIDER_VIDEOAIEASY
     with _active_render_provider_lock:
         prev = _active_render_provider
         _active_render_provider = p
@@ -112,7 +118,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     db = _g["db"]
     bot_name = _g["bot_name"]
-    initial = RENDER_PROVIDER_XIAOYANG
+    initial = RENDER_PROVIDER_VIDEOAIEASY
     bot_doc = db.collection("bots").document(bot_name).get()
     if bot_doc.exists:
         apply_render_provider_from_bot_data(bot_doc.to_dict() or {})
@@ -205,6 +211,20 @@ def _videoaieasy_model_for_order(order_data: dict) -> str:
     if model_id in AIDANCING_TURBO_MODEL_IDS:
         return MODEL_KLING_30
     return MODEL_KLING_26
+
+
+def _vae_duration_for_order(order_data: dict) -> int:
+    data = order_data or {}
+    explicit = data.get("vaeDurationSec")
+    if explicit is not None:
+        try:
+            return max(1, int(explicit))
+        except (TypeError, ValueError):
+            pass
+    model_id = str(data.get("modelId") or "").strip()
+    if model_id in AIDANCING_TURBO_MODEL_IDS:
+        return VAE_DURATION_TURBO_SEC
+    return VAE_DURATION_FAST_SEC
 
 
 def _videoaieasy_account_id(email: str) -> str:
@@ -813,10 +833,15 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
 
             char_path = None
             vid_path = None
+            vae_char_path = None
+            vae_char_is_tmp = False
+            vid_upload_path = None
+            vid_trim_tmp = None
             download_file = _g["download_file"]
             session_error_backoff = _g.get("session_error_backoff", {})
             try:
                 model_id = _videoaieasy_model_for_order(data)
+                max_sec = _vae_duration_for_order(data)
                 tier = "Kling 3.0" if model_id == MODEL_KLING_30 else "Kling 2.6"
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
@@ -825,7 +850,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                 _ensure_vae_web_session(api, account_email, account.get("password"))
                 print(
                     f"🚀 [VideoAiEasy/{nick_label}] {tier} — "
-                    f"modelId={data.get('modelId')} → {model_id}..."
+                    f"{max_sec}s 720p · modelId={data.get('modelId')} → {model_id}..."
                 )
                 for attempt in range(1, 3):
                     if attempt > 1:
@@ -837,15 +862,35 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     time.sleep(2)
                 if not char_path or not vid_path:
                     raise VideoAiEasyError("Không tải được ảnh/video từ link đơn hàng")
+
+                aspect = (data.get("aspectRatio") or "9:16").strip()
+                vae_char_path, vae_char_is_tmp = prepare_character_image_for_vae(
+                    char_path, aspect_ratio=aspect
+                )
+                vid_upload_path = vid_path
+                dur = probe_video_duration_seconds(vid_path)
+                if dur is None or dur > max_sec + 0.25:
+                    import tempfile
+                    fd, outp = tempfile.mkstemp(suffix=".mp4")
+                    os.close(fd)
+                    trim_video_to_seconds(
+                        Path(vid_path), max_seconds=max_sec, output=Path(outp)
+                    )
+                    vid_upload_path = outp
+                    vid_trim_tmp = outp
+                    print(f"✂️ Cắt video motion → {max_sec}s (VAE)")
+
                 print("📤 Upload ảnh lên videoaieasy.hdgr.online...")
-                image_url = api.upload_file(char_path, kind="image")
+                image_url = api.upload_file(vae_char_path, kind="image")
                 print("📤 Upload video motion...")
-                video_url = api.upload_file(vid_path, kind="video")
+                video_url = api.upload_file(vid_upload_path, kind="video")
+                resolution = resolution_for_order(data)
                 job_id = api.create_motion_job(
                     input_image_url=image_url,
                     driving_video_url=video_url,
                     prompt=prompt,
                     model_id=model_id,
+                    resolution=resolution,
                 )
                 print(f"🆔 [VideoAiEasy/{nick_label}] job: {job_id}")
                 _mark_order_processing(
@@ -878,6 +923,10 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     order_id, data, str(e), f"submit videoaieasy/{nick_label}"
                 )
             finally:
+                if vae_char_is_tmp and vae_char_path and os.path.exists(vae_char_path):
+                    os.remove(vae_char_path)
+                if vid_trim_tmp and os.path.exists(vid_trim_tmp):
+                    os.remove(vid_trim_tmp)
                 if char_path and os.path.exists(char_path):
                     os.remove(char_path)
                 if vid_path and os.path.exists(vid_path):
@@ -1046,14 +1095,24 @@ def _try_tool98_fallback_after_submit_exhausted(order_id: str) -> None:
 
 
 def submit_order(order_id: str):
-    """Nạp đơn theo renderProvider (Admin). Đơn processing giữ engine cũ."""
+    """Nạp đơn — Kaling chỉ dùng VideoAiEasy (VAE)."""
     db = _g["db"]
     doc = db.collection("orders").document(order_id).get()
     if doc.exists:
         data = doc.to_dict() or {}
         if _should_route_tool98(data):
-            submit_to_tool98(order_id)
+            _fail_order_processing(
+                doc,
+                data,
+                "Model tiết kiệm không còn hỗ trợ",
+                user_note_for_render_failure("Gói này đã ngừng. Chọn Model Nhanh hoặc Turbo."),
+                "submit tool98 disabled",
+            )
             return
+
+    if enabled_for_bot(_g.get("bot_name")):
+        _try_submit_videoaieasy(order_id)
+        return
 
     provider = get_active_render_provider()
 
