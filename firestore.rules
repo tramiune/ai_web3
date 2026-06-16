@@ -92,5 +92,15 @@ service cloud.firestore {
       allow read: if request.auth != null && (resource.data.referrerId == request.auth.uid || isAdmin());
       allow create, update, delete: if isAdmin();
     }
+
+    match /maintenanceSurveys/{docId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.surveyKey == 'kaling_price_jun2026'
+        && request.resource.data.choice in ['low_price', 'quality_price']
+        && request.resource.data.createdAt is timestamp
+        && (!('userId' in request.resource.data)
+            || request.resource.data.userId == null
+            || (request.auth != null && request.resource.data.userId == request.auth.uid));
+    }
   }
 }

@@ -89,6 +89,25 @@
             <p class="upgrade-maintenance-block__sub" data-i18n="dashboard.maintenance_upgrade_block_detail">
                 Do chi phí server tăng mạnh, chúng tôi đang tối ưu hạ tầng và train thêm model mới để giữ chất lượng video ổn định. Thực tế bên mình hoàn toàn có thể làm mức giá ~3.000đ/video, nhưng chất lượng sẽ không ổn định bằng hiện tại — chúng tôi ưu tiên chất lượng trước. Cảm ơn bạn đã thông cảm!
             </p>
+            <div id="upgrade-maintenance-survey" class="upgrade-maintenance-survey">
+                <p class="upgrade-maintenance-survey__label" data-i18n="dashboard.maintenance_survey_label">
+                    Bạn muốn Kaling theo hướng nào khi mở lại?
+                </p>
+                <div class="upgrade-maintenance-survey__options">
+                    <button type="button" class="upgrade-maintenance-survey__btn" data-survey-choice="low_price"
+                        data-i18n="dashboard.maintenance_survey_low_price">
+                        ~3.000đ/video — chấp nhận chất lượng thấp hơn
+                    </button>
+                    <button type="button" class="upgrade-maintenance-survey__btn upgrade-maintenance-survey__btn--primary"
+                        data-survey-choice="quality_price" data-i18n="dashboard.maintenance_survey_quality_price">
+                        Tăng giá — giữ chất lượng phù hợp nhất
+                    </button>
+                </div>
+                <p id="upgrade-maintenance-survey-thanks" class="upgrade-maintenance-survey__thanks" hidden
+                    data-i18n="dashboard.maintenance_survey_thanks">
+                    Cảm ơn bạn đã góp ý! Chúng mình sẽ tham khảo khi mở lại dịch vụ.
+                </p>
+            </div>
         </div>
     </div>
 

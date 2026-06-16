@@ -52,7 +52,7 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 440px;
+    max-width: 520px;
     padding: 2rem 1.5rem 1.75rem;
     border-radius: var(--radius-lg);
     border: 1px solid rgba(255, 193, 7, 0.28);
@@ -87,6 +87,76 @@
     color: var(--text-muted, rgba(255, 255, 255, 0.62));
     font-size: 0.85rem;
     line-height: 1.45;
+}
+
+.upgrade-maintenance-survey {
+    margin-top: 1.25rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid rgba(255, 193, 7, 0.18);
+    text-align: left;
+}
+
+.upgrade-maintenance-survey__label {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffe08a;
+    text-align: center;
+}
+
+.upgrade-maintenance-survey__options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.upgrade-maintenance-survey__btn {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary, #f5f5f7);
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    text-align: left;
+}
+
+.upgrade-maintenance-survey__btn:hover:not(:disabled) {
+    border-color: rgba(255, 193, 7, 0.45);
+    background: rgba(255, 193, 7, 0.08);
+}
+
+.upgrade-maintenance-survey__btn--primary {
+    border-color: rgba(255, 193, 7, 0.35);
+    background: rgba(255, 193, 7, 0.12);
+}
+
+.upgrade-maintenance-survey__btn.is-selected {
+    border-color: rgba(76, 217, 100, 0.65);
+    background: rgba(76, 217, 100, 0.12);
+    box-shadow: 0 0 0 1px rgba(76, 217, 100, 0.25);
+}
+
+.upgrade-maintenance-survey__btn:disabled {
+    opacity: 0.72;
+    cursor: default;
+}
+
+.upgrade-maintenance-survey__thanks {
+    margin: 0.85rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: #9ae6b4;
+    text-align: center;
+    font-weight: 600;
+}
+
+.upgrade-maintenance-survey__thanks[hidden] {
+    display: none !important;
 }
 
 body.upgrade-maintenance-locked {

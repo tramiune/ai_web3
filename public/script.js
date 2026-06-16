@@ -3144,6 +3144,54 @@ function blockIfUpgradeMaintenance() {
     return true;
 }
 
+const MAINTENANCE_SURVEY_KEY = 'kaling_price_jun2026';
+const MAINTENANCE_SURVEY_STORAGE = 'kaling_maint_survey_vote_v1';
+let _maintenanceSurveyInited = false;
+
+function applyMaintenanceSurveyVote(choice) {
+    const wrap = document.getElementById('upgrade-maintenance-survey');
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-survey-choice]').forEach((btn) => {
+        const picked = btn.dataset.surveyChoice === choice;
+        btn.classList.toggle('is-selected', picked);
+        btn.disabled = true;
+    });
+    const thanks = document.getElementById('upgrade-maintenance-survey-thanks');
+    if (thanks) thanks.hidden = false;
+}
+
+async function submitMaintenanceSurvey(choice) {
+    if (!choice || localStorage.getItem(MAINTENANCE_SURVEY_STORAGE)) return;
+    localStorage.setItem(MAINTENANCE_SURVEY_STORAGE, choice);
+    applyMaintenanceSurveyVote(choice);
+    try {
+        const { db, collection, addDoc, serverTimestamp } = window.firebase;
+        if (!db) return;
+        await addDoc(collection(db, 'maintenanceSurveys'), {
+            surveyKey: MAINTENANCE_SURVEY_KEY,
+            choice,
+            createdAt: serverTimestamp(),
+            userId: currentUser?.uid || null,
+            userEmail: currentUser?.email || null,
+            userAgent: (navigator.userAgent || '').slice(0, 200),
+        });
+    } catch (err) {
+        console.warn('maintenance survey save failed:', err);
+    }
+}
+
+function initMaintenanceSurvey() {
+    if (_maintenanceSurveyInited) return;
+    _maintenanceSurveyInited = true;
+    const wrap = document.getElementById('upgrade-maintenance-survey');
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-survey-choice]').forEach((btn) => {
+        btn.addEventListener('click', () => submitMaintenanceSurvey(btn.dataset.surveyChoice));
+    });
+    const saved = localStorage.getItem(MAINTENANCE_SURVEY_STORAGE);
+    if (saved) applyMaintenanceSurveyVote(saved);
+}
+
 function checkMaintenance() {
     const vp = getVietnamDateParts();
     const totalMinutes = vp.totalMinutes;
@@ -3178,6 +3226,7 @@ function checkMaintenance() {
 
 // Check every 30s so popup/block activates on time
 setInterval(checkMaintenance, 30000);
+initMaintenanceSurvey();
 
 // --- Admin Dashboard Logic ---
 window.switchAdminTab = (tabName) => {
