@@ -63,7 +63,7 @@ _pending_worker_started = False
 # Bảo trì nâng cấp — khớp public/script.js UPGRADE_MAINTENANCE (admin test bypass)
 _VN_TZ = timezone(timedelta(hours=7))
 _UPGRADE_MAINTENANCE_START = datetime(2026, 6, 14, 20, 30, tzinfo=_VN_TZ)
-_UPGRADE_MAINTENANCE_END = datetime(2026, 6, 16, 23, 59, tzinfo=_VN_TZ)
+_UPGRADE_MAINTENANCE_END = datetime(2026, 6, 18, 23, 59, tzinfo=_VN_TZ)
 _ADMIN_ROLES = frozenset({"admin", "super-admin"})
 _SUPER_ADMIN_EMAILS = frozenset({
     "traderfinn0312@gmail.com",
