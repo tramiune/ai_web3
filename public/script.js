@@ -2086,8 +2086,8 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
     const amount = selectedTopupPackage.amount;
     const bankId = "OCB";
-    const accNo = "CASS0965951536";
-    const accName = "VAN DINH HOANG";
+    const accNo = "CASS03121403";
+    const accName = "CAO THI QUYNH TRAM";
     const qrUrl = `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accName)}`;
 
     qrImg.src = qrUrl;
