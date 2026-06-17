@@ -5,8 +5,11 @@
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const MAX_VIDEO_DURATION_SEC = 30;
-const VAE_DURATION_FAST_SEC = 15;
-const VAE_DURATION_TURBO_SEC = 15;
+const KLING_MIN_VIDEO_SEC = 3;
+const KLING_COINS_PER_SEC = 0.6;
+const COIN_VND_RATE = 1000;
+const VAE_DURATION_FAST_SEC = 30;
+const VAE_DURATION_TURBO_SEC = 30;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -110,9 +113,87 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 }
 
 // --- Data Constants ---
-const MODEL_COST_FAST = 6;
-const MODEL_COST_TURBO = 15;
+const MODEL_COST_FAST = 1.8; // tối thiểu 3s × 0.6 coin
+const MODEL_COST_TURBO = 1.8;
 const DEFAULT_MODEL_KEY = 'fast';
+
+window.__orderVideoDurationSec = null;
+
+function billableVideoSeconds(durationSec) {
+    if (!durationSec || !Number.isFinite(durationSec) || durationSec <= 0) {
+        return KLING_MIN_VIDEO_SEC;
+    }
+    const sec = Math.ceil(durationSec);
+    return Math.max(KLING_MIN_VIDEO_SEC, Math.min(MAX_VIDEO_DURATION_SEC, sec));
+}
+
+function coinsFromVideoDuration(durationSec) {
+    const sec = billableVideoSeconds(durationSec);
+    const raw = sec * KLING_COINS_PER_SEC;
+    return Math.round(Math.max(KLING_COINS_PER_SEC, raw) * 10) / 10;
+}
+
+function vndFromVideoDuration(durationSec) {
+    return Math.round(coinsFromVideoDuration(durationSec) * COIN_VND_RATE);
+}
+
+function validateVideoDuration(durationSec) {
+    if (!durationSec || !Number.isFinite(durationSec)) {
+        return { ok: false, code: 'unknown' };
+    }
+    if (durationSec > MAX_VIDEO_DURATION_SEC + 0.05) {
+        return { ok: false, code: 'max' };
+    }
+    if (durationSec < KLING_MIN_VIDEO_SEC - 0.05) {
+        return { ok: false, code: 'min' };
+    }
+    return { ok: true };
+}
+
+function videoDurationErrorMessage(code) {
+    if (code === 'min') return t('modals.video_duration_limit_min');
+    if (code === 'max') return t('modals.video_duration_limit');
+    return t('modals.video_duration_unknown');
+}
+
+function probeVideoDurationFromFile(file) {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        const url = URL.createObjectURL(file);
+        video.onloadedmetadata = () => {
+            const dur = video.duration;
+            URL.revokeObjectURL(url);
+            resolve(dur);
+        };
+        video.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('duration_probe_failed'));
+        };
+        video.src = url;
+    });
+}
+
+function probeVideoDurationFromUrl(url) {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.crossOrigin = 'anonymous';
+        video.onloadedmetadata = () => resolve(video.duration);
+        video.onerror = () => reject(new Error('duration_probe_failed'));
+        video.src = url;
+    });
+}
+
+function setOrderVideoDuration(durationSec) {
+    window.__orderVideoDurationSec = durationSec;
+    updateFirstOrderUI();
+}
+
+function clearOrderVideoDuration() {
+    window.__orderVideoDurationSec = null;
+    updateFirstOrderUI();
+}
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
@@ -133,15 +214,15 @@ function vaeResolutionForModel(modelKey) {
 }
 
 function modelCoinCost(modelKey) {
-    if (modelKey === 'turbo') return MODEL_COST_TURBO;
-    return MODEL_COST_FAST;
+    return coinsFromVideoDuration(window.__orderVideoDurationSec);
 }
 
 function syncModelPriceLabels() {
     const fastEl = document.getElementById('model-fast-cost');
     const turboEl = document.getElementById('model-turbo-cost');
-    if (fastEl) fastEl.textContent = String(MODEL_COST_FAST);
-    if (turboEl) turboEl.textContent = String(MODEL_COST_TURBO);
+    const minCoins = String(coinsFromVideoDuration(KLING_MIN_VIDEO_SEC));
+    if (fastEl) fastEl.textContent = minCoins + '+';
+    if (turboEl) turboEl.textContent = minCoins + '+';
 }
 
 function normalizeOrderCost(model) {
@@ -1881,7 +1962,7 @@ window.closeTemplatePreview = () => {
     }
 };
 
-window.selectTemplate = (id, url) => {
+window.selectTemplate = async (id, url) => {
     document.querySelectorAll('.template-item').forEach(el => el.classList.remove('active'));
     const item = document.getElementById(`tpl-${id}`);
     if (item) item.classList.add('active');
@@ -1889,6 +1970,20 @@ window.selectTemplate = (id, url) => {
     window.currentVideoSource = 'library';
     const trend = TREND_VIDEOS.find(t => t.id === id);
     showToast(t('modals.toast_trend_selected', { title: trend ? trendTitle(trend) : id }));
+    try {
+        const dur = await probeVideoDurationFromUrl(url);
+        const check = validateVideoDuration(dur);
+        if (!check.ok) {
+            clearOrderVideoDuration();
+            document.getElementById('selected-template-url').value = '';
+            window.currentVideoSource = 'upload';
+            return showToast(videoDurationErrorMessage(check.code));
+        }
+        setOrderVideoDuration(dur);
+    } catch (e) {
+        console.warn('[Template] duration probe failed:', e);
+        clearOrderVideoDuration();
+    }
 };
 
 window.currentVideoSource = 'upload';
@@ -2154,7 +2249,18 @@ function updateFirstOrderUI() {
         if (submitBtn) submitBtn.classList.remove('btn-first-offer');
         if (submitText) submitText.innerText = t('hero.cta_create');
         if (summaryEl) {
-            summaryEl.innerText = t(`modals.model_${activeModelKey}_desc`);
+            const dur = window.__orderVideoDurationSec;
+            if (dur && Number.isFinite(dur)) {
+                const sec = billableVideoSeconds(dur);
+                const coins = coinsFromVideoDuration(dur);
+                summaryEl.innerText = t('modals.kling_price_line', {
+                    sec,
+                    coins: coins.toLocaleString('vi-VN'),
+                    vnd: vndFromVideoDuration(dur).toLocaleString('vi-VN')
+                });
+            } else {
+                summaryEl.innerText = t('modals.model_fast_desc');
+            }
             summaryEl.style.color = '';
         }
     }
@@ -2220,6 +2326,8 @@ function tiktokErrorMessage(code) {
     const msgKey = {
         invalid_url: 'modals.tiktok_url_invalid',
         duration_limit: 'modals.video_duration_limit',
+        min: 'modals.video_duration_limit_min',
+        max: 'modals.video_duration_limit',
         size_limit: 'modals.video_size_limit',
         fetch_failed: 'modals.tiktok_fetch_failed',
         video_download: 'modals.tiktok_fetch_failed',
@@ -2326,11 +2434,25 @@ function renderVideoPreviewContent(container, file, options = {}) {
     previewVideo.style.height = '100%';
     previewVideo.style.objectFit = 'cover';
     previewVideo.style.borderRadius = '8px';
-    previewVideo.addEventListener('loadeddata', () => {
+    previewVideo.addEventListener('loadedmetadata', async () => {
         try {
-            previewVideo.pause();
-            previewVideo.currentTime = 0;
-        } catch (_) { /* ignore */ }
+            const dur = previewVideo.duration;
+            const check = validateVideoDuration(dur);
+            if (!check.ok) {
+                showToast(videoDurationErrorMessage(check.code));
+                if (options.inputId) {
+                    const input = document.getElementById(options.inputId);
+                    if (input) input.value = '';
+                }
+                container.innerHTML = '';
+                clearOrderVideoDuration();
+                syncUploadZonePreviewState(container);
+                return;
+            }
+            setOrderVideoDuration(dur);
+        } catch (e) {
+            console.warn('[Video] duration:', e);
+        }
     }, { once: true });
 
     container.appendChild(previewVideo);
@@ -2353,9 +2475,16 @@ function renderVideoPreviewContent(container, file, options = {}) {
 }
 
 async function applyTikTokVideoFromUrl(pageUrl) {
-    const { blob } = await downloadTikTokVideoBlob(pageUrl);
+    const { blob, duration } = await downloadTikTokVideoBlob(pageUrl);
     if (blob.size > MAX_VIDEO_FILE_BYTES) {
         throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
+    }
+    if (Number.isFinite(duration)) {
+        const check = validateVideoDuration(duration);
+        if (!check.ok) {
+            throw Object.assign(new Error(videoDurationErrorMessage(check.code)), { code: check.code });
+        }
+        setOrderVideoDuration(duration);
     }
 
     const file = new File([blob], 'tiktok_video.mp4', { type: 'video/mp4' });
@@ -2643,6 +2772,30 @@ async function setupEventListeners() {
                     return showToast(t('modals.video_upload_required'));
                 }
 
+                let videoDurationSec = window.__orderVideoDurationSec;
+                if (window.currentVideoSource === 'upload' && videoFile) {
+                    try {
+                        videoDurationSec = await probeVideoDurationFromFile(videoFile);
+                    } catch (e) {
+                        return showToast(t('modals.video_duration_unknown'));
+                    }
+                } else if (window.currentVideoSource === 'library' && templateUrl) {
+                    if (!videoDurationSec) {
+                        try {
+                            videoDurationSec = await probeVideoDurationFromUrl(templateUrl);
+                        } catch (e) {
+                            return showToast(t('modals.video_duration_unknown'));
+                        }
+                    }
+                }
+                const durationCheck = validateVideoDuration(videoDurationSec);
+                if (!durationCheck.ok) {
+                    return showToast(videoDurationErrorMessage(durationCheck.code));
+                }
+                const billableSec = billableVideoSeconds(videoDurationSec);
+                const orderCostCoins = coinsFromVideoDuration(videoDurationSec);
+                const orderCostVnd = vndFromVideoDuration(videoDurationSec);
+
                 // Kiểm tra lại lần cuối trước khi upload
                 if (charFile.size > MAX_CHAR_FILE_BYTES) return showToast(t('modals.char_size_limit'));
                 if (window.currentVideoSource === 'upload' && videoFile && videoFile.size > MAX_VIDEO_FILE_BYTES) {
@@ -2661,7 +2814,7 @@ async function setupEventListeners() {
                     const userDoc = await transaction.get(userRef);
                     const modelKey = modelKeySelected;
                     const serviceType = document.querySelector('input[name="service-type"]:checked').value;
-                    let model = normalizeOrderCost({ ...localizedModel(modelKey) });
+                    let model = normalizeOrderCost({ ...localizedModel(modelKey), cost: orderCostCoins });
 
                     if (userDoc.data().coins < model.cost) {
                         throw t('modals.insufficient_coins_title');
@@ -2714,13 +2867,15 @@ async function setupEventListeners() {
                         serviceType: serviceType,
                         serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
                         costCoins: model.cost,
+                        costVnd: orderCostVnd,
+                        klingDurationSec: billableSec,
                         promo1Coin: !!model.promo1Coin,
                         characterImageLink: charUrl,
                         referenceVideoLink: videoUrl,
                         aspectRatio: aspectRatio,
-                        vaeDurationSec: vaeDurationSecForModel(modelKeySelected),
-                        vaeResolution: vaeResolutionForModel(modelKeySelected),
-                        renderProvider: 'videoaieasy',
+                        vaeDurationSec: billableSec,
+                        vaeResolution: '720p',
+                        renderProvider: 'kling',
                         status: "pending",
                         resultLink: "",
                         adminNote: "",
@@ -2736,7 +2891,7 @@ async function setupEventListeners() {
                 const serviceLabelPixel = SERVICE_TYPE_MAP()[serviceType] || serviceType;
                 if (typeof ttq !== 'undefined') {
                     ttq.track('PlaceAnOrder', {
-                        value: model.cost * 1000,
+                        value: orderCostVnd,
                         currency: 'VND',
                         content_name: serviceLabelPixel,
                         content_id: orderId
@@ -2744,7 +2899,7 @@ async function setupEventListeners() {
                 }
 
                 trackMetaEvent('Lead', {
-                    value: model.cost * 1000,
+                    value: orderCostVnd,
                     currency: 'VND',
                     content_name: serviceLabelPixel,
                     content_ids: [orderId],
@@ -2752,7 +2907,7 @@ async function setupEventListeners() {
                 });
 
                 logFirebaseEvent('generate_lead', {
-                    value: model.cost * 1000,
+                    value: orderCostVnd,
                     currency: 'VND',
                     content_name: serviceLabelPixel
                 });
