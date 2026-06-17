@@ -32,6 +32,7 @@ AUTH_COOKIE = "sb-gfevyulgkydodmlfnquh-auth-token"
 MODEL_KLING_26 = "kling-2.6"
 MODEL_KLING_30 = "kling-3.0"
 DEFAULT_VAE_RESOLUTION = "720p"
+KALING_TURBO_MODEL_IDS = frozenset({"117"})
 
 
 class VideoAiEasyError(RuntimeError):
@@ -339,7 +340,10 @@ def resolution_for_order(order_data: dict | None) -> str:
     explicit = data.get("vaeResolution") or data.get("resolution") or data.get("videoResolution")
     if explicit:
         return normalize_vae_resolution(str(explicit))
-    return "720p"
+    model_id = str(data.get("modelId") or "").strip()
+    if model_id in KALING_TURBO_MODEL_IDS:
+        return normalize_vae_resolution("1080p")
+    return normalize_vae_resolution(None)
 
 
 def _parse_vae_aspect_ratio(aspect_ratio: str | None) -> float:

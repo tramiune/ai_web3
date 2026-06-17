@@ -5,8 +5,8 @@
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const MAX_VIDEO_DURATION_SEC = 30;
-const VAE_DURATION_FAST_SEC = 5;
-const VAE_DURATION_TURBO_SEC = 10;
+const VAE_DURATION_FAST_SEC = 15;
+const VAE_DURATION_TURBO_SEC = 15;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -110,8 +110,8 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 }
 
 // --- Data Constants ---
-const MODEL_COST_FAST = 3;
-const MODEL_COST_TURBO = 4;
+const MODEL_COST_FAST = 6;
+const MODEL_COST_TURBO = 15;
 const DEFAULT_MODEL_KEY = 'fast';
 
 function getSelectedModelKey() {
@@ -126,6 +126,10 @@ function getMaxVideoDurationForModel(modelKey) {
 
 function vaeDurationSecForModel(modelKey) {
     return getMaxVideoDurationForModel(modelKey);
+}
+
+function vaeResolutionForModel(modelKey) {
+    return modelKey === 'turbo' ? '1080p' : '720p';
 }
 
 function modelCoinCost(modelKey) {
@@ -2715,7 +2719,7 @@ async function setupEventListeners() {
                         referenceVideoLink: videoUrl,
                         aspectRatio: aspectRatio,
                         vaeDurationSec: vaeDurationSecForModel(modelKeySelected),
-                        vaeResolution: '720p',
+                        vaeResolution: vaeResolutionForModel(modelKeySelected),
                         renderProvider: 'videoaieasy',
                         status: "pending",
                         resultLink: "",

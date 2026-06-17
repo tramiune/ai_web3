@@ -25,7 +25,6 @@ from videoaieasy_web import (
     VideoAiEasyAuthError,
     VideoAiEasyError,
     MODEL_KLING_26,
-    MODEL_KLING_30,
     prepare_character_image_for_vae,
     resolution_for_order,
 )
@@ -65,8 +64,8 @@ TOOL98_FALLBACK_MAX_VIDEO_SEC = 15.0
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
-VAE_DURATION_FAST_SEC = 5
-VAE_DURATION_TURBO_SEC = 10
+VAE_DURATION_FAST_SEC = 15
+VAE_DURATION_TURBO_SEC = 15
 VAE_SPLIT_SEGMENT_SEC = 5
 VAE_SPLIT_MODE_DUAL_5S = "dual_5s"
 
@@ -214,9 +213,7 @@ def _use_videoaieasy() -> bool:
 
 
 def _videoaieasy_model_for_order(order_data: dict) -> str:
-    model_id = str((order_data or {}).get("modelId") or "").strip()
-    if model_id in AIDANCING_TURBO_MODEL_IDS:
-        return MODEL_KLING_30
+    """Kaling VAE: Nhanh & Turbo đều render Kling 2.6 (720p / 1080p qua resolution_for_order)."""
     return MODEL_KLING_26
 
 
@@ -1065,15 +1062,15 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             try:
                 model_id = _videoaieasy_model_for_order(data)
                 max_sec = _vae_duration_for_order(data)
-                tier = "Kling 3.0" if model_id == MODEL_KLING_30 else "Kling 2.6"
+                resolution = resolution_for_order(data)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()
                 api = _get_vae_web_client(account_id)
                 _ensure_vae_web_session(api, account_email, account.get("password"))
                 print(
-                    f"🚀 [VideoAiEasy/{nick_label}] {tier} — "
-                    f"{max_sec}s 720p · modelId={data.get('modelId')} → {model_id}..."
+                    f"🚀 [VideoAiEasy/{nick_label}] Kling 2.6 — "
+                    f"{max_sec}s {resolution} · modelId={data.get('modelId')} → {model_id}..."
                 )
                 for attempt in range(1, 3):
                     if attempt > 1:
@@ -1107,7 +1104,6 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                 image_url = api.upload_file(vae_char_path, kind="image")
                 print("📤 Upload video motion...")
                 video_url = api.upload_file(vid_upload_path, kind="video")
-                resolution = resolution_for_order(data)
                 job_id = api.create_motion_job(
                     input_image_url=image_url,
                     driving_video_url=video_url,
