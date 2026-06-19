@@ -64,6 +64,36 @@ def proxy_dict_from_key(
     return {"http": url, "https": url}, host
 
 
+def proxy_dict_rotate_with_fallback(
+    proxy_key: str,
+    *,
+    province_id: int | None = None,
+) -> tuple[dict[str, str], str, bool]:
+    """Xoay IP mới; nếu 429 → dùng IP hiện tại (nếu còn). Trả (proxies, host, rotated)."""
+    current_proxies: dict[str, str] | None = None
+    current_host = ""
+    try:
+        current_proxies, current_host = proxy_dict_from_key(
+            proxy_key, rotate=False, province_id=province_id
+        )
+    except Exception:
+        pass
+
+    try:
+        proxies, host = proxy_dict_from_key(proxy_key, rotate=True, province_id=province_id)
+        return proxies, host, True
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 429 and current_host:
+            print(f"⚠ VNsProxy 429 — dùng IP hiện tại {current_host}")
+            return current_proxies or {}, current_host, False
+        raise
+    except Exception as exc:
+        if "429" in str(exc) and current_host:
+            print(f"⚠ VNsProxy 429 — dùng IP hiện tại {current_host}")
+            return current_proxies or {}, current_host, False
+        raise
+
+
 def probe_proxy(proxies: dict[str, str] | None, *, timeout: float = 15) -> bool:
     """True nếu proxy kết nối được (bất kỳ HTTP response nào từ Meitu)."""
     if not proxies:

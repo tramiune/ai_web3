@@ -132,6 +132,37 @@ def min_reuse_credits() -> int:
     return estimate_credits(sec, buffer_pct=0.0)
 
 
+def min_pick_credits() -> int:
+    """Sàn credit khi chọn nick pool — chỉ dùng nick ghi ≥120 coin trong pool."""
+    load_project_env()
+    return max(1, int(get_env("ROBONEO_MIN_PICK_CREDITS", "120") or "120"))
+
+
+def pick_credits_for_job(duration_sec: float) -> tuple[int, int]:
+    """(ước tính theo video, ngưỡng chọn nick) — pick = max(estimate, min_pick)."""
+    est = estimate_credits(duration_sec)
+    return est, max(est, min_pick_credits())
+
+
+def required_credits_from_cost(*, estimate: int, cost_item: dict[str, Any] | None) -> int:
+    """
+    Credit thực cần sau count_cost.
+    Chỉ dùng fallback_cost / real_cost — field cost (115) là hằng rate, không phải giá job.
+    """
+    required = max(estimate, min_pick_credits())
+    if not cost_item:
+        return required
+    for key in ("fallback_cost", "real_cost"):
+        val = cost_item.get(key)
+        if val is None:
+            continue
+        try:
+            required = max(required, math.ceil(float(val)))
+        except (TypeError, ValueError):
+            pass
+    return required
+
+
 def credit_sync_ttl_sec() -> int:
     load_project_env()
     return max(30, int(get_env("ROBONEO_CREDIT_SYNC_TTL_SEC", "180") or "180"))
@@ -297,37 +328,28 @@ def list_eligible_accounts(
     exclude: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     skip = {e.strip().lower() for e in (exclude or set()) if e}
+    floor = max(credits_needed, min_pick_credits())
     out: list[dict[str, Any]] = []
     for a in list_accounts():
         email = (a.get("email") or "").strip().lower()
         if not email or email in skip:
             continue
-        st = a.get("status")
-        if st == "locked":
-            continue
-        if st not in ("active", "depleted"):
+        if a.get("status") != "active":
             continue
         eff = effective_credits(a)
-        if eff is None:
-            out.append(a)
-        elif eff >= credits_needed:
-            out.append(a)
-        elif st == "depleted":
+        if eff is not None and eff >= floor:
             out.append(a)
     return out
 
 
 def _account_pick_sort_key(a: dict[str, Any]) -> tuple:
-    st_rank = 0 if a.get("status") == "active" else 1
-    eff = effective_credits(a)
-    if eff is None:
-        return (st_rank, 1, 999999)
-    return (st_rank, 0, eff)
+    eff = effective_credits(a) or 0
+    return (0, eff)
 
 
 def update_account_after_job(email: str, remaining: int) -> None:
-    """Cập nhật pool sau job — giữ active nếu còn đủ credit cho job tiếp."""
-    floor = min_reuse_credits()
+    """Cập nhật pool sau job — chỉ giữ active nếu còn ≥120 credit (đủ chọn lại)."""
+    floor = min_pick_credits()
     if remaining >= floor:
         mark_account(email, status="active", credits=remaining, note="")
     else:
@@ -554,7 +576,8 @@ def acquire_client_for_job(
     chờ PROXY_ROTATE_COOLDOWN_SEC (60s) trước mỗi lần xoay.
     """
     excluded = {e.strip().lower() for e in (exclude_emails or set()) if e}
-    print(f"→ Cần ~{credits_needed} credit (quy đổi {credits_per_15s()}/15s)")
+    floor = max(credits_needed, min_pick_credits())
+    print(f"→ Cần nick pool ≥{floor} credit (job ~{credits_needed})")
 
     for row in sorted(
         list_eligible_accounts(credits_needed, exclude=excluded),
@@ -572,9 +595,9 @@ def acquire_client_for_job(
             client, info = get_or_refresh_client(
                 email, row["password"], surface=surface
             )
-            if info["credits"] < credits_needed:
+            if info["credits"] < floor:
                 print(
-                    f"⚠ Credit thực {info['credits']} < cần {credits_needed} — đổi nick…"
+                    f"⚠ Credit thực {info['credits']} < {floor} (pool ghi ≥{floor}) — đổi nick…"
                 )
                 mark_account(email, status="depleted", note="credit không đủ sau sync", credits=info["credits"])
                 excluded.add(email.strip().lower())

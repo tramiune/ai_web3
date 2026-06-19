@@ -710,6 +710,9 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             vid_trim_tmp = None
             download_file = _g["download_file"]
             session_error_backoff = _g.get("session_error_backoff", {})
+            resolution = "720p"
+            duration_sec = 10
+            model_id = MODEL_KLING_26
             try:
                 model_id = _videoaieasy_model_for_order(data)
                 duration_sec = duration_for_order(data)
@@ -867,13 +870,33 @@ def submit_order(order_id: str):
         data = doc.to_dict() or {}
         if data.get("status") != "pending":
             return
+        # RoboNeo hết nick / thiếu credit / lỗi proxy → fallback VAE (720p/10s vẫn render được)
+        print(
+            f"🔄 RoboNeo không nạp được đơn {order_id} "
+            f"(nick/credit/proxy) → fallback VideoAiEasy (VAE)"
+        )
+        _g.get("session_error_backoff", {}).pop(order_id, None)
+        if _try_submit_videoaieasy(order_id):
+            try:
+                short_id = order_id[-6:].upper()
+                _g["send_telegram_message"](
+                    f"🔄 <b>RoboNeo → VAE</b>\n\n"
+                    f"🆔 #{short_id}: không đủ nick/credit RoboNeo, đã chuyển VideoAiEasy."
+                )
+            except Exception:
+                pass
+            return
+        doc = doc_ref.get()
+        data = doc.to_dict() or {}
+        if data.get("status") != "pending":
+            return
         if _g["pending_submit_backoff_active"](order_id):
-            print(f"⏸ RoboNeo chờ nick/slot — đơn {order_id}")
+            print(f"⏸ RoboNeo+VAE chờ slot — đơn {order_id}")
             return
         _fail_order_processing(
             doc,
             data,
-            "Không nạp được RoboNeo",
+            "Không nạp được RoboNeo (đã thử fallback VAE)",
             USER_NOTE_SUBMIT_FAILED,
             "submit roboneo",
         )

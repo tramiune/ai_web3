@@ -168,10 +168,14 @@ class VideoAiEasyClient:
         try:
             self._probe_origin_session()
             return self.get_profile()
-        except (VideoAiEasyAuthError, VideoAiEasyError):
-            self.login(email, password)
-            self._probe_origin_session()
-            return self.get_profile()
+        except (VideoAiEasyAuthError, VideoAiEasyError, ValueError, json.JSONDecodeError):
+            pass
+        except Exception as e:
+            if "padding" not in str(e).lower() and "base64" not in str(e).lower():
+                raise
+        self.login(email, password)
+        self._probe_origin_session()
+        return self.get_profile()
 
     def get_profile(self) -> dict:
         me = self._current_user()

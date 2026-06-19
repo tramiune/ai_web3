@@ -16,12 +16,14 @@ from project_env import get_env, load_project_env
 from account_pool import (
     acquire_client_for_job,
     effective_credits,
-    estimate_credits,
     list_accounts,
     list_eligible_accounts,
     max_accounts_per_ip,
+    min_pick_credits,
+    pick_credits_for_job,
     refresh_account_credits,
     release_reserved,
+    required_credits_from_cost,
     sync_stale_pool_credits,
     update_account_after_job,
     video_duration_sec,
@@ -300,8 +302,11 @@ def submit_to_roboneo(order_id: str) -> bool:
                 raise RoboNeoError("Không tải được ảnh/video từ link đơn hàng")
 
             duration = video_duration_sec(vid_path)
-            need = estimate_credits(duration)
-            print(f"→ Video ~{duration:.1f}s → cần ~{need} credit RoboNeo")
+            need, pick_need = pick_credits_for_job(duration)
+            print(
+                f"→ Video ~{duration:.1f}s → cần ~{need} credit RoboNeo "
+                f"(chỉ nick pool ≥120 coin)"
+            )
 
             for attempt in range(1, max_attempts + 1):
                 account_email = ""
@@ -317,7 +322,7 @@ def submit_to_roboneo(order_id: str) -> bool:
 
                     surface = _roboneo_surface()
                     client, info = acquire_client_for_job(
-                        need,
+                        pick_need,
                         exclude_emails=excluded_nicks,
                         slot_available=lambda e: _rb_active_count(e)
                         < ROBONEO_MAX_CONCURRENT_PER_ACCOUNT,
@@ -325,7 +330,7 @@ def submit_to_roboneo(order_id: str) -> bool:
                     )
                     account_email = info.get("email") or ""
                     account_id = _roboneo_account_id(account_email)
-                    reserved_amt = int(info.get("reserved") or need)
+                    reserved_amt = int(info.get("reserved") or pick_need)
                     _rb_inflight_inc(account_id)
 
                     api_name = _roboneo_api_name()
@@ -342,8 +347,10 @@ def submit_to_roboneo(order_id: str) -> bool:
                     client.init_config()
                     credit = client.meiye_query(surface=surface)
                     amount = int(credit.get("amount") or 0) if isinstance(credit, dict) else 0
-                    if credit.get("check_result") is False or amount < need:
-                        last_credit_err = f"Không đủ credit: cần ~{need}, có {amount} ({credit})"
+                    if credit.get("check_result") is False or amount < pick_need:
+                        last_credit_err = (
+                            f"Không đủ credit: cần ≥{pick_need}, có {amount} ({credit})"
+                        )
                         print(f"⚠ {last_credit_err} — đổi nick…")
                         from account_pool import mark_account
 
@@ -374,13 +381,9 @@ def submit_to_roboneo(order_id: str) -> bool:
                         f"  cost={cost_item.get('cost')} real_cost={cost_item.get('real_cost')} "
                         f"fallback={fallback}"
                     )
-                    required = need
-                    for val in (fallback, cost_item.get("real_cost"), cost_item.get("cost")):
-                        if val is not None:
-                            try:
-                                required = max(required, int(val))
-                            except (TypeError, ValueError):
-                                pass
+                    required = required_credits_from_cost(
+                        estimate=need, cost_item=cost_item
+                    )
                     if amount < required:
                         last_credit_err = (
                             f"Credit {amount} < cost thực {required} "
@@ -618,13 +621,17 @@ def log_pool_on_startup():
     synced = sync_stale_pool_credits(surface=surface)
     if synced:
         print(f"🔄 Đã sync credit {synced} nick (session, không login thừa)")
-    rows = list_eligible_accounts(1)
-    all_rows = [a for a in list_accounts() if a.get("status") in ("active", "depleted")]
-    known = sum(1 for a in all_rows if a.get("credits") is not None)
+    floor = min_pick_credits()
+    rows = list_eligible_accounts(floor)
+    all_rows = [a for a in list_accounts() if a.get("status") == "active"]
+    known_120 = sum(
+        1 for a in all_rows if (effective_credits(a) or 0) >= floor
+    )
     path = _pool_path()
     print(
-        f"👥 RoboNeo pool: {len(all_rows)} nick (active+depleted) | "
-        f"{len(rows)} sẵn sàng thử | {known} đã biết credit | "
+        f"👥 RoboNeo pool: {len(all_rows)} nick active | "
+        f"{len(rows)} sẵn sàng (≥{floor} coin trong pool) | "
+        f"{known_120} ghi ≥{floor} | "
         f"file {path} | "
         f"max {ROBONEO_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick | "
         f"{max_accounts_per_ip()} nick/IP VNsProxy | "
