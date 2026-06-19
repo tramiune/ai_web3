@@ -19,7 +19,7 @@ const ROBONEO_TRIAL = {
     windowMs: 24 * 60 * 60 * 1000,
     modelKey: 'rbTrial',
     cost: 3,
-    maxVideoSec: 15,
+    maxVideoSec: 12,
 };
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
@@ -1818,20 +1818,7 @@ window.niceConfirm = ({ title, message, icon, onConfirm }) => {
     modal.style.display = 'flex';
 };
 
-// Preview Helper
-window.handlePreview = (input, containerId) => {
-    const container = document.getElementById(containerId);
-    const file = input.files[0];
-    if (file) {
-        const url = URL.createObjectURL(file);
-        container.style.display = 'block';
-        if (file.type.startsWith('image/')) {
-            container.innerHTML = `<img src="${url}">`;
-        } else {
-            container.innerHTML = `<video src="${url}" autoplay muted loop></video>`;
-        }
-    }
-};
+// Preview Helper — video upload uses handlePreview below (with auto-trim).
 
 window.copyToClipboard = (text) => {
     if (!text) return;
@@ -1968,7 +1955,8 @@ window.switchVideoSource = (type) => {
             renderVideoFilePreview('preview-video-container', existing, {
                 inputId: 'file-video',
                 changeKey: 'modals.video_change',
-                maxDurationSec: MAX_VIDEO_DURATION_SEC
+                maxDurationSec: getMaxVideoSecForSelectedModel(),
+                skipDurationCheck: true,
             });
         }
     } else if (type === 'tiktok') {
@@ -2133,6 +2121,7 @@ window.openModal = (id) => {
 
 window.closeModal = (id) => {
     if (id === 'auth-modal') return; // non-dismissible
+    if (id === 'order-modal' && isVideoProcessBusy()) return;
     document.getElementById(id).style.display = 'none';
 };
 
@@ -2466,6 +2455,104 @@ function appendPreviewChangeButton(container, inputId, labelKey) {
 
 const TIKWM_API = 'https://www.tikwm.com/api/';
 let _ffmpegLoadPromise = null;
+let _videoProcessBusy = false;
+
+function isVideoProcessBusy() {
+    return _videoProcessBusy;
+}
+
+function setVideoProcessOverlay(visible, messageKey, params = {}) {
+    const overlay = document.getElementById('video-process-overlay');
+    const textEl = document.getElementById('video-process-overlay-text');
+    const orderModal = document.getElementById('order-modal');
+    _videoProcessBusy = !!visible;
+
+    if (overlay) {
+        overlay.hidden = !visible;
+        overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+    if (textEl && messageKey) {
+        textEl.textContent = t(messageKey, params);
+    }
+    if (orderModal) {
+        orderModal.classList.toggle('video-processing-busy', !!visible);
+    }
+
+    const submitBtn = document.getElementById('order-submit-btn');
+    if (submitBtn) submitBtn.disabled = !!visible;
+
+    const fetchBtn = document.getElementById('tiktok-fetch-btn');
+    if (fetchBtn) fetchBtn.disabled = !!visible;
+}
+
+function updateVideoProcessOverlay(phase, params = {}) {
+    const maxSec = params.sec ?? getMaxVideoSecForSelectedModel();
+    const phaseKey = {
+        downloading: 'modals.tiktok_fetching',
+        preparing: 'modals.video_processing_preparing',
+        trimming: 'modals.video_processing_trim',
+        loading_engine: 'modals.video_processing_engine',
+    }[phase];
+    if (phaseKey) {
+        setVideoProcessOverlay(true, phaseKey, { sec: maxSec, ...params });
+    }
+}
+
+async function prepareVideoFileFromBlob(blob, fileName, options = {}) {
+    const { onProgress, knownDuration } = options;
+    const maxSec = getMaxVideoSecForSelectedModel();
+
+    if (blob.size > MAX_VIDEO_FILE_BYTES) {
+        throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
+    }
+
+    let duration = knownDuration;
+    if (!Number.isFinite(duration)) {
+        try {
+            duration = await getBlobVideoDurationSec(blob);
+        } catch (_) {
+            duration = Infinity;
+        }
+    }
+
+    let trimmed = false;
+    let outBlob = blob;
+    const needsTrim = !Number.isFinite(duration) || duration > maxSec + 0.15;
+
+    if (needsTrim) {
+        onProgress?.('loading_engine');
+        onProgress?.('trimming', { sec: maxSec });
+        try {
+            const result = await trimVideoBlobToMaxSec(outBlob, maxSec);
+            outBlob = result.blob;
+            trimmed = result.trimmed;
+        } catch (err) {
+            console.error('[Video] trim failed:', err);
+            throw Object.assign(new Error(t('modals.tiktok_trim_failed')), { code: 'trim_failed' });
+        }
+    }
+
+    try {
+        duration = await getBlobVideoDurationSec(outBlob);
+    } catch (_) {
+        duration = trimmed ? maxSec : Math.min(Number.isFinite(duration) ? duration : maxSec, maxSec);
+    }
+    if (duration > maxSec + 0.15) {
+        duration = maxSec;
+    }
+
+    const baseName = ((fileName || 'video').replace(/\.[^.]+$/, '') || 'video');
+    const file = new File([outBlob], `${baseName}.mp4`, { type: 'video/mp4' });
+    return { file, duration, trimmed, maxSec };
+}
+
+function assignVideoToFileInput(file) {
+    const fileInput = document.getElementById('file-video');
+    if (!fileInput) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+}
 
 function isTikTokPageUrl(raw) {
     try {
@@ -2650,51 +2737,35 @@ async function trimVideoBlobToMaxSec(blob, maxSec = MAX_VIDEO_DURATION_SEC) {
 
 async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
     const { onProgress } = options;
+    onProgress?.('downloading');
     const { blob: initialBlob, duration: metaDuration } = await downloadTikTokVideoBlob(pageUrl);
-    let blob = initialBlob;
-    if (blob.size > MAX_VIDEO_FILE_BYTES) {
-        throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
-    }
 
-    let blobDuration = metaDuration;
-    if (!isFinite(blobDuration)) {
-        try {
-            blobDuration = await getBlobVideoDurationSec(blob);
-        } catch (_) {
-            blobDuration = MAX_VIDEO_DURATION_SEC + 1;
+    onProgress?.('preparing');
+    const { file, duration, trimmed, maxSec } = await prepareVideoFileFromBlob(
+        initialBlob,
+        'tiktok_video.mp4',
+        {
+            knownDuration: metaDuration,
+            onProgress: (phase, params) => onProgress?.(phase, params),
         }
-    }
-    const tiktokMaxSec = getMaxVideoSecForSelectedModel();
-    const needsTrim = blobDuration > tiktokMaxSec + 0.15;
+    );
 
-    if (needsTrim) {
-        onProgress?.('trimming');
-        try {
-            const trimmed = await trimVideoBlobToMaxSec(blob, tiktokMaxSec);
-            blob = trimmed.blob;
-        } catch (trimErr) {
-            console.error('[TikTok] trim failed:', trimErr);
-            throw Object.assign(new Error(t('modals.tiktok_trim_failed')), { code: 'trim_failed' });
-        }
-    }
-
-    const file = new File([blob], 'tiktok_video.mp4', { type: 'video/mp4' });
-    const fileInput = document.getElementById('file-video');
-    if (!fileInput) throw Object.assign(new Error(t('common.error')), { code: 'fetch_failed' });
-
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
+    assignVideoToFileInput(file);
 
     const templateInput = document.getElementById('selected-template-url');
     if (templateInput) templateInput.value = '';
     window.currentVideoSource = 'upload';
 
+    kalingSelectedDurationSec = duration;
+    updateFirstOrderUI();
+
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
-        maxDurationSec: tiktokMaxSec,
+        maxDurationSec: maxSec,
+        skipDurationCheck: true,
         onChange: () => {
-            fileInput.value = '';
+            const fileInput = document.getElementById('file-video');
+            if (fileInput) fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
             if (tiktokPreview) {
                 tiktokPreview.innerHTML = '';
@@ -2704,41 +2775,33 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
         }
     });
 
-    return { file, trimmed: needsTrim };
+    return { file, trimmed, maxSec };
 }
 
 window.fetchTikTokVideo = async () => {
     const input = document.getElementById('tiktok-video-url');
-    const btn = document.getElementById('tiktok-fetch-btn');
     const pageUrl = input?.value?.trim();
     if (!pageUrl) {
         return showToast(t('modals.tiktok_url_required'));
     }
+    if (isVideoProcessBusy()) return;
 
-    const prevBtnText = btn?.textContent;
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = t('modals.tiktok_fetching');
-    }
-    showToast(t('modals.tiktok_fetching'));
+    setVideoProcessOverlay(true, 'modals.tiktok_fetching');
 
     try {
-        const { trimmed } = await applyTikTokVideoFromUrl(pageUrl, {
-            onProgress: (phase) => {
-                if (phase === 'trimming' && btn) btn.textContent = t('modals.tiktok_trimming');
-                if (phase === 'trimming') showToast(t('modals.tiktok_trimming'));
-            }
+        const { trimmed, maxSec } = await applyTikTokVideoFromUrl(pageUrl, {
+            onProgress: (phase, params) => updateVideoProcessOverlay(phase, params),
         });
-        showToast(trimmed ? t('modals.tiktok_fetch_trimmed') : t('modals.tiktok_fetch_success'));
+        showToast(
+            trimmed
+                ? t('modals.tiktok_fetch_trimmed', { sec: maxSec })
+                : t('modals.tiktok_fetch_success')
+        );
     } catch (e) {
         console.error('[TikTok] fetch failed:', e);
         showToast(e.code ? tiktokErrorMessage(e.code) : (e.message || t('modals.tiktok_fetch_failed')));
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            if (prevBtnText) btn.textContent = prevBtnText;
-            else applyTranslations();
-        }
+        setVideoProcessOverlay(false);
     }
 };
 
@@ -2767,7 +2830,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     probe.onloadedmetadata = () => {
         const duration = probe.duration;
         URL.revokeObjectURL(probeUrl);
-        if (duration > maxDurationSec + 0.15) {
+        if (!options.skipDurationCheck && duration > maxDurationSec + 0.15) {
             showToast(t('modals.video_duration_limit', { sec: maxDurationSec }));
             if (options.inputId) {
                 const input = document.getElementById(options.inputId);
@@ -2830,6 +2893,54 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     probe.src = probeUrl;
 }
 
+async function handleVideoUploadPreview(input, containerId) {
+    const container = document.getElementById(containerId);
+    const file = input?.files?.[0];
+    if (!container || !file) return;
+    if (isVideoProcessBusy()) {
+        input.value = '';
+        return;
+    }
+
+    container.innerHTML = '';
+    setVideoProcessOverlay(true, 'modals.video_processing_preparing');
+
+    try {
+        const { file: processed, duration, trimmed, maxSec } = await prepareVideoFileFromBlob(
+            file,
+            file.name,
+            {
+                onProgress: (phase, params) => updateVideoProcessOverlay(phase, params),
+            }
+        );
+
+        assignVideoToFileInput(processed);
+        kalingSelectedDurationSec = duration;
+        updateFirstOrderUI();
+
+        renderVideoFilePreview(containerId, processed, {
+            inputId: 'file-video',
+            changeKey: 'modals.video_change',
+            maxDurationSec: maxSec,
+            skipDurationCheck: true,
+        });
+
+        if (trimmed) {
+            showToast(t('modals.video_upload_trimmed', { sec: maxSec }));
+        }
+    } catch (err) {
+        console.error('[Video] upload prepare failed:', err);
+        input.value = '';
+        container.innerHTML = '';
+        syncUploadZonePreviewState(container);
+        kalingSelectedDurationSec = null;
+        updateFirstOrderUI();
+        showToast(err.code ? tiktokErrorMessage(err.code) : (err.message || t('modals.tiktok_trim_failed')));
+    } finally {
+        setVideoProcessOverlay(false);
+    }
+}
+
 window.handlePreview = (input, containerId) => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -2867,11 +2978,7 @@ window.handlePreview = (input, containerId) => {
         appendPreviewChangeButton(container, meta.inputId, meta.changeKey);
         syncUploadZonePreviewState(container);
     } else if (file.type.startsWith('video/')) {
-        renderVideoFilePreview(containerId, file, {
-            inputId: meta.inputId,
-            changeKey: meta.changeKey,
-            maxDurationSec: MAX_VIDEO_DURATION_SEC
-        });
+        void handleVideoUploadPreview(input, containerId);
     }
 };
 
@@ -2982,6 +3089,8 @@ async function setupEventListeners() {
         orderForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            if (isVideoProcessBusy()) return;
+
             if (!currentUser) {
                 // Nếu chưa đăng nhập thì hiện Auth Modal
                 const authModal = document.getElementById('auth-modal');
@@ -3025,25 +3134,20 @@ async function setupEventListeners() {
                     if (!isTikTokPageUrl(tiktokUrl)) {
                         return showToast(t('modals.tiktok_url_invalid'));
                     }
-                    submitBtn.disabled = true;
-                    const mainTextFetch = submitBtn.querySelector('[data-i18n="hero.cta_create"]');
-                    if (mainTextFetch) mainTextFetch.innerText = t('modals.tiktok_fetching');
-                    showToast(t('modals.tiktok_fetch_on_submit'));
+                    if (isVideoProcessBusy()) return;
+                    setVideoProcessOverlay(true, 'modals.tiktok_fetch_on_submit');
                     try {
                         const result = await applyTikTokVideoFromUrl(tiktokUrl, {
-                            onProgress: (phase) => {
-                                if (phase === 'trimming' && mainTextFetch) {
-                                    mainTextFetch.innerText = t('modals.tiktok_trimming');
-                                }
-                            }
+                            onProgress: (phase, params) => updateVideoProcessOverlay(phase, params),
                         });
                         videoFile = result.file;
                     } catch (tiktokErr) {
                         console.error('[TikTok] auto fetch on submit:', tiktokErr);
-                        submitBtn.disabled = false;
                         updateFirstOrderUI();
                         showToast(tiktokErr.code ? tiktokErrorMessage(tiktokErr.code) : (tiktokErr.message || t('modals.tiktok_fetch_failed')));
                         return;
+                    } finally {
+                        setVideoProcessOverlay(false);
                     }
                 }
 

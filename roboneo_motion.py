@@ -253,7 +253,7 @@ def submit_to_roboneo(order_id: str) -> bool:
 
             from client_version import client_version_label, client_version_ok, min_client_version
             from user_order_notes import USER_NOTE_CLIENT_OUTDATED, USER_NOTE_ROBONEO_TRIAL_INVALID
-            from roboneo_trial import is_roboneo_trial_order, validate_roboneo_trial_order
+            from roboneo_trial import TRIAL_MAX_SEC, is_roboneo_trial_order, validate_roboneo_trial_order
 
             if not client_version_ok(data):
                 print(
@@ -327,7 +327,7 @@ def submit_to_roboneo(order_id: str) -> bool:
                         "submit roboneo trial",
                     )
                     return False
-                print(f"→ RoboNeo trial ~{duration:.1f}s / max {15}s — 3 coin")
+                print(f"→ RoboNeo trial ~{duration:.1f}s / max {TRIAL_MAX_SEC}s — 3 coin")
 
             need, pick_need = pick_credits_for_job(duration)
             print(

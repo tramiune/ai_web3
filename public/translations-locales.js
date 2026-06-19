@@ -83,8 +83,8 @@ window.TRANSLATIONS_LOCALES = {
             "notes": {
                 "starter_v2": "Paquete limitado",
                 "creator": "Popular package",
-                "studio": "Bonus 25 Coins · 525 total",
-                "pro-studio": "Extra 100 Coins · 1100 total"
+                "studio": "Bonus 25 Coins",
+                "pro-studio": "Extra 100 Coins"
             }
         },
         "dashboard": {
@@ -243,8 +243,8 @@ window.TRANSLATIONS_LOCALES = {
             "notes": {
                 "starter_v2": "Pacote limitado",
                 "creator": "Pacote popular",
-                "studio": "Bônus 25 Coins · 525 total",
-                "pro-studio": "Extra 100 Coins · 1100 total"
+                "studio": "Bônus 25 Coins",
+                "pro-studio": "Extra 100 Coins"
             }
         },
         "dashboard": {
