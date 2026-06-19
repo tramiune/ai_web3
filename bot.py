@@ -1291,26 +1291,37 @@ def _complete_order_with_video(doc, local_vid):
     return True
 
 def check_finished_orders_api():
-    """Monitor RoboNeo — Kaling không poll Aidancing/XiaoYang/VideoAiEasy."""
+    """Kaling: poll RoboNeo + VideoAiEasy (không poll Aidancing/XiaoYang)."""
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
-    _, _, _, rb_orders, _, _ = _processing_monitor_state()
-    if not rb_orders:
+    _, _, vae_orders, rb_orders, _, _ = _processing_monitor_state()
+    if not rb_orders and not vae_orders:
         return
 
-    rb_wait = int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
-    print(
-        f"\n🔍 [MONITOR/HTTP] Poll RoboNeo={len(rb_orders)} "
-        f"(sau {rb_wait // 60}p từ submittedAt)..."
-    )
     if rb_orders and xy_motion.enabled_for_bot(BOT_NAME):
+        rb_wait = int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
+        print(
+            f"\n🔍 [MONITOR/HTTP] Poll RoboNeo={len(rb_orders)} "
+            f"(sau {rb_wait // 60}p từ submittedAt)..."
+        )
         try:
             import roboneo_motion as rb_motion
 
             rb_motion.poll_roboneo_orders(rb_orders)
         except Exception as e:
             print(f"❌ Lỗi monitor RoboNeo: {e}")
+
+    if vae_orders and xy_motion.enabled_for_bot(BOT_NAME):
+        vae_wait = int(os.environ.get("VIDEOAIEASY_MIN_RENDER_SEC", os.environ.get("ROBONEO_MIN_RENDER_SEC", "300")))
+        print(
+            f"\n🔍 [MONITOR/HTTP] Poll VideoAiEasy={len(vae_orders)} "
+            f"(sau {vae_wait // 60}p từ submittedAt)..."
+        )
+        try:
+            xy_motion.poll_videoaieasy_orders(vae_orders)
+        except Exception as e:
+            print(f"❌ Lỗi monitor VideoAiEasy: {e}")
 
 def _mark_order_processing(
     doc_ref,

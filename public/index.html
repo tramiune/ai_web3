@@ -1016,34 +1016,34 @@
                     <div id="custom-model-info" style="display: none; margin-bottom: 1.5rem;"></div>
 
                     <div class="form-group" id="model-selection-group">
-                        <label data-i18n="modals.model_label">Chọn Model (Chất lượng)</label>
+                        <label data-i18n="modals.model_label">Chọn Model</label>
                         <div class="model-selection-grid">
                             <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="fast" checked>
+                                <input type="radio" name="model-type" value="quality" checked>
                                 <div class="card-content-inline"
                                     style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_fast">
-                                        Nhanh</div>
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_quality">
+                                        Motion AI</div>
                                     <div style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_fast_desc">30p</div>
+                                        data-i18n="modals.model_quality_desc">0,6 coin/giây · tối đa 13s</div>
                                     <div
                                         style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-fast-cost">3</span>
-                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                        <span id="model-quality-cost">0.6</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;" data-i18n="modals.model_quality_cost_unit">coin/giây</span>
                                     </div>
                                 </div>
                             </label>
                             <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="turbo">
+                                <input type="radio" name="model-type" value="vae20">
                                 <div class="card-content-inline"
                                     style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_turbo">
-                                        Turbo 2K</div>
+                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_vae20">
+                                        Kling 2.6</div>
                                     <div style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_turbo_desc">15-20p</div>
+                                        data-i18n="modals.model_vae20_desc">720p · tối đa 20s</div>
                                     <div
                                         style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-turbo-cost">10</span>
+                                        <span id="model-vae20-cost">10</span>
                                         <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                     </div>
                                 </div>

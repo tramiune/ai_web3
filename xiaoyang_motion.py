@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 from firebase_admin import firestore
@@ -24,7 +26,10 @@ from videoaieasy_web import (
     MODEL_KLING_26,
     MODEL_KLING_30,
     QUALITY_MODEL_IDS,
+    prepare_character_image_for_vae,
+    resolution_for_order,
 )
+from tool98_api import probe_video_duration_seconds, trim_video_to_seconds
 import roboneo_motion as rb_motion
 
 load_project_env()
@@ -45,6 +50,8 @@ AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
+VAE_DURATION_KALING_SEC = 20
+KALING_VAE_MODEL_IDS = frozenset({"124", "125"})
 
 from user_order_notes import (
     USER_NOTE_CLIENT_OUTDATED,
@@ -186,6 +193,10 @@ def _use_videoaieasy() -> bool:
 
 def _order_target_provider(order_data: dict) -> str:
     if enabled_for_bot(_g.get("bot_name")):
+        model_id = str((order_data or {}).get("modelId") or "").strip()
+        rp = (order_data.get("renderProvider") or "").strip().lower()
+        if rp == RENDER_PROVIDER_VIDEOAIEASY or model_id in KALING_VAE_MODEL_IDS:
+            return RENDER_PROVIDER_VIDEOAIEASY
         return RENDER_PROVIDER_ROBONEO
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
@@ -198,10 +209,19 @@ def _order_target_provider(order_data: dict) -> str:
     return RENDER_PROVIDER_AIDANCING
 
 
+def _vae_duration_for_order(order_data: dict) -> int:
+    data = order_data or {}
+    explicit = data.get("vaeDurationSec")
+    if explicit is not None:
+        try:
+            return max(1, int(float(explicit)))
+        except (TypeError, ValueError):
+            pass
+    return VAE_DURATION_KALING_SEC
+
+
 def _videoaieasy_model_for_order(order_data: dict) -> str:
-    model_id = str((order_data or {}).get("modelId") or "").strip()
-    if model_id in AIDANCING_TURBO_MODEL_IDS:
-        return MODEL_KLING_30
+    """Kaling VAE: Kling 2.6 (720p qua resolution_for_order)."""
     return MODEL_KLING_26
 
 
@@ -688,19 +708,24 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
 
             char_path = None
             vid_path = None
+            vae_char_path = None
+            vae_char_is_tmp = False
+            vid_upload_path = None
+            vid_trim_tmp = None
             download_file = _g["download_file"]
             session_error_backoff = _g.get("session_error_backoff", {})
             try:
                 model_id = _videoaieasy_model_for_order(data)
-                tier = "Kling 3.0" if model_id == MODEL_KLING_30 else "Kling 2.6"
+                max_sec = _vae_duration_for_order(data)
+                resolution = resolution_for_order(data)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()
                 api = _get_vae_web_client(account_id)
                 _ensure_vae_web_session(api, account_email, account.get("password"))
                 print(
-                    f"🚀 [VideoAiEasy/{nick_label}] {tier} — "
-                    f"modelId={data.get('modelId')} → {model_id}..."
+                    f"🚀 [VideoAiEasy/{nick_label}] Kling 2.6 — "
+                    f"{max_sec}s {resolution} · modelId={data.get('modelId')} → {model_id}..."
                 )
                 for attempt in range(1, 3):
                     if attempt > 1:
@@ -712,15 +737,33 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     time.sleep(2)
                 if not char_path or not vid_path:
                     raise VideoAiEasyError("Không tải được ảnh/video từ link đơn hàng")
+
+                aspect = (data.get("aspectRatio") or "9:16").strip()
+                vae_char_path, vae_char_is_tmp = prepare_character_image_for_vae(
+                    char_path, aspect_ratio=aspect
+                )
+                vid_upload_path = vid_path
+                dur = probe_video_duration_seconds(vid_path)
+                if dur is None or dur > max_sec + 0.25:
+                    fd, outp = tempfile.mkstemp(suffix=".mp4")
+                    os.close(fd)
+                    trim_video_to_seconds(
+                        Path(vid_path), max_seconds=max_sec, output=Path(outp)
+                    )
+                    vid_upload_path = outp
+                    vid_trim_tmp = outp
+                    print(f"✂️ Cắt video motion → {max_sec}s (VAE)")
+
                 print("📤 Upload ảnh lên videoaieasy.hdgr.online...")
-                image_url = api.upload_file(char_path, kind="image")
+                image_url = api.upload_file(vae_char_path, kind="image")
                 print("📤 Upload video motion...")
-                video_url = api.upload_file(vid_path, kind="video")
+                video_url = api.upload_file(vid_upload_path, kind="video")
                 job_id = api.create_motion_job(
                     input_image_url=image_url,
                     driving_video_url=video_url,
                     prompt=prompt,
                     model_id=model_id,
+                    resolution=resolution,
                 )
                 print(f"🆔 [VideoAiEasy/{nick_label}] job: {job_id}")
                 _mark_order_processing(
@@ -752,6 +795,10 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     order_id, data, str(e), f"submit videoaieasy/{nick_label}"
                 )
             finally:
+                if vae_char_is_tmp and vae_char_path and os.path.exists(vae_char_path):
+                    os.remove(vae_char_path)
+                if vid_trim_tmp and os.path.exists(vid_trim_tmp):
+                    os.remove(vid_trim_tmp)
                 if char_path and os.path.exists(char_path):
                     os.remove(char_path)
                 if vid_path and os.path.exists(vid_path):
@@ -784,7 +831,7 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
 
 
 def submit_order(order_id: str):
-    """Kaling: chỉ nạp RoboNeo — không fallback XiaoYang/Aidancing/VideoAiEasy."""
+    """Kaling: RoboNeo (model 127) hoặc VideoAiEasy Kling 2.6 (model 124, 20s)."""
     db = _g["db"]
     doc_ref = db.collection("orders").document(order_id)
     doc = doc_ref.get()
@@ -807,6 +854,26 @@ def submit_order(order_id: str):
             f"clientVersion={client_version_label(data)}",
             USER_NOTE_CLIENT_OUTDATED,
             "client version",
+        )
+        return
+
+    provider = _order_target_provider(data)
+    if provider == RENDER_PROVIDER_VIDEOAIEASY:
+        if _try_submit_videoaieasy(order_id):
+            return
+        doc = doc_ref.get()
+        data = doc.to_dict() or {}
+        if data.get("status") != "pending":
+            return
+        if _g["pending_submit_backoff_active"](order_id):
+            print(f"⏸ VideoAiEasy chờ nick/slot — đơn {order_id}")
+            return
+        _fail_order_processing(
+            doc,
+            data,
+            "Không nạp được VideoAiEasy",
+            USER_NOTE_SUBMIT_FAILED,
+            "submit videoaieasy",
         )
         return
 

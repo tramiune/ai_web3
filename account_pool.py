@@ -22,6 +22,14 @@ from roboneo_web import RoboNeoWebClient, RoboNeoError
 POOL_FILE = Path(__file__).resolve().parent / "account_pool.json"
 
 
+def _pool_path() -> Path:
+    load_project_env()
+    raw = (get_env("ROBONEO_POOL_FILE") or "").strip()
+    if raw:
+        return Path(raw)
+    return POOL_FILE
+
+
 def credits_per_15s() -> float:
     load_project_env()
     return float(get_env("ROBONEO_CREDITS_PER_15S", "115") or "115")
@@ -116,6 +124,13 @@ def estimate_credits(duration_sec: float, *, buffer_pct: float = 0.05) -> int:
     return max(need, 1)
 
 
+def min_reuse_credits() -> int:
+    """Credit tối thiểu để giữ nick active sau 1 job."""
+    load_project_env()
+    sec = float(get_env("ROBONEO_MIN_REUSE_VIDEO_SEC", "5") or "5")
+    return estimate_credits(sec, buffer_pct=0.0)
+
+
 def video_duration_sec(path: str | Path) -> float:
     path = Path(path)
     try:
@@ -141,13 +156,16 @@ def video_duration_sec(path: str | Path) -> float:
 
 
 def _load_pool() -> dict[str, Any]:
-    if POOL_FILE.is_file():
-        return json.loads(POOL_FILE.read_text(encoding="utf-8"))
+    path = _pool_path()
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
     return {"accounts": [], "last_proxy_rotate_at": 0, "accounts_on_current_ip": 0}
 
 
 def _save_pool(data: dict[str, Any]) -> None:
-    POOL_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path = _pool_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def list_accounts() -> list[dict[str, Any]]:
@@ -226,13 +244,47 @@ def list_eligible_accounts(
     exclude: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     skip = {e.strip().lower() for e in (exclude or set()) if e}
-    return [
-        a
-        for a in list_accounts()
-        if a.get("status") == "active"
-        and int(a.get("credits") or 0) >= credits_needed
-        and (a.get("email") or "").strip().lower() not in skip
-    ]
+    out: list[dict[str, Any]] = []
+    for a in list_accounts():
+        email = (a.get("email") or "").strip().lower()
+        if not email or email in skip:
+            continue
+        st = a.get("status")
+        if st == "locked":
+            continue
+        if st not in ("active", "depleted"):
+            continue
+        c = a.get("credits")
+        if c is None:
+            out.append(a)
+        elif int(c) >= credits_needed:
+            out.append(a)
+        elif st == "depleted":
+            # depleted trong JSON có thể sai — login lại kiểm credit thật
+            out.append(a)
+    return out
+
+
+def _account_pick_sort_key(a: dict[str, Any]) -> tuple:
+    st_rank = 0 if a.get("status") == "active" else 1
+    c = a.get("credits")
+    if c is None:
+        return (st_rank, 1, 999999)
+    return (st_rank, 0, int(c))
+
+
+def update_account_after_job(email: str, remaining: int) -> None:
+    """Cập nhật pool sau job — giữ active nếu còn đủ credit cho job tiếp."""
+    floor = min_reuse_credits()
+    if remaining >= floor:
+        mark_account(email, status="active", credits=remaining, note="")
+    else:
+        mark_account(
+            email,
+            status="depleted",
+            credits=remaining,
+            note=f"còn {remaining} credit (< {floor})",
+        )
 
 
 def _wait_proxy_rotate_cooldown(data: dict[str, Any]) -> None:
@@ -356,9 +408,10 @@ def acquire_client_for_job(
 
     for row in sorted(
         list_eligible_accounts(credits_needed, exclude=excluded),
-        key=lambda a: int(a.get("credits") or 0),
+        key=_account_pick_sort_key,
     ):
-        print(f"→ Dùng nick pool {row['email']} ({row.get('credits')} credit)")
+        cr_label = row.get("credits")
+        print(f"→ Dùng nick pool {row['email']} ({cr_label if cr_label is not None else '?'} credit)")
         try:
             client, info = _login_once(row["email"], row["password"], rotate=False)
             if info["credits"] < credits_needed:

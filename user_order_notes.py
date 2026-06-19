@@ -15,3 +15,6 @@ USER_NOTE_ORDER_FAILED = (
     "Ảnh hoặc video có thể nhạy cảm, không vượt qua khâu kiểm duyệt. "
     "Nếu bạn tin đây là nhầm lẫn thì vui lòng thử lại. Hệ thống đã hoàn lại coin."
 )
+USER_NOTE_MODEL_UPDATED = (
+    "Hệ thống đã cập nhật model mới. Vui lòng tạo lại đơn hàng. Coin đã hoàn lại."
+)

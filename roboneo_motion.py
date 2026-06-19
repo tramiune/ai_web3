@@ -17,9 +17,12 @@ from account_pool import (
     acquire_client_for_job,
     estimate_credits,
     list_accounts,
+    list_eligible_accounts,
     max_accounts_per_ip,
     refresh_account_credits,
+    update_account_after_job,
     video_duration_sec,
+    _pool_path,
 )
 from roboneo_web import (
     RoboNeoAuthError,
@@ -417,14 +420,9 @@ def submit_to_roboneo(order_id: str) -> bool:
                         roboneo_room_id=room_id,
                         roboneo_account_email=account_email,
                     )
-                    refresh_account_credits(client, account_email)
-                    from account_pool import mark_account
-
-                    mark_account(
-                        account_email,
-                        status="depleted",
-                        note="đã xử lý 1 đơn (1 nick = 1 job)",
-                    )
+                    remaining = refresh_account_credits(client, account_email)
+                    update_account_after_job(account_email, remaining)
+                    print(f"→ Nick {account_email} còn {remaining} credit sau nạp đơn")
                     session_error_backoff.pop(order_id, None)
                     print(f"✅ Đơn {order_id} → processing (RoboNeo, {account_email})")
                     try:
@@ -590,12 +588,17 @@ def poll_roboneo_orders(orders_to_check):
 
 
 def log_pool_on_startup():
-    rows = [a for a in list_accounts() if a.get("status") == "active"]
+    rows = list_eligible_accounts(1)
+    all_rows = [a for a in list_accounts() if a.get("status") in ("active", "depleted")]
+    known = sum(1 for a in all_rows if a.get("credits") is not None)
+    path = _pool_path()
     print(
-        f"👥 RoboNeo pool: {len(rows)} nick | "
+        f"👥 RoboNeo pool: {len(all_rows)} nick (active+depleted) | "
+        f"{len(rows)} sẵn sàng thử | {known} đã biết credit | "
+        f"file {path} | "
         f"max {ROBONEO_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick | "
         f"{max_accounts_per_ip()} nick/IP VNsProxy | "
         f"surface {_roboneo_surface()} | model {_roboneo_api_name()}"
     )
-    for row in rows[:8]:
-        print(f"  • {row.get('email')} — ~{row.get('credits', '?')} credit")
+    for row in sorted(all_rows, key=lambda a: -(int(a.get("credits") or 0)))[:10]:
+        print(f"  • {row.get('email')} — {row.get('credits', '?')} credit ({row.get('status')})")

@@ -9,7 +9,8 @@ export { APP_CLIENT_VERSION };
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const KALING_PRICING = { coinPerSec: 0.6, maxVideoSec: 13 };
-const MAX_VIDEO_DURATION_SEC = KALING_PRICING.maxVideoSec;
+const KALING_VAE_PRICING = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
+const MAX_VIDEO_DURATION_SEC = KALING_VAE_PRICING.maxVideoSec;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -191,21 +192,41 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 }
 
 // --- Data Constants ---
-const MODEL_COST_FAST = 3;
-const MODEL_COST_TURBO = 10;
+const MODEL_COST_LEGACY_FAST = 3;
+const MODEL_COST_LEGACY_TURBO = 10;
+
+function getSelectedModelKey() {
+    const checked = document.querySelector('input[name="model-type"]:checked');
+    return checked ? checked.value : 'quality';
+}
+
+function getMaxVideoSecForModel(modelKey) {
+    const m = MODELS[modelKey] || MODELS.quality;
+    return m.maxVideoSec ?? KALING_PRICING.maxVideoSec;
+}
+
+function getMaxVideoSecForSelectedModel() {
+    return getMaxVideoSecForModel(getSelectedModelKey());
+}
 
 function modelCoinCost(modelKey) {
+    const key = modelKey || getSelectedModelKey();
+    if (key === 'vae20') return KALING_VAE_PRICING.cost;
     if (kalingSelectedDurationSec != null) {
         return kalingCoinsForDuration(kalingSelectedDurationSec);
     }
-    return modelKey === 'turbo' ? MODEL_COST_TURBO : MODEL_COST_FAST;
+    return '—';
 }
 
 function syncModelPriceLabels() {
-    const fastEl = document.getElementById('model-fast-cost');
-    const turboEl = document.getElementById('model-turbo-cost');
-    if (fastEl) fastEl.textContent = String(MODEL_COST_FAST);
-    if (turboEl) turboEl.textContent = String(MODEL_COST_TURBO);
+    const qualityEl = document.getElementById('model-quality-cost');
+    const vaeEl = document.getElementById('model-vae20-cost');
+    if (qualityEl) {
+        qualityEl.textContent = kalingSelectedDurationSec != null
+            ? String(kalingCoinsForDuration(kalingSelectedDurationSec))
+            : String(KALING_PRICING.coinPerSec);
+    }
+    if (vaeEl) vaeEl.textContent = String(KALING_VAE_PRICING.cost);
 }
 
 function normalizeOrderCost(model) {
@@ -248,7 +269,7 @@ const AI_MODELS = [
         id: 'copy-motion-photo',
         titleKey: 'models.model1_title',
         descKey: 'models.model1_desc',
-        cost: MODEL_COST_FAST,
+        cost: MODEL_COST_LEGACY_FAST,
         serviceType: 'motion-to-char',
         demoChar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
         demoRef: 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4',
@@ -336,12 +357,30 @@ const MODELS = {
         renderProvider: "roboneo",
         maxVideoSec: KALING_PRICING.maxVideoSec,
     },
-    fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "127", renderProvider: "roboneo" },
-    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "127", renderProvider: "roboneo" }
+    vae20: {
+        nameKey: "modals.model_vae20",
+        cost: KALING_VAE_PRICING.cost,
+        timeKey: "modals.model_vae20_desc",
+        modelId: "124",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_PRICING.maxVideoSec,
+        vaeDurationSec: KALING_VAE_PRICING.vaeDurationSec,
+        vaeResolution: KALING_VAE_PRICING.vaeResolution,
+    },
 };
 
 function localizedModel(key) {
-    const m = MODELS.quality;
+    const modelKey = key || getSelectedModelKey();
+    const m = MODELS[modelKey] || MODELS.quality;
+    if (modelKey === 'vae20') {
+        return {
+            ...m,
+            name: t(m.nameKey),
+            time: t(m.timeKey),
+            cost: m.cost,
+            renderProvider: m.renderProvider,
+        };
+    }
     const dur = kalingSelectedDurationSec;
     const cost = dur != null ? kalingCoinsForDuration(dur) : null;
     return {
@@ -358,8 +397,8 @@ function localizedModel(key) {
 }
 
 const SERVICE_PACKAGES = [
-    { id: 'plus', name: 'Plus', cost: MODEL_COST_FAST, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
-    { id: 'viral', name: 'Viral', cost: MODEL_COST_TURBO, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
+    { id: 'plus', name: 'Plus', cost: MODEL_COST_LEGACY_FAST, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
+    { id: 'viral', name: 'Viral', cost: MODEL_COST_LEGACY_TURBO, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
 ];
 
 async function getVideoDurationSeconds(file) {
@@ -1996,8 +2035,9 @@ window.selectTemplate = async (id, url) => {
     const trend = TREND_VIDEOS.find(t => t.id === id);
     showToast(t('modals.toast_trend_selected', { title: trend ? trendTitle(trend) : id }));
     const dur = await getVideoDurationFromUrl(url);
-    if (dur != null && dur > KALING_PRICING.maxVideoSec + 0.15) {
-        showToast(t('modals.video_duration_limit', { sec: KALING_PRICING.maxVideoSec }));
+    const maxSec = getMaxVideoSecForSelectedModel();
+    if (dur != null && dur > maxSec + 0.15) {
+        showToast(t('modals.video_duration_limit', { sec: maxSec }));
         document.getElementById('selected-template-url').value = '';
         kalingSelectedDurationSec = null;
     } else {
@@ -2251,15 +2291,15 @@ function updateFirstOrderUI() {
 
     if (offerBanner) offerBanner.style.display = 'none';
     if (guestOfferBar) guestOfferBar.style.display = 'none';
-    if (modelGroupEl) modelGroupEl.style.display = 'none';
+    if (modelGroupEl) modelGroupEl.style.display = '';
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
         const submitText = submitBtn ? submitBtn.querySelector('[data-i18n="hero.cta_create"]') : null;
         const summaryEl = document.getElementById('submit-summary-line');
-        const checkedModel = document.querySelector('input[name="model-type"]:checked');
-        const modelKey = checkedModel ? checkedModel.value : 'fast';
+        const modelKey = getSelectedModelKey();
         const lm = localizedModel(modelKey);
+        syncModelPriceLabels();
 
         if (lm && lm.cost !== '—') {
             costEl.innerText = String(lm.cost);
@@ -2855,7 +2895,7 @@ async function setupEventListeners() {
                 let videoFile = document.getElementById('file-video')?.files?.[0];
                 const templateUrl = document.getElementById('selected-template-url')?.value || '';
                 const tiktokUrl = document.getElementById('tiktok-video-url')?.value?.trim() || '';
-                const modelKeySelected = 'quality';
+                const modelKeySelected = getSelectedModelKey();
                 let modelIdOverride = null;
 
                 if (!charFile) {
@@ -2903,7 +2943,7 @@ async function setupEventListeners() {
                 }
 
                 let kalingDurationSec = kalingSelectedDurationSec;
-                const maxSec = KALING_PRICING.maxVideoSec;
+                const maxSec = getMaxVideoSecForModel(modelKeySelected);
                 if (videoFile) {
                     kalingDurationSec = await getVideoDurationSeconds(videoFile);
                 } else if (window.currentVideoSource === 'library') {
@@ -2940,7 +2980,7 @@ async function setupEventListeners() {
                     let model = normalizeOrderCost({ ...localizedModel(modelKey) });
                     if (modelIdOverride) model.modelId = modelIdOverride;
 
-                    if (kalingDurationSec != null) {
+                    if (modelKeySelected === 'quality' && kalingDurationSec != null) {
                         model.cost = kalingCoinsForDuration(kalingDurationSec);
                         model.vaeDurationSec = Math.ceil(kalingDurationSec);
                     }
@@ -2998,6 +3038,7 @@ async function setupEventListeners() {
                         modelId: model.modelId,
                         renderProvider: model.renderProvider || "roboneo",
                         ...(model.vaeDurationSec ? { vaeDurationSec: model.vaeDurationSec } : {}),
+                        ...(model.vaeResolution ? { vaeResolution: model.vaeResolution } : {}),
                         serviceType: serviceType,
                         serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
                         costCoins: model.cost,
