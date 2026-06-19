@@ -192,8 +192,8 @@ window.TRANSLATIONS = {
             notes: {
                 starter_v2: "Gói giới hạn",
                 creator: "Gói phổ biến",
-                studio: "Tặng 300 Coin",
-                "pro-studio": "Tặng 600 Coin"
+                studio: "Tặng 25 Coin · Tổng 525 Coin",
+                "pro-studio": "Cộng 100 Coin · Tổng 1100 Coin"
             },
             packages: {
                 starter_v2: "Starter",
@@ -901,8 +901,8 @@ window.TRANSLATIONS = {
             notes: {
                 starter_v2: "Limited package",
                 creator: "Popular package",
-                studio: "Bonus 300 Coins",
-                "pro-studio": "Bonus 600 Coins"
+                studio: "Bonus 25 Coins · 525 total",
+                "pro-studio": "Extra 100 Coins · 1100 total"
             },
             packages: {
                 starter_v2: "Starter",

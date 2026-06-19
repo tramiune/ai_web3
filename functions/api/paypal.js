@@ -46,7 +46,7 @@ const PAYPAL_DEFAULTS = {
 const PACKAGES = {
     'starter_v2':  { coins: 10,   priceUsd: 0.49,  name: 'Starter (International)' },
     'creator':     { coins: 100,  priceUsd: 5.99,  name: 'Creator (International)' },
-    'studio':      { coins: 550,  priceUsd: 24.99, name: 'Studio (International)' },
+    'studio':      { coins: 525,  priceUsd: 24.99, name: 'Studio (International)' },
     'pro-studio':  { coins: 1100, priceUsd: 49.99, name: 'Enterprise (International)' }
 };
 
@@ -371,7 +371,7 @@ async function verifyPaypalWebhook(cfg, headers, rawBody, parsedEvent) {
 
 function inferPackageFromAmount(usd) {
     if (usd >= 45) return { coins: 1100, name: 'Enterprise (Fallback)' };
-    if (usd >= 20) return { coins: 550,  name: 'Studio (Fallback)' };
+    if (usd >= 20) return { coins: 525,  name: 'Studio (Fallback)' };
     if (usd >= 10) return { coins: 200,  name: 'Creator (Fallback)' };
     if (usd >= 1.5) return { coins: 10,   name: 'Starter (Fallback)' };
     return { coins: 5, name: 'Starter (Legacy Fallback)' };

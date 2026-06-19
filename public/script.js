@@ -270,7 +270,7 @@ function normalizeOrderCost(model) {
 const COIN_PACKAGES = [
     { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '10.000đ',  usdPrice: '$0.49', amount: 10000,  hasBonus: false, oneTime: true },
     { id: 'creator',    name: 'Creator',    coins: 100, price: '100.000đ', usdPrice: '$5.99', amount: 100000, featured: false, hasBonus: false },
-    { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
+    { id: 'studio',     name: 'Studio',     coins: 525,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
 ];
 
