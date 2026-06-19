@@ -69,7 +69,7 @@ if __name__ == "__main__":
     print("=== BẮT ĐẦU CHƯƠNG TRÌNH DỌN RÁC ===")
     
     # 1. Dọn dẹp đơn hàng (chỉ xóa đơn đã xong hoặc lỗi sau 7 ngày)
-    delete_old_docs('orders', 7, status_field='status', status_values=['completed', 'failed'])
+    delete_old_docs('orders', 3, status_field='status', status_values=['completed', 'failed'])
     
     # 2. Dọn dẹp lịch sử nạp coin (topups)
     # Xóa đơn pending cũ hơn 1 ngày
