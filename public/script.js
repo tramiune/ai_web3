@@ -8,8 +8,9 @@ export { APP_CLIENT_VERSION };
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
-const KALING_VAE_PRICING = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
-const MAX_VIDEO_DURATION_SEC = KALING_VAE_PRICING.maxVideoSec;
+const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
+const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
+const MAX_VIDEO_DURATION_SEC = KALING_VAE_20.maxVideoSec;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -190,24 +191,29 @@ const MODEL_COST_LEGACY_FAST = 3;
 const MODEL_COST_LEGACY_TURBO = 10;
 
 function getSelectedModelKey() {
-    return 'vae10';
+    const checked = document.querySelector('input[name="model-type"]:checked');
+    return checked ? checked.value : 'vae10';
 }
 
-function getMaxVideoSecForModel(_modelKey) {
-    return KALING_VAE_PRICING.maxVideoSec;
+function getMaxVideoSecForModel(modelKey) {
+    const m = MODELS[modelKey] || MODELS.vae10;
+    return m.maxVideoSec;
 }
 
 function getMaxVideoSecForSelectedModel() {
-    return KALING_VAE_PRICING.maxVideoSec;
+    return getMaxVideoSecForModel(getSelectedModelKey());
 }
 
-function modelCoinCost() {
-    return KALING_VAE_PRICING.cost;
+function modelCoinCost(modelKey) {
+    const m = MODELS[modelKey || getSelectedModelKey()] || MODELS.vae10;
+    return m.cost;
 }
 
 function syncModelPriceLabels() {
-    const costEl = document.getElementById('model-vae10-cost');
-    if (costEl) costEl.textContent = String(KALING_VAE_PRICING.cost);
+    const el10 = document.getElementById('model-vae10-cost');
+    const el20 = document.getElementById('model-vae20-cost');
+    if (el10) el10.textContent = String(KALING_VAE_10.cost);
+    if (el20) el20.textContent = String(KALING_VAE_20.cost);
 }
 
 function normalizeOrderCost(model) {
@@ -332,18 +338,29 @@ function gatewayLabel(gateway) {
 const MODELS = {
     vae10: {
         nameKey: "modals.model_vae10",
-        cost: KALING_VAE_PRICING.cost,
+        cost: KALING_VAE_10.cost,
         timeKey: "modals.model_vae10_desc",
         modelId: "124",
         renderProvider: "videoaieasy",
-        maxVideoSec: KALING_VAE_PRICING.maxVideoSec,
-        vaeDurationSec: KALING_VAE_PRICING.vaeDurationSec,
-        vaeResolution: KALING_VAE_PRICING.vaeResolution,
+        maxVideoSec: KALING_VAE_10.maxVideoSec,
+        vaeDurationSec: KALING_VAE_10.vaeDurationSec,
+        vaeResolution: KALING_VAE_10.vaeResolution,
+    },
+    vae20: {
+        nameKey: "modals.model_vae20",
+        cost: KALING_VAE_20.cost,
+        timeKey: "modals.model_vae20_desc",
+        modelId: "125",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_20.maxVideoSec,
+        vaeDurationSec: KALING_VAE_20.vaeDurationSec,
+        vaeResolution: KALING_VAE_20.vaeResolution,
     },
 };
 
 function localizedModel(key) {
-    const m = MODELS.vae10;
+    const modelKey = key || getSelectedModelKey();
+    const m = MODELS[modelKey] || MODELS.vae10;
     return {
         ...m,
         name: t(m.nameKey),
@@ -2248,7 +2265,7 @@ function updateFirstOrderUI() {
 
     if (offerBanner) offerBanner.style.display = 'none';
     if (guestOfferBar) guestOfferBar.style.display = 'none';
-    if (modelGroupEl) modelGroupEl.style.display = 'none';
+    if (modelGroupEl) modelGroupEl.style.display = '';
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
