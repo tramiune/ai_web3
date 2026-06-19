@@ -192,7 +192,7 @@ const MODEL_COST_LEGACY_TURBO = 10;
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    return checked ? checked.value : 'vae10';
+    return checked ? checked.value : 'vae20';
 }
 
 function getMaxVideoSecForModel(modelKey) {
