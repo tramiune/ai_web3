@@ -19,13 +19,24 @@ const ROBONEO_TRIAL = {
     windowMs: 24 * 60 * 60 * 1000,
     modelKey: 'rbTrial',
     cost: 3,
-    maxVideoSec: 15,
+    maxVideoSec: 12,
 };
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
 /** Thời lượng video đã chọn — dùng validate tối đa 10s. */
 let kalingSelectedDurationSec = null;
+
+/** Coin luôn là số nguyên — tránh hiển thị 99.0000000001 sau phép trừ float. */
+function normalizeCoins(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n);
+}
+
+function formatCoinAmount(value) {
+    return String(normalizeCoins(value));
+}
 
 async function getVideoDurationFromUrl(url) {
     if (!url) return null;
@@ -1514,10 +1525,10 @@ async function handleUserLoggedIn(user) {
                     num_items: 1
                 });
 
-                sendTelegramMessage(`💰 <b>NẠP COIN THÀNH CÔNG!</b>\n👤 Khách: ${escapeHTML(data.displayName)}\n📧 Email: ${escapeHTML(data.email)}\n✨ Đã cộng: +${addedCoins} Coin\n💰 Số dư mới: ${currentCoins} Coin`);
+                sendTelegramMessage(`💰 <b>NẠP COIN THÀNH CÔNG!</b>\n👤 Khách: ${escapeHTML(data.displayName)}\n📧 Email: ${escapeHTML(data.email)}\n✨ Đã cộng: +${formatCoinAmount(addedCoins)} Coin\n💰 Số dư mới: ${formatCoinAmount(currentCoins)} Coin`);
             }
 
-            document.querySelectorAll('.coin-balance-text').forEach(el => el.innerText = currentCoins);
+            document.querySelectorAll('.coin-balance-text').forEach(el => el.innerText = formatCoinAmount(currentCoins));
             document.querySelectorAll('.user-greeting-text').forEach(el => el.innerText = t('dashboard.greeting', { name: data.displayName }));
             document.querySelectorAll('.user-email-text').forEach(el => el.innerText = data.email);
 
@@ -3097,13 +3108,13 @@ async function setupEventListeners() {
                         throw t('modals.roboneo_trial_expired');
                     }
 
-                    if (userData.coins < model.cost) {
+                    if (normalizeCoins(userData.coins) < model.cost) {
                         throw t('modals.insufficient_coins_title');
                     }
                     if (!Number.isFinite(Number(model.cost)) || Number(model.cost) < 1) {
                         throw t('modals.video_upload_required');
                     }
-                    return { currentCoins: userDoc.data().coins, model, serviceType };
+                    return { currentCoins: normalizeCoins(userDoc.data().coins), model, serviceType };
                 });
 
                 const { model, serviceType } = userSnap;
@@ -3130,7 +3141,7 @@ async function setupEventListeners() {
                 const orderId = await runTransaction(db, async (transaction) => {
                     const userDoc = await transaction.get(userRef);
                     const userData = userDoc.data();
-                    const currentCoins = userData.coins;
+                    const currentCoins = normalizeCoins(userData.coins);
                     normalizeOrderCost(model);
 
                     const aspectRatioEl = document.querySelector('input[name="aspect-ratio"]:checked');
@@ -3487,7 +3498,7 @@ function renderMyTopups() {
             <tr>
                 <td>${d.packageName}</td>
                 <td>${d.amount ? d.amount.toLocaleString() : 0}đ</td>
-                <td>${d.coins}</td>
+                <td>${formatCoinAmount(d.coins)}</td>
                 <td><span class="status-badge status-${d.status}">${statusVN}</span></td>
                 <td>${date}</td>
             </tr>
@@ -4396,7 +4407,7 @@ window.approveTopup = async (topupId, userId, coins) => {
             const userSnap = await transaction.get(userRef);
             if (!userSnap.exists()) throw "User không tồn tại!";
 
-            const newCoins = (userSnap.data().coins || 0) + coins;
+            const newCoins = normalizeCoins(userSnap.data().coins) + normalizeCoins(coins);
             transaction.update(userRef, { coins: newCoins, updatedAt: serverTimestamp() });
             transaction.update(topupRef, { status: 'approved' });
         });

@@ -18,7 +18,7 @@ TRIAL_START = datetime(2026, 6, 19, 0, 0, 0, tzinfo=VN_TZ)
 TRIAL_WINDOW = timedelta(hours=24)
 TRIAL_MODEL_ID = "130"
 TRIAL_COST = 3
-TRIAL_MAX_SEC = 15
+TRIAL_MAX_SEC = 12
 KALING_ROBONEO_MODEL_IDS = frozenset({"124", TRIAL_MODEL_ID})
 
 
