@@ -50,7 +50,7 @@ AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
-VAE_DURATION_KALING_SEC = 20
+VAE_DURATION_KALING_SEC = 10
 KALING_VAE_MODEL_IDS = frozenset({"124", "125"})
 
 from user_order_notes import (
@@ -96,8 +96,7 @@ def get_active_render_provider():
 
 def apply_render_provider_from_bot_data(data: dict, source=""):
     global _active_render_provider
-    # Kaling bot: luôn RoboNeo, bỏ qua admin switch engine khác
-    p = RENDER_PROVIDER_ROBONEO
+    p = RENDER_PROVIDER_VIDEOAIEASY
     with _active_render_provider_lock:
         prev = _active_render_provider
         _active_render_provider = p
@@ -108,7 +107,9 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
-    _g["print"]("🎬 Engine: RoboNeo (Kaling — không fallback engine khác)")
+    _g["print"](
+        f"🎬 Engine: VideoAiEasy Kling 2.6 · {VAE_DURATION_KALING_SEC}s 720p (Kaling — không RoboNeo)"
+    )
 
 
 def _xiaoyang_account_id(email: str) -> str:
@@ -193,11 +194,7 @@ def _use_videoaieasy() -> bool:
 
 def _order_target_provider(order_data: dict) -> str:
     if enabled_for_bot(_g.get("bot_name")):
-        model_id = str((order_data or {}).get("modelId") or "").strip()
-        rp = (order_data.get("renderProvider") or "").strip().lower()
-        if rp == RENDER_PROVIDER_VIDEOAIEASY or model_id in KALING_VAE_MODEL_IDS:
-            return RENDER_PROVIDER_VIDEOAIEASY
-        return RENDER_PROVIDER_ROBONEO
+        return RENDER_PROVIDER_VIDEOAIEASY
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
     model_id = str(order_data.get("modelId") or "").strip()
@@ -831,7 +828,7 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
 
 
 def submit_order(order_id: str):
-    """Kaling: RoboNeo (model 127) hoặc VideoAiEasy Kling 2.6 (model 124, 20s)."""
+    """Kaling: chỉ VideoAiEasy Kling 2.6 (model 124, 10s)."""
     db = _g["db"]
     doc_ref = db.collection("orders").document(order_id)
     doc = doc_ref.get()
@@ -857,41 +854,21 @@ def submit_order(order_id: str):
         )
         return
 
-    provider = _order_target_provider(data)
-    if provider == RENDER_PROVIDER_VIDEOAIEASY:
-        if _try_submit_videoaieasy(order_id):
-            return
-        doc = doc_ref.get()
-        data = doc.to_dict() or {}
-        if data.get("status") != "pending":
-            return
-        if _g["pending_submit_backoff_active"](order_id):
-            print(f"⏸ VideoAiEasy chờ nick/slot — đơn {order_id}")
-            return
-        _fail_order_processing(
-            doc,
-            data,
-            "Không nạp được VideoAiEasy",
-            USER_NOTE_SUBMIT_FAILED,
-            "submit videoaieasy",
-        )
-        return
-
-    if rb_motion.submit_to_roboneo(order_id):
+    if _try_submit_videoaieasy(order_id):
         return
     doc = doc_ref.get()
     data = doc.to_dict() or {}
     if data.get("status") != "pending":
         return
     if _g["pending_submit_backoff_active"](order_id):
-        print(f"⏸ RoboNeo chờ nick/credit — đơn {order_id}")
+        print(f"⏸ VideoAiEasy chờ nick/slot — đơn {order_id}")
         return
     _fail_order_processing(
         doc,
         data,
-        "Không nạp được RoboNeo",
+        "Không nạp được VideoAiEasy",
         USER_NOTE_SUBMIT_FAILED,
-        "submit roboneo",
+        "submit videoaieasy",
     )
 
 
@@ -1019,4 +996,10 @@ def poll_videoaieasy_orders(orders_to_check):
 
 
 def log_accounts_on_startup():
-    rb_motion.log_pool_on_startup()
+    accounts = load_videoaieasy_accounts()
+    print(
+        f"👥 VideoAiEasy: {len(accounts)} nick | Kling 2.6 · {VAE_DURATION_KALING_SEC}s · 720p | "
+        f"max {VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick"
+    )
+    for acc in accounts[:8]:
+        print(f"  • {acc.get('email')}")

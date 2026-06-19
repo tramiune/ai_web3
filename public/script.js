@@ -8,19 +8,13 @@ export { APP_CLIENT_VERSION };
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
-const KALING_PRICING = { coinPerSec: 0.6, maxVideoSec: 13 };
-const KALING_VAE_PRICING = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
+const KALING_VAE_PRICING = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_PRICING.maxVideoSec;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
-/** Thời lượng video đã chọn — dùng tính giá động. */
+/** Thời lượng video đã chọn — dùng validate tối đa 10s. */
 let kalingSelectedDurationSec = null;
-
-function kalingCoinsForDuration(sec) {
-    const d = Math.min(Math.max(Number(sec) || 0, 0.1), KALING_PRICING.maxVideoSec);
-    return Math.max(1, Math.ceil(d * KALING_PRICING.coinPerSec));
-}
 
 async function getVideoDurationFromUrl(url) {
     if (!url) return null;
@@ -196,37 +190,24 @@ const MODEL_COST_LEGACY_FAST = 3;
 const MODEL_COST_LEGACY_TURBO = 10;
 
 function getSelectedModelKey() {
-    const checked = document.querySelector('input[name="model-type"]:checked');
-    return checked ? checked.value : 'quality';
+    return 'vae10';
 }
 
-function getMaxVideoSecForModel(modelKey) {
-    const m = MODELS[modelKey] || MODELS.quality;
-    return m.maxVideoSec ?? KALING_PRICING.maxVideoSec;
+function getMaxVideoSecForModel(_modelKey) {
+    return KALING_VAE_PRICING.maxVideoSec;
 }
 
 function getMaxVideoSecForSelectedModel() {
-    return getMaxVideoSecForModel(getSelectedModelKey());
+    return KALING_VAE_PRICING.maxVideoSec;
 }
 
-function modelCoinCost(modelKey) {
-    const key = modelKey || getSelectedModelKey();
-    if (key === 'vae20') return KALING_VAE_PRICING.cost;
-    if (kalingSelectedDurationSec != null) {
-        return kalingCoinsForDuration(kalingSelectedDurationSec);
-    }
-    return '—';
+function modelCoinCost() {
+    return KALING_VAE_PRICING.cost;
 }
 
 function syncModelPriceLabels() {
-    const qualityEl = document.getElementById('model-quality-cost');
-    const vaeEl = document.getElementById('model-vae20-cost');
-    if (qualityEl) {
-        qualityEl.textContent = kalingSelectedDurationSec != null
-            ? String(kalingCoinsForDuration(kalingSelectedDurationSec))
-            : String(KALING_PRICING.coinPerSec);
-    }
-    if (vaeEl) vaeEl.textContent = String(KALING_VAE_PRICING.cost);
+    const costEl = document.getElementById('model-vae10-cost');
+    if (costEl) costEl.textContent = String(KALING_VAE_PRICING.cost);
 }
 
 function normalizeOrderCost(model) {
@@ -349,18 +330,10 @@ function gatewayLabel(gateway) {
 }
 
 const MODELS = {
-    quality: {
-        nameKey: "modals.model_quality",
-        cost: 0,
-        timeKey: "modals.model_quality_desc",
-        modelId: "127",
-        renderProvider: "roboneo",
-        maxVideoSec: KALING_PRICING.maxVideoSec,
-    },
-    vae20: {
-        nameKey: "modals.model_vae20",
+    vae10: {
+        nameKey: "modals.model_vae10",
         cost: KALING_VAE_PRICING.cost,
-        timeKey: "modals.model_vae20_desc",
+        timeKey: "modals.model_vae10_desc",
         modelId: "124",
         renderProvider: "videoaieasy",
         maxVideoSec: KALING_VAE_PRICING.maxVideoSec,
@@ -370,29 +343,13 @@ const MODELS = {
 };
 
 function localizedModel(key) {
-    const modelKey = key || getSelectedModelKey();
-    const m = MODELS[modelKey] || MODELS.quality;
-    if (modelKey === 'vae20') {
-        return {
-            ...m,
-            name: t(m.nameKey),
-            time: t(m.timeKey),
-            cost: m.cost,
-            renderProvider: m.renderProvider,
-        };
-    }
-    const dur = kalingSelectedDurationSec;
-    const cost = dur != null ? kalingCoinsForDuration(dur) : null;
+    const m = MODELS.vae10;
     return {
         ...m,
-        name: t('modals.kaling_package_name'),
-        time: t('modals.kaling_price_per_sec', {
-            rate: KALING_PRICING.coinPerSec,
-            max: KALING_PRICING.maxVideoSec,
-        }),
-        cost: cost ?? '—',
-        vaeDurationSec: dur != null ? Math.ceil(dur) : undefined,
-        renderProvider: m.renderProvider || 'roboneo',
+        name: t(m.nameKey),
+        time: t(m.timeKey),
+        cost: m.cost,
+        renderProvider: m.renderProvider,
     };
 }
 
@@ -2291,7 +2248,7 @@ function updateFirstOrderUI() {
 
     if (offerBanner) offerBanner.style.display = 'none';
     if (guestOfferBar) guestOfferBar.style.display = 'none';
-    if (modelGroupEl) modelGroupEl.style.display = '';
+    if (modelGroupEl) modelGroupEl.style.display = 'none';
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
@@ -2980,11 +2937,6 @@ async function setupEventListeners() {
                     let model = normalizeOrderCost({ ...localizedModel(modelKey) });
                     if (modelIdOverride) model.modelId = modelIdOverride;
 
-                    if (modelKeySelected === 'quality' && kalingDurationSec != null) {
-                        model.cost = kalingCoinsForDuration(kalingDurationSec);
-                        model.vaeDurationSec = Math.ceil(kalingDurationSec);
-                    }
-
                     if (userDoc.data().coins < model.cost) {
                         throw t('modals.insufficient_coins_title');
                     }
@@ -3036,7 +2988,7 @@ async function setupEventListeners() {
                         userName: currentUser.displayName,
                         packageName: model.name,
                         modelId: model.modelId,
-                        renderProvider: model.renderProvider || "roboneo",
+                        renderProvider: "videoaieasy",
                         ...(model.vaeDurationSec ? { vaeDurationSec: model.vaeDurationSec } : {}),
                         ...(model.vaeResolution ? { vaeResolution: model.vaeResolution } : {}),
                         serviceType: serviceType,

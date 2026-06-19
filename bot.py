@@ -1291,7 +1291,7 @@ def _complete_order_with_video(doc, local_vid):
     return True
 
 def check_finished_orders_api():
-    """Kaling: poll RoboNeo + VideoAiEasy (không poll Aidancing/XiaoYang)."""
+    """Kaling: poll VideoAiEasy (+ RoboNeo nếu còn đơn processing cũ)."""
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
@@ -1302,7 +1302,7 @@ def check_finished_orders_api():
     if rb_orders and xy_motion.enabled_for_bot(BOT_NAME):
         rb_wait = int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
         print(
-            f"\n🔍 [MONITOR/HTTP] Poll RoboNeo={len(rb_orders)} "
+            f"\n🔍 [MONITOR/HTTP] Poll RoboNeo (legacy)={len(rb_orders)} "
             f"(sau {rb_wait // 60}p từ submittedAt)..."
         )
         try:
@@ -1920,7 +1920,7 @@ def _rescan_pending_orders_loop():
 
 def start_bot():
     global BOT_NAME
-    parser = argparse.ArgumentParser(description='Kaling order bot — RoboNeo only')
+    parser = argparse.ArgumentParser(description='Kaling order bot — VideoAiEasy Kling 2.6')
     parser.add_argument('--name', required=True, help='Tên bot duy nhất (vd: aidancing-vps1, bot-may-nha)')
     parser.add_argument('--mode', choices=['browser', 'api', 'http'], default=None,
                         help='browser=Playwright; api/http=Pure HTTP (cookie + XY, không Chrome)')
@@ -1932,7 +1932,7 @@ def start_bot():
         print("❌ Tên bot không hợp lệ. Dùng: python bot.py --name aidancing-vps1")
         sys.exit(1)
 
-    print(f"📡 Kaling BOT [{BOT_NAME}] (RoboNeo-only — mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
+    print(f"📡 Kaling BOT [{BOT_NAME}] (VideoAiEasy — mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
     cdp_url = os.environ.get("BOT_CDP_URL", "").strip()
     if cdp_url:
         if ensure_cdp_available(cdp_url):
