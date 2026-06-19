@@ -53,7 +53,7 @@ XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 VAE_DURATION_KALING_SEC = 10
-KALING_VAE_MODEL_IDS = frozenset({"124", "125"})
+KALING_VAE_MODEL_IDS = frozenset({"124", "125", "126", "128", "129"})
 
 from user_order_notes import (
     USER_NOTE_CLIENT_OUTDATED,
@@ -705,7 +705,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             try:
                 model_id = _videoaieasy_model_for_order(data)
                 duration_sec = duration_for_order(data)
-                vae_credits = vae_credits_for_duration(duration_sec)
+                vae_credits = vae_credits_for_duration(duration_sec, resolution)
                 max_sec = duration_sec
                 resolution = resolution_for_order(data)
                 prompt = (data.get("prompt") or get_env(

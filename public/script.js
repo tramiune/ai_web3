@@ -10,7 +10,10 @@ const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
-const MAX_VIDEO_DURATION_SEC = KALING_VAE_20.maxVideoSec;
+const KALING_VAE_1080_10 = { cost: 7, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '1080p' };
+const KALING_VAE_1080_20 = { cost: 13, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '1080p' };
+const KALING_VAE_1080_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '1080p' };
+const MAX_VIDEO_DURATION_SEC = KALING_VAE_1080_30.maxVideoSec;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -210,10 +213,10 @@ function modelCoinCost(modelKey) {
 }
 
 function syncModelPriceLabels() {
-    const el10 = document.getElementById('model-vae10-cost');
-    const el20 = document.getElementById('model-vae20-cost');
-    if (el10) el10.textContent = String(KALING_VAE_10.cost);
-    if (el20) el20.textContent = String(KALING_VAE_20.cost);
+    Object.entries(MODELS).forEach(([key, m]) => {
+        const el = document.getElementById(`model-${key}-cost`);
+        if (el) el.textContent = String(m.cost);
+    });
 }
 
 function normalizeOrderCost(model) {
@@ -355,6 +358,36 @@ const MODELS = {
         maxVideoSec: KALING_VAE_20.maxVideoSec,
         vaeDurationSec: KALING_VAE_20.vaeDurationSec,
         vaeResolution: KALING_VAE_20.vaeResolution,
+    },
+    vae1080_10: {
+        nameKey: "modals.model_vae1080_10",
+        cost: KALING_VAE_1080_10.cost,
+        timeKey: "modals.model_vae1080_10_desc",
+        modelId: "126",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_1080_10.maxVideoSec,
+        vaeDurationSec: KALING_VAE_1080_10.vaeDurationSec,
+        vaeResolution: KALING_VAE_1080_10.vaeResolution,
+    },
+    vae1080_20: {
+        nameKey: "modals.model_vae1080_20",
+        cost: KALING_VAE_1080_20.cost,
+        timeKey: "modals.model_vae1080_20_desc",
+        modelId: "128",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_1080_20.maxVideoSec,
+        vaeDurationSec: KALING_VAE_1080_20.vaeDurationSec,
+        vaeResolution: KALING_VAE_1080_20.vaeResolution,
+    },
+    vae1080_30: {
+        nameKey: "modals.model_vae1080_30",
+        cost: KALING_VAE_1080_30.cost,
+        timeKey: "modals.model_vae1080_30_desc",
+        modelId: "129",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_1080_30.maxVideoSec,
+        vaeDurationSec: KALING_VAE_1080_30.vaeDurationSec,
+        vaeResolution: KALING_VAE_1080_30.vaeResolution,
     },
 };
 
@@ -2530,12 +2563,13 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
             blobDuration = MAX_VIDEO_DURATION_SEC + 1;
         }
     }
-    const needsTrim = blobDuration > MAX_VIDEO_DURATION_SEC + 0.15;
+    const tiktokMaxSec = getMaxVideoSecForSelectedModel();
+    const needsTrim = blobDuration > tiktokMaxSec + 0.15;
 
     if (needsTrim) {
         onProgress?.('trimming');
         try {
-            const trimmed = await trimVideoBlobToMaxSec(blob, MAX_VIDEO_DURATION_SEC);
+            const trimmed = await trimVideoBlobToMaxSec(blob, tiktokMaxSec);
             blob = trimmed.blob;
         } catch (trimErr) {
             console.error('[TikTok] trim failed:', trimErr);
@@ -2557,7 +2591,7 @@ async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
 
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
-        maxDurationSec: MAX_VIDEO_DURATION_SEC,
+        maxDurationSec: tiktokMaxSec,
         onChange: () => {
             fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
@@ -2611,7 +2645,7 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     const container = document.getElementById(containerId);
     if (!container || !file) return;
 
-    const maxDurationSec = options.maxDurationSec ?? MAX_VIDEO_DURATION_SEC;
+    const maxDurationSec = options.maxDurationSec ?? getMaxVideoSecForSelectedModel();
 
     if (file.size > MAX_VIDEO_FILE_BYTES) {
         showToast(t('modals.video_size_limit'));

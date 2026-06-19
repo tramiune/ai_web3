@@ -34,9 +34,19 @@ QUALITY_MODEL_IDS = frozenset({"127"})
 KALING_TURBO_MODEL_IDS = frozenset({"117"})
 KALING_VAE_10_MODEL_IDS = frozenset({"124"})
 KALING_VAE_20_MODEL_IDS = frozenset({"125"})
+KALING_VAE_1080_10_MODEL_IDS = frozenset({"126"})
+KALING_VAE_1080_20_MODEL_IDS = frozenset({"128"})
+KALING_VAE_1080_30_MODEL_IDS = frozenset({"129"})
+KALING_VAE_1080_MODEL_IDS = (
+    KALING_VAE_1080_10_MODEL_IDS
+    | KALING_VAE_1080_20_MODEL_IDS
+    | KALING_VAE_1080_30_MODEL_IDS
+)
 VAE_PACKAGE_10_DURATION_SEC = 10
 VAE_PACKAGE_20_DURATION_SEC = 20
-VAE_CREDITS_BY_DURATION = {10: 1, 20: 2}
+VAE_PACKAGE_30_DURATION_SEC = 30
+VAE_CREDITS_BY_DURATION = {10: 1, 20: 2, 30: 3}
+VAE_CREDITS_1080_BY_DURATION = {10: 2, 20: 4, 30: 6}
 DEFAULT_VAE_RESOLUTION = "720p"
 
 
@@ -334,37 +344,44 @@ def resolution_for_order(order_data: dict | None) -> str:
     if explicit:
         return normalize_vae_resolution(str(explicit))
     model_id = str(data.get("modelId") or "").strip()
-    if model_id in KALING_TURBO_MODEL_IDS:
+    if model_id in KALING_VAE_1080_MODEL_IDS or model_id in KALING_TURBO_MODEL_IDS:
         return normalize_vae_resolution("1080p")
     return normalize_vae_resolution(None)
 
 
 def normalize_vae_duration_sec(value: int | float | str | None) -> int:
-    """VAE chỉ có gói 10s (1 xu) hoặc 20s (2 xu)."""
+    """VAE: gói 10s, 20s hoặc 30s."""
     try:
         sec = int(float(value))
     except (TypeError, ValueError):
         return VAE_PACKAGE_10_DURATION_SEC
+    if sec >= 25:
+        return VAE_PACKAGE_30_DURATION_SEC
     if sec >= 15:
         return VAE_PACKAGE_20_DURATION_SEC
     return VAE_PACKAGE_10_DURATION_SEC
 
 
-def vae_credits_for_duration(duration_sec: int) -> int:
-    return VAE_CREDITS_BY_DURATION.get(int(duration_sec), 1)
+def vae_credits_for_duration(duration_sec: int, resolution: str | None = None) -> int:
+    dur = int(duration_sec)
+    if normalize_vae_resolution(resolution) == "1080p":
+        return VAE_CREDITS_1080_BY_DURATION.get(dur, 2)
+    return VAE_CREDITS_BY_DURATION.get(dur, 1)
 
 
 def duration_for_order(order_data: dict | None) -> int:
-    """Map đơn Kaling → gói VAE: 10s hoặc 20s."""
+    """Map đơn Kaling → gói VAE: 10s, 20s hoặc 30s."""
     data = order_data or {}
     for key in ("vaeDurationSec", "durationSec"):
         val = data.get(key)
         if val is not None:
             return normalize_vae_duration_sec(val)
     model_id = str(data.get("modelId") or "").strip()
-    if model_id in KALING_VAE_20_MODEL_IDS:
+    if model_id in KALING_VAE_1080_30_MODEL_IDS:
+        return VAE_PACKAGE_30_DURATION_SEC
+    if model_id in KALING_VAE_1080_20_MODEL_IDS or model_id in KALING_VAE_20_MODEL_IDS:
         return VAE_PACKAGE_20_DURATION_SEC
-    if model_id in KALING_VAE_10_MODEL_IDS:
+    if model_id in KALING_VAE_1080_10_MODEL_IDS or model_id in KALING_VAE_10_MODEL_IDS:
         return VAE_PACKAGE_10_DURATION_SEC
     return VAE_PACKAGE_10_DURATION_SEC
 
