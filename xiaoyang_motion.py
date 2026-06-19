@@ -108,7 +108,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
     _g["print"](
-        f"🎬 Engine: VideoAiEasy Kling 2.6 · {VAE_DURATION_KALING_SEC}s 720p (Kaling — không RoboNeo)"
+        "🎬 Kaling: gói 720p/10s → RoboNeo · gói 720p/20s & 1080p → VideoAiEasy (VAE)"
     )
 
 
@@ -192,9 +192,22 @@ def _use_videoaieasy() -> bool:
     return enabled_for_bot(_g.get("bot_name"))
 
 
+def _kaling_order_provider(order_data: dict) -> str:
+    """Gói 720p/10s (model 124) → RoboNeo; các gói khác → VideoAiEasy."""
+    rp = (order_data.get("renderProvider") or "").strip().lower()
+    if rp == RENDER_PROVIDER_ROBONEO:
+        return RENDER_PROVIDER_ROBONEO
+    if rp == RENDER_PROVIDER_VIDEOAIEASY:
+        return RENDER_PROVIDER_VIDEOAIEASY
+    model_id = str(order_data.get("modelId") or "").strip()
+    if model_id in KALING_VAE_MODEL_IDS and model_id == "124":
+        return RENDER_PROVIDER_ROBONEO
+    return RENDER_PROVIDER_VIDEOAIEASY
+
+
 def _order_target_provider(order_data: dict) -> str:
     if enabled_for_bot(_g.get("bot_name")):
-        return RENDER_PROVIDER_VIDEOAIEASY
+        return _kaling_order_provider(order_data)
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
     rp = (order_data.get("renderProvider") or "").strip().lower()
@@ -818,7 +831,7 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
 
 
 def submit_order(order_id: str):
-    """Kaling: chỉ VideoAiEasy Kling 2.6 (model 124, 10s)."""
+    """Kaling: RoboNeo (720p/10s) hoặc VideoAiEasy (các gói còn lại)."""
     db = _g["db"]
     doc_ref = db.collection("orders").document(order_id)
     doc = doc_ref.get()
@@ -841,6 +854,28 @@ def submit_order(order_id: str):
             f"clientVersion={client_version_label(data)}",
             USER_NOTE_CLIENT_OUTDATED,
             "client version",
+        )
+        return
+
+    provider = _kaling_order_provider(data)
+    if provider == RENDER_PROVIDER_ROBONEO:
+        import roboneo_motion as rb_motion
+
+        if rb_motion.submit_to_roboneo(order_id):
+            return
+        doc = doc_ref.get()
+        data = doc.to_dict() or {}
+        if data.get("status") != "pending":
+            return
+        if _g["pending_submit_backoff_active"](order_id):
+            print(f"⏸ RoboNeo chờ nick/slot — đơn {order_id}")
+            return
+        _fail_order_processing(
+            doc,
+            data,
+            "Không nạp được RoboNeo",
+            USER_NOTE_SUBMIT_FAILED,
+            "submit roboneo",
         )
         return
 
