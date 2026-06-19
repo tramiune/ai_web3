@@ -942,10 +942,6 @@
     <!-- Order Modal -->
     <div id="order-modal" class="modal-overlay">
         <div class="modal-content">
-            <div id="video-process-overlay" class="video-process-overlay" hidden aria-hidden="true">
-                <div class="spinner-ring video-process-spinner"></div>
-                <p id="video-process-overlay-text" class="loading-text video-process-text"></p>
-            </div>
             <span class="modal-close" onclick="closeModal('order-modal')" data-i18n="modals.close">&times;</span>
             <div class="modal-header order-modal-header">
                 <h2 data-i18n="modals.order_title">Tạo video mới</h2>
@@ -993,7 +989,7 @@
                                             onclick="window.fetchTikTokVideo()"
                                             data-i18n="modals.tiktok_fetch_btn">Lấy video</button>
                                     </div>
-                                    <div class="upload-note" data-i18n="modals.tiktok_tab_hint">Tải video rồi tự cắt theo gói đã chọn</div>
+                                    <div class="upload-note" data-i18n="modals.tiktok_tab_hint">Tự cắt còn 30s nếu video dài hơn</div>
                                     <div id="preview-tiktok-video-container" class="preview-container"></div>
                                 </div>
                             </div>
@@ -1005,7 +1001,7 @@
                                         onclick="event.stopPropagation(); document.getElementById('file-video').click()">
                                         Tải video
                                     </button>
-                                    <div class="upload-note" data-i18n="modals.video_note">Tự cắt theo gói đã chọn nếu video dài hơn. Nhân vật nên xuất hiện ngay từ đầu.</div>
+                                    <div class="upload-note" data-i18n="modals.video_note">Lưu ý: Đảm bảo nhân vật xuất hiện ngay từ đầu video.</div>
                                     <div id="preview-video-container" class="preview-container"></div>
                                 </div>
                                 <input type="file" id="file-video" accept="video/*" style="display:none"
@@ -1031,7 +1027,7 @@
                                         <span class="model-trial-badge" data-i18n="status.new">MỚI</span>
                                     </div>
                                     <div style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_rbTrial_desc">720p · 12s · 24h</div>
+                                        data-i18n="modals.model_rbTrial_desc">720p · 15s · 24h</div>
                                     <div id="rbtrial-countdown" class="model-trial-countdown"></div>
                                     <div
                                         style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
@@ -1384,7 +1380,7 @@
             <p class="auth-modal-desc" id="auth-modal-desc" data-i18n="modals.auth_desc_default" style="margin-bottom: 0.75rem;">Vào nhanh một xíu thôi nha — đăng nhập để <strong>lưu Coin</strong> và <strong>video của bạn</strong>.</p>
             <div class="auth-promo-pills" aria-label="Kaling highlights">
                 <span class="auth-promo-pill auth-promo-pill--hot" data-i18n="modals.auth_promo_rate">Nick mới · 3 coin</span>
-                <span class="auth-promo-pill" data-i18n="modals.auth_promo_motion">720p · 12s</span>
+                <span class="auth-promo-pill" data-i18n="modals.auth_promo_motion">720p · 15s</span>
                 <span class="auth-promo-pill" data-i18n="modals.auth_promo_max">24h đầu</span>
             </div>
 
