@@ -14,6 +14,8 @@ venv/
 
 # Bot Sensitive Data
 serviceAccountKey.json
+account_pool.json
+videoaieasy_session_*.json
 bot_chrome_profile/
 *.mp4
 *.png

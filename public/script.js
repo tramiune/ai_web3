@@ -1,14 +1,95 @@
 /**
- * script.js - Core logic for Nhay Cloud
+ * script.js - Core logic for Kaling Cloud
  */
+
+import { APP_CLIENT_VERSION } from "./app-version.js";
+
+export { APP_CLIENT_VERSION };
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
-const MAX_VIDEO_DURATION_SEC = 30;
-const VAE_DURATION_FAST_SEC = 15;
-const VAE_DURATION_TURBO_SEC = 15;
+const KALING_PRICING = { coinPerSec: 0.6, maxVideoSec: 13 };
+const MAX_VIDEO_DURATION_SEC = KALING_PRICING.maxVideoSec;
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
+
+/** Thời lượng video đã chọn — dùng tính giá động. */
+let kalingSelectedDurationSec = null;
+
+function kalingCoinsForDuration(sec) {
+    const d = Math.min(Math.max(Number(sec) || 0, 0.1), KALING_PRICING.maxVideoSec);
+    return Math.max(1, Math.ceil(d * KALING_PRICING.coinPerSec));
+}
+
+async function getVideoDurationFromUrl(url) {
+    if (!url) return null;
+    try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.crossOrigin = 'anonymous';
+        const duration = await new Promise((resolve, reject) => {
+            const cleanup = () => {
+                video.removeAttribute('src');
+                video.load();
+            };
+            video.onloadedmetadata = () => {
+                const d = Number(video.duration);
+                cleanup();
+                resolve(Number.isFinite(d) ? d : null);
+            };
+            video.onerror = () => {
+                cleanup();
+                reject(new Error('metadata error'));
+            };
+            video.src = url;
+        });
+        return duration;
+    } catch {
+        return null;
+    }
+}
+
+function isClientOlderThan(current, required) {
+    const a = String(current).split('.').map((x) => parseInt(x, 10) || 0);
+    const b = String(required).split('.').map((x) => parseInt(x, 10) || 0);
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+        const x = a[i] || 0;
+        const y = b[i] || 0;
+        if (x < y) return true;
+        if (x > y) return false;
+    }
+    return false;
+}
+
+async function ensureClientVersionGate() {
+    let minVer = APP_CLIENT_VERSION;
+    try {
+        const { db, doc, getDoc } = window.firebase;
+        const snap = await getDoc(doc(db, 'settings', 'client'));
+        if (snap.exists() && snap.data().minClientVersion != null) {
+            minVer = Number(snap.data().minClientVersion);
+        }
+    } catch (e) {
+        console.warn('[clientVersion] settings/client:', e);
+    }
+    window.__minClientVersion = minVer;
+    if (!isClientOlderThan(APP_CLIENT_VERSION, minVer)) return;
+
+    const bannerId = 'client-outdated-banner';
+    if (document.getElementById(bannerId)) return;
+    const banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.className = 'client-outdated-banner';
+    banner.innerHTML = `
+        <p>${t('modals.client_outdated_banner')}</p>
+        <button type="button" class="btn-primary client-outdated-refresh">${t('modals.client_outdated_refresh')}</button>
+    `;
+    banner.querySelector('button')?.addEventListener('click', () => {
+        window.location.reload();
+    });
+    document.body.prepend(banner);
+}
 
 // --- EmailJS Config ---
 const EMAILJS_SERVICE_ID = 'service_6r6rd2q';
@@ -110,31 +191,14 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 }
 
 // --- Data Constants ---
-const MODEL_COST_FAST = 6;
-const MODEL_COST_TURBO = 15;
-const DEFAULT_MODEL_KEY = 'fast';
-
-function getSelectedModelKey() {
-    const checked = document.querySelector('input[name="model-type"]:checked');
-    return checked ? checked.value : DEFAULT_MODEL_KEY;
-}
-
-function getMaxVideoDurationForModel(modelKey) {
-    if (modelKey === 'turbo') return VAE_DURATION_TURBO_SEC;
-    return VAE_DURATION_FAST_SEC;
-}
-
-function vaeDurationSecForModel(modelKey) {
-    return getMaxVideoDurationForModel(modelKey);
-}
-
-function vaeResolutionForModel(modelKey) {
-    return modelKey === 'turbo' ? '1080p' : '720p';
-}
+const MODEL_COST_FAST = 3;
+const MODEL_COST_TURBO = 10;
 
 function modelCoinCost(modelKey) {
-    if (modelKey === 'turbo') return MODEL_COST_TURBO;
-    return MODEL_COST_FAST;
+    if (kalingSelectedDurationSec != null) {
+        return kalingCoinsForDuration(kalingSelectedDurationSec);
+    }
+    return modelKey === 'turbo' ? MODEL_COST_TURBO : MODEL_COST_FAST;
 }
 
 function syncModelPriceLabels() {
@@ -264,18 +328,32 @@ function gatewayLabel(gateway) {
 }
 
 const MODELS = {
-    // "Model thường" uses Aidancing model id 124
-    fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "124" },
-    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "117" }
+    quality: {
+        nameKey: "modals.model_quality",
+        cost: 0,
+        timeKey: "modals.model_quality_desc",
+        modelId: "127",
+        renderProvider: "roboneo",
+        maxVideoSec: KALING_PRICING.maxVideoSec,
+    },
+    fast: { nameKey: "modals.model_fast", cost: MODEL_COST_FAST, timeKey: "modals.model_fast_desc", modelId: "127", renderProvider: "roboneo" },
+    turbo: { nameKey: "modals.model_turbo", cost: MODEL_COST_TURBO, timeKey: "modals.model_turbo_desc", modelId: "127", renderProvider: "roboneo" }
 };
 
 function localizedModel(key) {
-    const m = MODELS[key];
-    if (!m) return null;
+    const m = MODELS.quality;
+    const dur = kalingSelectedDurationSec;
+    const cost = dur != null ? kalingCoinsForDuration(dur) : null;
     return {
         ...m,
-        name: t(m.nameKey),
-        time: t(m.timeKey)
+        name: t('modals.kaling_package_name'),
+        time: t('modals.kaling_price_per_sec', {
+            rate: KALING_PRICING.coinPerSec,
+            max: KALING_PRICING.maxVideoSec,
+        }),
+        cost: cost ?? '—',
+        vaeDurationSec: dur != null ? Math.ceil(dur) : undefined,
+        renderProvider: m.renderProvider || 'roboneo',
     };
 }
 
@@ -283,6 +361,35 @@ const SERVICE_PACKAGES = [
     { id: 'plus', name: 'Plus', cost: MODEL_COST_FAST, featureKeys: ['services.plus_f1', 'services.plus_f2', 'services.plus_f3'], featured: true },
     { id: 'viral', name: 'Viral', cost: MODEL_COST_TURBO, featureKeys: ['services.viral_f1', 'services.viral_f2', 'services.viral_f3'] }
 ];
+
+async function getVideoDurationSeconds(file) {
+    if (!file) return null;
+    try {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        const duration = await new Promise((resolve, reject) => {
+            const cleanup = () => {
+                try { URL.revokeObjectURL(url); } catch { }
+                video.removeAttribute('src');
+                video.load();
+            };
+            video.onloadedmetadata = () => {
+                const d = Number(video.duration);
+                cleanup();
+                resolve(Number.isFinite(d) ? d : null);
+            };
+            video.onerror = () => {
+                cleanup();
+                reject(new Error('metadata error'));
+            };
+            video.src = url;
+        });
+        return duration;
+    } catch {
+        return null;
+    }
+}
 
 let currentUser = null;
 let selectedTopupPackage = null;
@@ -550,7 +657,6 @@ window.switchLanguage = (lang) => {
         else if (adminActiveTab === 'users') renderAdminUsers();
         else if (adminActiveTab === 'referrals') renderAdminReferrals();
         else if (adminActiveTab === 'bots') renderAdminBots();
-        else if (adminActiveTab === 'split-test') renderAdminSplitTests();
     }
 };
 
@@ -662,6 +768,7 @@ export async function initAppLogic() {
 
     // Call again after dynamic parts are rendered
     applyTranslations();
+    await ensureClientVersionGate();
 }
 
 // --- In-app browser (TikTok / Facebook / …) ---
@@ -1330,7 +1437,6 @@ async function handleUserLoggedIn(user) {
             window.__currentUserData = data;
             window.__isAdmin = isAdmin;
             window.__isSuperAdmin = isSuperAdmin;
-            checkMaintenance();
 
             if (isAdmin) {
                 const adminProfileItem = document.getElementById('admin-dropdown-item-profile');
@@ -1462,7 +1568,6 @@ function handleUserLoggedOut() {
     updateReferralNavVisibility(false);
     window.__isSuperAdmin = false;
     window.__currentUserData = null;
-    checkMaintenance();
     adminSubscribedOrderStatus = null;
     adminSubscribedTopupStatus = null;
     Object.keys(FB_CACHE).forEach(k => { delete FB_CACHE[k]; });
@@ -1766,7 +1871,8 @@ window.switchVideoSource = (type) => {
         if (existing?.type?.startsWith('video/')) {
             renderVideoFilePreview('preview-video-container', existing, {
                 inputId: 'file-video',
-                changeKey: 'modals.video_change'
+                changeKey: 'modals.video_change',
+                maxDurationSec: MAX_VIDEO_DURATION_SEC
             });
         }
     } else if (type === 'tiktok') {
@@ -1881,7 +1987,7 @@ window.closeTemplatePreview = () => {
     }
 };
 
-window.selectTemplate = (id, url) => {
+window.selectTemplate = async (id, url) => {
     document.querySelectorAll('.template-item').forEach(el => el.classList.remove('active'));
     const item = document.getElementById(`tpl-${id}`);
     if (item) item.classList.add('active');
@@ -1889,6 +1995,15 @@ window.selectTemplate = (id, url) => {
     window.currentVideoSource = 'library';
     const trend = TREND_VIDEOS.find(t => t.id === id);
     showToast(t('modals.toast_trend_selected', { title: trend ? trendTitle(trend) : id }));
+    const dur = await getVideoDurationFromUrl(url);
+    if (dur != null && dur > KALING_PRICING.maxVideoSec + 0.15) {
+        showToast(t('modals.video_duration_limit', { sec: KALING_PRICING.maxVideoSec }));
+        document.getElementById('selected-template-url').value = '';
+        kalingSelectedDurationSec = null;
+    } else {
+        kalingSelectedDurationSec = dur;
+    }
+    updateFirstOrderUI();
 };
 
 window.currentVideoSource = 'upload';
@@ -1925,12 +2040,10 @@ window.closeModal = (id) => {
 };
 
 window.openTopupModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     window.openPricingModal();
 };
 
 window.openPricingModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     if (!currentUser) return login();
     renderPricing();
     window.openModal('pricing-modal');
@@ -2090,8 +2203,8 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
     const amount = selectedTopupPackage.amount;
     const bankId = "OCB";
-    const accNo = "CASS03121403";
-    const accName = "CAO THI QUYNH TRAM";
+    const accNo = "CASS0965951536";
+    const accName = "VAN DINH HOANG";
     const qrUrl = `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accName)}`;
 
     qrImg.src = qrUrl;
@@ -2100,7 +2213,6 @@ window.selectTopup = async (id, method = 'vietqr') => {
 };
 
 window.openOrderModal = () => {
-    if (blockIfUpgradeMaintenance()) return;
     updateFirstOrderUI();
     window.switchVideoSource('upload');
     window.openModal('order-modal');
@@ -2139,27 +2251,28 @@ function updateFirstOrderUI() {
 
     if (offerBanner) offerBanner.style.display = 'none';
     if (guestOfferBar) guestOfferBar.style.display = 'none';
-    if (modelGroupEl) modelGroupEl.style.display = 'block';
-
-    const modelKey = getSelectedModelKey();
+    if (modelGroupEl) modelGroupEl.style.display = 'none';
 
     if (costEl) {
         const submitBtn = document.getElementById('order-submit-btn');
         const submitText = submitBtn ? submitBtn.querySelector('[data-i18n="hero.cta_create"]') : null;
         const summaryEl = document.getElementById('submit-summary-line');
         const checkedModel = document.querySelector('input[name="model-type"]:checked');
-        const activeModelKey = checkedModel ? checkedModel.value : DEFAULT_MODEL_KEY;
+        const modelKey = checkedModel ? checkedModel.value : 'fast';
+        const lm = localizedModel(modelKey);
 
-        costEl.innerText = String(modelCoinCost(activeModelKey));
+        if (lm && lm.cost !== '—') {
+            costEl.innerText = String(lm.cost);
+        } else {
+            costEl.innerText = '—';
+        }
         if (submitBtn) submitBtn.classList.remove('btn-first-offer');
         if (submitText) submitText.innerText = t('hero.cta_create');
         if (summaryEl) {
-            summaryEl.innerText = t(`modals.model_${activeModelKey}_desc`);
+            summaryEl.innerText = lm ? lm.time : t(`modals.model_${modelKey}_desc`);
             summaryEl.style.color = '';
         }
     }
-
-    // Bot cắt video theo gói — web không cần xử lý lại khi đổi model.
 }
 
 window.closeOfferBar = () => {
@@ -2204,6 +2317,7 @@ function appendPreviewChangeButton(container, inputId, labelKey) {
 }
 
 const TIKWM_API = 'https://www.tikwm.com/api/';
+let _ffmpegLoadPromise = null;
 
 function isTikTokPageUrl(raw) {
     try {
@@ -2224,7 +2338,8 @@ function tiktokErrorMessage(code) {
         fetch_failed: 'modals.tiktok_fetch_failed',
         video_download: 'modals.tiktok_fetch_failed',
         tikwm_parse: 'modals.tiktok_fetch_failed',
-        no_video: 'modals.tiktok_fetch_failed'
+        no_video: 'modals.tiktok_fetch_failed',
+        trim_failed: 'modals.tiktok_trim_failed'
     }[code] || 'modals.tiktok_fetch_failed';
     return t(msgKey);
 }
@@ -2300,69 +2415,127 @@ async function downloadTikTokVideoBlob(pageUrl) {
     }
 }
 
-function setFileInputFromFile(inputId, file) {
-    const input = document.getElementById(inputId);
-    if (!input || !file) return false;
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-    return true;
+async function getBlobVideoDurationSec(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.src = url;
+        await new Promise((resolve, reject) => {
+            video.onloadedmetadata = () => resolve();
+            video.onerror = () => reject(new Error('metadata'));
+        });
+        return video.duration;
+    } finally {
+        URL.revokeObjectURL(url);
+    }
 }
 
-function renderVideoPreviewContent(container, file, options = {}) {
-    container.innerHTML = '';
-    const previewVideo = document.createElement('video');
-    const previewUrl = URL.createObjectURL(file);
-    previewVideo.src = previewUrl;
-    previewVideo.muted = true;
-    previewVideo.loop = true;
-    previewVideo.playsInline = true;
-    previewVideo.setAttribute('playsinline', '');
-    previewVideo.setAttribute('webkit-playsinline', '');
-    previewVideo.preload = 'metadata';
-    previewVideo.controls = false;
-    previewVideo.disablePictureInPicture = true;
-    previewVideo.style.width = '100%';
-    previewVideo.style.height = '100%';
-    previewVideo.style.objectFit = 'cover';
-    previewVideo.style.borderRadius = '8px';
-    previewVideo.addEventListener('loadeddata', () => {
-        try {
-            previewVideo.pause();
-            previewVideo.currentTime = 0;
-        } catch (_) { /* ignore */ }
-    }, { once: true });
-
-    container.appendChild(previewVideo);
-
-    if (options.onChange) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'preview-change-btn btn-primary order-upload-btn';
-        btn.textContent = t(options.changeKey || 'modals.video_change');
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            options.onChange();
+async function loadFfmpegForTrim() {
+    if (!_ffmpegLoadPromise) {
+        _ffmpegLoadPromise = (async () => {
+            const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+            const { toBlobURL, fetchFile } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
+            const ffmpeg = new FFmpeg();
+            const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+            await ffmpeg.load({
+                coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm')
+            });
+            return { ffmpeg, fetchFile };
+        })().catch((err) => {
+            _ffmpegLoadPromise = null;
+            throw err;
         });
-        container.appendChild(btn);
-    } else if (options.inputId) {
-        appendPreviewChangeButton(container, options.inputId, options.changeKey || 'modals.video_change');
+    }
+    return _ffmpegLoadPromise;
+}
+
+async function trimVideoBlobToMaxSec(blob, maxSec = MAX_VIDEO_DURATION_SEC) {
+    let duration;
+    try {
+        duration = await getBlobVideoDurationSec(blob);
+    } catch (_) {
+        duration = Infinity;
+    }
+    if (isFinite(duration) && duration <= maxSec + 0.15) {
+        return { blob, trimmed: false };
     }
 
-    syncUploadZonePreviewState(container);
+    const { ffmpeg, fetchFile } = await loadFfmpegForTrim();
+    const inputName = 'tiktok_in.mp4';
+    const outputName = 'tiktok_out.mp4';
+    await ffmpeg.writeFile(inputName, await fetchFile(blob));
+
+    try {
+        await ffmpeg.exec(['-i', inputName, '-t', String(maxSec), '-c', 'copy', '-movflags', '+faststart', outputName]);
+    } catch (_) {
+        await ffmpeg.exec([
+            '-i', inputName,
+            '-t', String(maxSec),
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '28',
+            '-c:a', 'aac',
+            '-b:a', '96k',
+            '-movflags', '+faststart',
+            outputName
+        ]);
+    }
+
+    const outData = await ffmpeg.readFile(outputName);
+    try {
+        await ffmpeg.deleteFile(inputName);
+        await ffmpeg.deleteFile(outputName);
+    } catch (_) { /* ignore */ }
+
+    const outBytes = outData instanceof Uint8Array ? outData : new Uint8Array(outData);
+    return {
+        blob: new Blob([outBytes], { type: 'video/mp4' }),
+        trimmed: true
+    };
 }
 
-async function applyTikTokVideoFromUrl(pageUrl) {
-    const { blob } = await downloadTikTokVideoBlob(pageUrl);
+async function applyTikTokVideoFromUrl(pageUrl, options = {}) {
+    const { onProgress } = options;
+    const { blob: initialBlob, duration: metaDuration } = await downloadTikTokVideoBlob(pageUrl);
+    let blob = initialBlob;
     if (blob.size > MAX_VIDEO_FILE_BYTES) {
         throw Object.assign(new Error(t('modals.video_size_limit')), { code: 'size_limit' });
+    }
+
+    let blobDuration = metaDuration;
+    if (!isFinite(blobDuration)) {
+        try {
+            blobDuration = await getBlobVideoDurationSec(blob);
+        } catch (_) {
+            blobDuration = MAX_VIDEO_DURATION_SEC + 1;
+        }
+    }
+    const needsTrim = blobDuration > MAX_VIDEO_DURATION_SEC + 0.15;
+
+    if (needsTrim) {
+        onProgress?.('trimming');
+        try {
+            const trimmed = await trimVideoBlobToMaxSec(blob, MAX_VIDEO_DURATION_SEC);
+            blob = trimmed.blob;
+        } catch (trimErr) {
+            console.error('[TikTok] trim failed:', trimErr);
+            throw Object.assign(new Error(t('modals.tiktok_trim_failed')), { code: 'trim_failed' });
+        }
     }
 
     const file = new File([blob], 'tiktok_video.mp4', { type: 'video/mp4' });
     const fileInput = document.getElementById('file-video');
     if (!fileInput) throw Object.assign(new Error(t('common.error')), { code: 'fetch_failed' });
 
-    setFileInputFromFile('file-video', file);
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
 
     const templateInput = document.getElementById('selected-template-url');
     if (templateInput) templateInput.value = '';
@@ -2370,6 +2543,7 @@ async function applyTikTokVideoFromUrl(pageUrl) {
 
     renderVideoFilePreview('preview-tiktok-video-container', file, {
         changeKey: 'modals.tiktok_pick_another',
+        maxDurationSec: MAX_VIDEO_DURATION_SEC,
         onChange: () => {
             fileInput.value = '';
             const tiktokPreview = document.getElementById('preview-tiktok-video-container');
@@ -2381,7 +2555,7 @@ async function applyTikTokVideoFromUrl(pageUrl) {
         }
     });
 
-    return { file };
+    return { file, trimmed: needsTrim };
 }
 
 window.fetchTikTokVideo = async () => {
@@ -2400,8 +2574,13 @@ window.fetchTikTokVideo = async () => {
     showToast(t('modals.tiktok_fetching'));
 
     try {
-        await applyTikTokVideoFromUrl(pageUrl);
-        showToast(t('modals.tiktok_fetch_success'));
+        const { trimmed } = await applyTikTokVideoFromUrl(pageUrl, {
+            onProgress: (phase) => {
+                if (phase === 'trimming' && btn) btn.textContent = t('modals.tiktok_trimming');
+                if (phase === 'trimming') showToast(t('modals.tiktok_trimming'));
+            }
+        });
+        showToast(trimmed ? t('modals.tiktok_fetch_trimmed') : t('modals.tiktok_fetch_success'));
     } catch (e) {
         console.error('[TikTok] fetch failed:', e);
         showToast(e.code ? tiktokErrorMessage(e.code) : (e.message || t('modals.tiktok_fetch_failed')));
@@ -2418,6 +2597,8 @@ function renderVideoFilePreview(containerId, file, options = {}) {
     const container = document.getElementById(containerId);
     if (!container || !file) return;
 
+    const maxDurationSec = options.maxDurationSec ?? MAX_VIDEO_DURATION_SEC;
+
     if (file.size > MAX_VIDEO_FILE_BYTES) {
         showToast(t('modals.video_size_limit'));
         if (options.inputId) {
@@ -2429,8 +2610,75 @@ function renderVideoFilePreview(containerId, file, options = {}) {
         return;
     }
 
-    container.innerHTML = '';
-    renderVideoPreviewContent(container, file, options);
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.muted = true;
+    probe.playsInline = true;
+    const probeUrl = URL.createObjectURL(file);
+    probe.onloadedmetadata = () => {
+        const duration = probe.duration;
+        URL.revokeObjectURL(probeUrl);
+        if (duration > maxDurationSec + 0.15) {
+            showToast(t('modals.video_duration_limit', { sec: maxDurationSec }));
+            if (options.inputId) {
+                const input = document.getElementById(options.inputId);
+                if (input) input.value = '';
+            }
+            container.innerHTML = '';
+            syncUploadZonePreviewState(container);
+            kalingSelectedDurationSec = null;
+            updateFirstOrderUI();
+            return;
+        }
+
+        kalingSelectedDurationSec = duration;
+        updateFirstOrderUI();
+        container.innerHTML = '';
+        const previewVideo = document.createElement('video');
+        const previewUrl = URL.createObjectURL(file);
+        previewVideo.src = previewUrl;
+        previewVideo.muted = true;
+        previewVideo.loop = true;
+        previewVideo.playsInline = true;
+        previewVideo.setAttribute('playsinline', '');
+        previewVideo.setAttribute('webkit-playsinline', '');
+        previewVideo.preload = 'metadata';
+        previewVideo.controls = false;
+        previewVideo.disablePictureInPicture = true;
+        previewVideo.style.width = '100%';
+        previewVideo.style.height = '100%';
+        previewVideo.style.objectFit = 'cover';
+        previewVideo.style.borderRadius = '8px';
+        previewVideo.addEventListener('loadeddata', () => {
+            try {
+                previewVideo.pause();
+                previewVideo.currentTime = 0;
+            } catch (_) { /* ignore */ }
+        }, { once: true });
+
+        container.appendChild(previewVideo);
+
+        if (options.onChange) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'preview-change-btn btn-primary order-upload-btn';
+            btn.textContent = t(options.changeKey || 'modals.video_change');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                options.onChange();
+            });
+            container.appendChild(btn);
+        } else if (options.inputId) {
+            appendPreviewChangeButton(container, options.inputId, options.changeKey || 'modals.video_change');
+        }
+
+        syncUploadZonePreviewState(container);
+    };
+    probe.onerror = () => {
+        URL.revokeObjectURL(probeUrl);
+        showToast(t('modals.tiktok_fetch_failed'));
+    };
+    probe.src = probeUrl;
 }
 
 window.handlePreview = (input, containerId) => {
@@ -2472,7 +2720,8 @@ window.handlePreview = (input, containerId) => {
     } else if (file.type.startsWith('video/')) {
         renderVideoFilePreview(containerId, file, {
             inputId: meta.inputId,
-            changeKey: meta.changeKey
+            changeKey: meta.changeKey,
+            maxDurationSec: MAX_VIDEO_DURATION_SEC
         });
     }
 };
@@ -2584,13 +2833,16 @@ async function setupEventListeners() {
         orderForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            if (blockIfUpgradeMaintenance()) return;
-
             if (!currentUser) {
                 // Nếu chưa đăng nhập thì hiện Auth Modal
                 const authModal = document.getElementById('auth-modal');
                 if (authModal) authModal.style.display = 'flex';
                 showToast(t('common.toast_login_required'));
+                return;
+            }
+
+            if (window.__minClientVersion != null && isClientOlderThan(APP_CLIENT_VERSION, window.__minClientVersion)) {
+                showToast(t('modals.client_outdated_banner'));
                 return;
             }
 
@@ -2603,7 +2855,8 @@ async function setupEventListeners() {
                 let videoFile = document.getElementById('file-video')?.files?.[0];
                 const templateUrl = document.getElementById('selected-template-url')?.value || '';
                 const tiktokUrl = document.getElementById('tiktok-video-url')?.value?.trim() || '';
-                const modelKeySelected = document.querySelector('input[name="model-type"]:checked')?.value || DEFAULT_MODEL_KEY;
+                const modelKeySelected = 'quality';
+                let modelIdOverride = null;
 
                 if (!charFile) {
                     const charZone = document.querySelector('#file-char')?.closest('.upload-zone');
@@ -2628,7 +2881,13 @@ async function setupEventListeners() {
                     if (mainTextFetch) mainTextFetch.innerText = t('modals.tiktok_fetching');
                     showToast(t('modals.tiktok_fetch_on_submit'));
                     try {
-                        const result = await applyTikTokVideoFromUrl(tiktokUrl);
+                        const result = await applyTikTokVideoFromUrl(tiktokUrl, {
+                            onProgress: (phase) => {
+                                if (phase === 'trimming' && mainTextFetch) {
+                                    mainTextFetch.innerText = t('modals.tiktok_trimming');
+                                }
+                            }
+                        });
                         videoFile = result.file;
                     } catch (tiktokErr) {
                         console.error('[TikTok] auto fetch on submit:', tiktokErr);
@@ -2642,6 +2901,23 @@ async function setupEventListeners() {
                 if (window.currentVideoSource === 'upload' && !videoFile) {
                     return showToast(t('modals.video_upload_required'));
                 }
+
+                let kalingDurationSec = kalingSelectedDurationSec;
+                const maxSec = KALING_PRICING.maxVideoSec;
+                if (videoFile) {
+                    kalingDurationSec = await getVideoDurationSeconds(videoFile);
+                } else if (window.currentVideoSource === 'library') {
+                    const tpl = document.getElementById('selected-template-url')?.value || '';
+                    kalingDurationSec = tpl ? await getVideoDurationFromUrl(tpl) : null;
+                }
+                if (kalingDurationSec == null || !Number.isFinite(kalingDurationSec)) {
+                    return showToast(t('modals.video_upload_required'));
+                }
+                if (kalingDurationSec > maxSec + 0.15) {
+                    return showToast(t('modals.video_duration_limit', { sec: maxSec }));
+                }
+                kalingSelectedDurationSec = kalingDurationSec;
+                updateFirstOrderUI();
 
                 // Kiểm tra lại lần cuối trước khi upload
                 if (charFile.size > MAX_CHAR_FILE_BYTES) return showToast(t('modals.char_size_limit'));
@@ -2662,9 +2938,18 @@ async function setupEventListeners() {
                     const modelKey = modelKeySelected;
                     const serviceType = document.querySelector('input[name="service-type"]:checked').value;
                     let model = normalizeOrderCost({ ...localizedModel(modelKey) });
+                    if (modelIdOverride) model.modelId = modelIdOverride;
+
+                    if (kalingDurationSec != null) {
+                        model.cost = kalingCoinsForDuration(kalingDurationSec);
+                        model.vaeDurationSec = Math.ceil(kalingDurationSec);
+                    }
 
                     if (userDoc.data().coins < model.cost) {
                         throw t('modals.insufficient_coins_title');
+                    }
+                    if (!Number.isFinite(Number(model.cost)) || Number(model.cost) < 1) {
+                        throw t('modals.video_upload_required');
                     }
                     return { currentCoins: userDoc.data().coins, model, serviceType };
                 });
@@ -2711,16 +2996,16 @@ async function setupEventListeners() {
                         userName: currentUser.displayName,
                         packageName: model.name,
                         modelId: model.modelId,
+                        renderProvider: model.renderProvider || "roboneo",
+                        ...(model.vaeDurationSec ? { vaeDurationSec: model.vaeDurationSec } : {}),
                         serviceType: serviceType,
                         serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
                         costCoins: model.cost,
                         promo1Coin: !!model.promo1Coin,
+                        clientVersion: APP_CLIENT_VERSION,
                         characterImageLink: charUrl,
                         referenceVideoLink: videoUrl,
                         aspectRatio: aspectRatio,
-                        vaeDurationSec: vaeDurationSecForModel(modelKeySelected),
-                        vaeResolution: vaeResolutionForModel(modelKeySelected),
-                        renderProvider: 'videoaieasy',
                         status: "pending",
                         resultLink: "",
                         adminNote: "",
@@ -2884,12 +3169,8 @@ function userFacingOrderNote(order) {
     return raw
         .replace(/\bXiaoYang\b/gi, 'hệ thống')
         .replace(/\bAidancing\b/gi, 'hệ thống')
-        .replace(/\bVideoAiEasy\b/gi, 'hệ thống')
-        .replace(/\bKling\b/gi, 'AI')
         .replace(/\baidancing\.net\b/gi, 'hệ thống')
-        .replace(/\bxiaoyang\.online\b/gi, 'hệ thống')
-        .replace(/\bvideoaieasy\.[^\s]+/gi, 'hệ thống')
-        .replace(/\bhdgr\.online\b/gi, 'hệ thống');
+        .replace(/\bxiaoyang\.online\b/gi, 'hệ thống');
 }
 
 function renderMyOrders() {
@@ -3084,153 +3365,26 @@ window.viewFullImage = (url) => {
     modal.style.display = 'flex';
 };
 
-// --- Maintenance (one-time upgrade 14/06 20:30 → 18/06 23:59 VN) ---
-const UPGRADE_MAINTENANCE = {
-    start: { y: 2026, m: 6, d: 14, h: 20, min: 30 },
-    end: { y: 2026, m: 6, d: 18, h: 23, min: 59 },
-};
-
-function getVietnamDateParts(date = new Date()) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).formatToParts(date);
-    const get = (type) => parts.find((p) => p.type === type)?.value || '0';
-    const hour = +get('hour');
-    const minute = +get('minute');
-    return {
-        year: +get('year'),
-        month: +get('month'),
-        day: +get('day'),
-        hour,
-        minute,
-        totalMinutes: hour * 60 + minute,
-    };
-}
-
-function vietnamTimestamp(point) {
-    const pad = (n) => String(n).padStart(2, '0');
-    const h = point.h ?? point.hour ?? 0;
-    const min = point.min ?? point.minute ?? 0;
-    return new Date(
-        `${point.y}-${pad(point.m)}-${pad(point.d)}T${pad(h)}:${pad(min)}:00+07:00`
-    ).getTime();
-}
-
-function currentVietnamTimestamp() {
-    const vp = getVietnamDateParts();
-    return vietnamTimestamp({ y: vp.year, m: vp.month, d: vp.day, h: vp.hour, min: vp.minute });
-}
-
-function isUpgradeMaintenanceActive() {
-    const now = currentVietnamTimestamp();
-    return now >= vietnamTimestamp(UPGRADE_MAINTENANCE.start)
-        && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
-}
-
-function isUpgradeMaintenanceNotice() {
-    const now = currentVietnamTimestamp();
-    return now < vietnamTimestamp(UPGRADE_MAINTENANCE.start)
-        && now < vietnamTimestamp(UPGRADE_MAINTENANCE.end);
-}
-
-window.isUpgradeMaintenanceBlocked = () =>
-    isUpgradeMaintenanceActive() && !window.__isAdmin;
-
-function blockIfUpgradeMaintenance() {
-    if (!window.isUpgradeMaintenanceBlocked()) return false;
-    showToast(typeof t === 'function' ? t('dashboard.maintenance_upgrade_block_msg') : 'Hệ thống đang bảo trì nâng cấp đến hết ngày 18/06 (23:59). Vui lòng quay lại sau đó.');
-    return true;
-}
-
-const MAINTENANCE_SURVEY_KEY = 'kaling_price_jun2026';
-const MAINTENANCE_SURVEY_STORAGE = 'kaling_maint_survey_vote_v1';
-let _maintenanceSurveyInited = false;
-
-function applyMaintenanceSurveyVote(choice) {
-    const wrap = document.getElementById('upgrade-maintenance-survey');
-    if (!wrap) return;
-    wrap.querySelectorAll('[data-survey-choice]').forEach((btn) => {
-        const picked = btn.dataset.surveyChoice === choice;
-        btn.classList.toggle('is-selected', picked);
-        btn.disabled = true;
-    });
-    const thanks = document.getElementById('upgrade-maintenance-survey-thanks');
-    if (thanks) thanks.hidden = false;
-}
-
-async function submitMaintenanceSurvey(choice) {
-    if (!choice || localStorage.getItem(MAINTENANCE_SURVEY_STORAGE)) return;
-    localStorage.setItem(MAINTENANCE_SURVEY_STORAGE, choice);
-    applyMaintenanceSurveyVote(choice);
-    try {
-        const { db, collection, addDoc, serverTimestamp } = window.firebase;
-        if (!db) return;
-        await addDoc(collection(db, 'maintenanceSurveys'), {
-            surveyKey: MAINTENANCE_SURVEY_KEY,
-            choice,
-            createdAt: serverTimestamp(),
-            userId: currentUser?.uid || null,
-            userEmail: currentUser?.email || null,
-            userAgent: (navigator.userAgent || '').slice(0, 200),
-        });
-    } catch (err) {
-        console.warn('maintenance survey save failed:', err);
-    }
-}
-
-function initMaintenanceSurvey() {
-    if (_maintenanceSurveyInited) return;
-    _maintenanceSurveyInited = true;
-    const wrap = document.getElementById('upgrade-maintenance-survey');
-    if (!wrap) return;
-    wrap.querySelectorAll('[data-survey-choice]').forEach((btn) => {
-        btn.addEventListener('click', () => submitMaintenanceSurvey(btn.dataset.surveyChoice));
-    });
-    const saved = localStorage.getItem(MAINTENANCE_SURVEY_STORAGE);
-    if (saved) applyMaintenanceSurveyVote(saved);
-}
-
 function checkMaintenance() {
-    const vp = getVietnamDateParts();
-    const totalMinutes = vp.totalMinutes;
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const totalMinutes = hour * 60 + minute;
 
-    // Nightly maintenance from 00:30 to 07:00
-    const maintenanceStart = 0 * 60 + 30;
-    const maintenanceEnd = 7 * 60;
-    const isNightlyMaintenance = totalMinutes >= maintenanceStart && totalMinutes < maintenanceEnd;
+    // Maintenance from 00:30 to 07:00
+    const maintenanceStart = 0 * 60 + 30; // 00:30
+    const maintenanceEnd = 7 * 60; // 07:00
+
+    const isMaintenance = totalMinutes >= maintenanceStart && totalMinutes < maintenanceEnd;
 
     const banner = document.getElementById('maintenance-banner');
     if (banner) {
-        banner.style.display = isNightlyMaintenance ? 'flex' : 'none';
-    }
-
-    const notice = document.getElementById('upgrade-maintenance-notice');
-    if (notice) {
-        notice.hidden = !isUpgradeMaintenanceNotice();
-    }
-
-    const blockModal = document.getElementById('upgrade-maintenance-block');
-    if (blockModal) {
-        const active = isUpgradeMaintenanceActive() && !window.__isAdmin;
-        blockModal.hidden = !active;
-        document.body.classList.toggle('upgrade-maintenance-locked', active);
-        if (active) {
-            document.querySelectorAll('.modal-overlay, .auth-modal-overlay').forEach((el) => {
-                el.style.display = 'none';
-            });
-        }
+        banner.style.display = isMaintenance ? 'flex' : 'none';
     }
 }
 
-// Check every 30s so popup/block activates on time
-setInterval(checkMaintenance, 30000);
-initMaintenanceSurvey();
+// Check every minute
+setInterval(checkMaintenance, 60000);
 
 // --- Admin Dashboard Logic ---
 window.switchAdminTab = (tabName) => {
@@ -3440,13 +3594,18 @@ function renderAdminRenderProviderUI() {
     const btnAd = document.getElementById('admin-rp-aidancing');
     const btnXy = document.getElementById('admin-rp-xiaoyang');
     const btnVae = document.getElementById('admin-rp-videoaieasy');
-    if (btnAd) btnAd.style.display = 'none';
-    if (btnXy) btnXy.style.display = 'none';
-    if (btnVae) btnVae.style.display = 'none';
+    const p = adminActiveRenderProvider;
     if (activeEl) {
-        activeEl.textContent = t('admin.render_provider_active_vae_only');
-        activeEl.style.color = '#fbbf24';
+        activeEl.textContent = p === 'videoaieasy'
+            ? t('admin.render_provider_active_vae')
+            : p === 'xiaoyang'
+                ? t('admin.render_provider_active_xy')
+                : t('admin.render_provider_active_ad');
+        activeEl.style.color = p === 'videoaieasy' ? '#fbbf24' : p === 'xiaoyang' ? '#a78bfa' : '#4ade80';
     }
+    if (btnAd) btnAd.style.outline = p === 'aidancing' ? '2px solid #4ade80' : '';
+    if (btnXy) btnXy.style.outline = p === 'xiaoyang' ? '2px solid #a78bfa' : '';
+    if (btnVae) btnVae.style.outline = p === 'videoaieasy' ? '2px solid #fbbf24' : '';
     if (queueEl) {
         refreshRenderProviderQueueHint(queueEl);
     }
@@ -4311,7 +4470,7 @@ window.deleteTopup = async (event, topupId) => {
 //   5) Switch tab (orders/topups/users) -> unsub các tab khác (Mức 3: subscribe per active tab).
 //   6) Tất cả query admin có orderBy('createdAt','desc') + limit(100) (Mức 2).
 
-let adminActiveTab = 'orders';            // 'orders' | 'topups' | 'users' | 'referrals' | 'bots' | 'split-test'
+let adminActiveTab = 'orders';            // 'orders' | 'topups' | 'users' | 'referrals' | 'bots'
 let adminSubscribedOrderStatus = null;    // status đang sub cho orders
 let adminSubscribedTopupStatus = null;    // status đang sub cho topups
 let adminSearchDebounceTimer = null;
@@ -4384,7 +4543,6 @@ function setupAdminSearchInputOnce() {
             else if (adminActiveTab === 'users') renderAdminUsers();
             else if (adminActiveTab === 'referrals') renderAdminReferrals();
             else if (adminActiveTab === 'bots') renderAdminBots();
-        else if (adminActiveTab === 'split-test') renderAdminSplitTests();
         }, 300);
     });
     window.adminSearchInited = true;
@@ -4396,7 +4554,6 @@ function loadAdminPanel() {
     console.log("Loading Admin Panel...");
     if (!window.__isAdmin) return;
     setupAdminSearchInputOnce();
-    setupAdminSplitTestFormOnce();
     refreshActiveAdminSubscription();
 }
 
@@ -4410,7 +4567,6 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferralAllowlist');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
-        fbUnsub('adminSplitTests');
         return;
     }
 
@@ -4420,7 +4576,6 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
-        fbUnsub('adminSplitTests');
         subscribeAdminOrders();
     } else if (adminActiveTab === 'topups') {
         fbUnsub('adminOrders');
@@ -4428,7 +4583,6 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
-        fbUnsub('adminSplitTests');
         subscribeAdminTopups();
     } else if (adminActiveTab === 'users') {
         fbUnsub('adminOrders');
@@ -4436,7 +4590,6 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminReferrals');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
-        fbUnsub('adminSplitTests');
         subscribeAdminUsers();
     } else if (adminActiveTab === 'referrals') {
         fbUnsub('adminOrders');
@@ -4444,7 +4597,6 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminUsers');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
-        fbUnsub('adminSplitTests');
         subscribeAdminReferrals();
         subscribeAdminReferralAllowlist();
     } else if (adminActiveTab === 'bots') {
@@ -4452,147 +4604,8 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminTopups');
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
-        fbUnsub('adminSplitTests');
         subscribeAdminBots();
-    } else if (adminActiveTab === 'split-test') {
-        fbUnsub('adminOrders');
-        fbUnsub('adminTopups');
-        fbUnsub('adminUsers');
-        fbUnsub('adminReferrals');
-        fbUnsub('adminBots');
-        fbUnsub('adminRenderProvider');
-        subscribeAdminSplitTests();
     }
-}
-
-// ----- SPLIT TEST (Turbo 10s = 2×5s VAE) -----
-let adminSplitTestFormInited = false;
-
-function setupAdminSplitTestFormOnce() {
-    if (adminSplitTestFormInited) return;
-    const form = document.getElementById('admin-split-test-form');
-    if (!form) return;
-    adminSplitTestFormInited = true;
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!window.__isAdmin || !currentUser) return;
-
-        const charFile = document.getElementById('split-test-char')?.files?.[0];
-        const videoFile = document.getElementById('split-test-video')?.files?.[0];
-        const aspect = document.getElementById('split-test-aspect')?.value || '9:16';
-        const btn = document.getElementById('split-test-submit-btn');
-        if (!charFile || !videoFile) return showToast(t('common.error'));
-
-        try {
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = t('admin.split_test_creating');
-            }
-            const charUrl = await uploadFile(charFile, 'characters');
-            const videoUrl = await uploadFile(videoFile, 'motions');
-            const { db, doc, collection, setDoc, serverTimestamp } = window.firebase;
-            const orderRef = doc(collection(db, 'orders'));
-            await setDoc(orderRef, {
-                userId: currentUser.uid,
-                userEmail: currentUser.email,
-                userName: currentUser.displayName || 'Admin',
-                packageName: 'Turbo Split Test',
-                modelId: '117',
-                serviceType: 'copy-motion-photo',
-                serviceLabel: SERVICE_TYPE_MAP()['copy-motion-photo'] || 'copy-motion-photo',
-                costCoins: 0,
-                promo1Coin: false,
-                characterImageLink: charUrl,
-                referenceVideoLink: videoUrl,
-                aspectRatio: aspect,
-                vaeDurationSec: 10,
-                vaeResolution: '720p',
-                vaeSplitMode: 'dual_5s',
-                renderProvider: 'videoaieasy',
-                adminTest: true,
-                status: 'pending',
-                resultLink: '',
-                adminNote: 'split 2x5s test',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            showToast(t('admin.split_test_created'));
-            form.reset();
-            switchAdminTab('split-test');
-        } catch (err) {
-            console.error('[SplitTest]', err);
-            showToast(err.message || t('common.error'));
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                applyTranslations();
-            }
-        }
-    });
-}
-
-function subscribeAdminSplitTests() {
-    const { db, collection, query, where, onSnapshot, limit } = window.firebase;
-    if (fbHas('adminSplitTests')) {
-        renderAdminSplitTests();
-        return;
-    }
-    const q = query(
-        collection(db, 'orders'),
-        where('vaeSplitMode', '==', 'dual_5s'),
-        limit(25)
-    );
-    fbSub('adminSplitTests', onSnapshot(q, (snapshot) => {
-        FB_CACHE.adminSplitTests = snapshot.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => {
-                const ta = a.createdAt?.toMillis?.() ?? 0;
-                const tb = b.createdAt?.toMillis?.() ?? 0;
-                return tb - ta;
-            });
-        renderAdminSplitTests();
-    }, (error) => {
-        console.error('Split test snapshot error:', error);
-        showToast(error.message || t('common.error'));
-    }));
-}
-
-function renderAdminSplitTests() {
-    const el = document.getElementById('admin-split-test-list');
-    if (!el) return;
-    const docs = FB_CACHE.adminSplitTests || [];
-    if (!docs.length) {
-        el.innerHTML = `<p style="opacity:0.6;text-align:center;padding:2rem;">${t('admin.split_test_empty')}</p>`;
-        return;
-    }
-    el.innerHTML = docs.map((d) => {
-        const shortId = d.id.slice(-6).toUpperCase();
-        const stage = d.vaeSplitStage || d.status || 'pending';
-        const part = d.vaeSplitPart != null ? ` · part ${d.vaeSplitPart}` : '';
-        const created = safeToDate(d.createdAt);
-        const dateStr = created ? created.toLocaleString('vi-VN') : '';
-        const statusColor = d.status === 'completed' ? '#4ade80' : d.status === 'failed' ? '#f87171' : '#fbbf24';
-        const resultBlock = d.resultLink ? `
-            <div style="margin-top:0.75rem;">
-                <video src="${d.resultLink}" controls playsinline style="width:100%;max-width:360px;border-radius:8px;background:#000;"></video>
-                <a href="${d.resultLink}" target="_blank" rel="noopener" class="btn-secondary" style="margin-top:0.5rem;display:inline-block;font-size:0.8rem;">${t('admin.split_test_view_result')}</a>
-            </div>` : '';
-        return `
-            <div class="glass-card" style="padding:1rem;">
-                <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-                    <div>
-                        <strong style="font-family:monospace;color:var(--accent);">#${shortId}</strong>
-                        <span style="margin-left:0.5rem;font-size:0.85rem;color:${statusColor};">${escapeHTML(d.status)}</span>
-                    </div>
-                    <small style="opacity:0.6;">${dateStr}</small>
-                </div>
-                <div style="font-size:0.8rem;opacity:0.75;margin-top:0.35rem;">
-                    ${t('admin.split_test_stage')}: <code>${escapeHTML(String(stage))}</code>${part}
-                </div>
-                ${resultBlock}
-                <button type="button" class="btn-secondary" style="margin-top:0.5rem;font-size:0.75rem;padding:4px 10px;" onclick="window.openAdminDetail('${d.id}')">${t('admin.update_btn')}</button>
-            </div>`;
-    }).join('');
 }
 
 // ----- TOPUPS -----

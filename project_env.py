@@ -8,7 +8,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent
 _LOADED = False
 
-_ENV_PREFIXES = ("XIAOYANG_", "BOT_", "AIDANCING_", "R2_", "TELEGRAM_")
+_ENV_PREFIXES = ("XIAOYANG_", "BOT_", "AIDANCING_", "R2_", "TELEGRAM_", "ROBONEO_", "HUANAIHUB_", "PROXY_", "VIDEOAIEASY_")
 
 
 def _clean_val(val: str) -> str:

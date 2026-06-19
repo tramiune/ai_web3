@@ -5,7 +5,6 @@ Video AI Easy (videoaieasy.hdgr.online) — web session cho kaling (web3) bot.
 from __future__ import annotations
 
 import base64
-import binascii
 import json
 import mimetypes
 import os
@@ -31,8 +30,7 @@ AUTH_COOKIE = "sb-gfevyulgkydodmlfnquh-auth-token"
 
 MODEL_KLING_26 = "kling-2.6"
 MODEL_KLING_30 = "kling-3.0"
-DEFAULT_VAE_RESOLUTION = "720p"
-KALING_TURBO_MODEL_IDS = frozenset({"117"})
+QUALITY_MODEL_IDS = frozenset({"127"})
 
 
 class VideoAiEasyError(RuntimeError):
@@ -90,23 +88,6 @@ class VideoAiEasyClient:
         }
         self.session_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    def _decode_auth_cookie(self, raw: str) -> dict:
-        if not raw.startswith("base64-"):
-            raise VideoAiEasyAuthError("Chưa có session cookie")
-        try:
-            return json.loads(base64.b64decode(raw[7:], validate=False).decode("utf-8"))
-        except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise VideoAiEasyAuthError(f"Cookie session hỏng — login lại ({exc})") from exc
-
-    def _clear_session(self) -> None:
-        self.session.cookies.clear()
-        self._user_email = None
-        if self.session_file.is_file():
-            try:
-                self.session_file.unlink()
-            except OSError:
-                pass
-
     def _load_session(self) -> None:
         if not self.session_file.is_file():
             return
@@ -115,11 +96,10 @@ class VideoAiEasyClient:
             name = data.get("cookie_name") or AUTH_COOKIE
             value = data.get("cookie_value") or ""
             if value:
-                self._decode_auth_cookie(value)
                 self.session.cookies.set(name, value, domain="videoaieasy.hdgr.online", path="/")
             self._user_email = data.get("email")
         except Exception:
-            self._clear_session()
+            pass
 
     def _api(self, method: str, path: str, **kwargs) -> dict:
         timeout = kwargs.pop("timeout", 120)
@@ -171,8 +151,7 @@ class VideoAiEasyClient:
         try:
             self._probe_origin_session()
             return self.get_profile()
-        except (VideoAiEasyAuthError, VideoAiEasyError, binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
-            self._clear_session()
+        except (VideoAiEasyAuthError, VideoAiEasyError):
             self.login(email, password)
             self._probe_origin_session()
             return self.get_profile()
@@ -197,7 +176,9 @@ class VideoAiEasyClient:
 
     def _access_token(self) -> str:
         raw = self.session.cookies.get(AUTH_COOKIE, "")
-        payload = self._decode_auth_cookie(raw)
+        if not raw.startswith("base64-"):
+            raise VideoAiEasyAuthError("Chưa có session cookie")
+        payload = json.loads(base64.b64decode(raw[7:]).decode("utf-8"))
         token = payload.get("access_token")
         if not token:
             raise VideoAiEasyAuthError("Cookie không có access_token")
@@ -205,7 +186,9 @@ class VideoAiEasyClient:
 
     def _current_user(self) -> dict:
         raw = self.session.cookies.get(AUTH_COOKIE, "")
-        payload = self._decode_auth_cookie(raw)
+        if not raw.startswith("base64-"):
+            raise VideoAiEasyAuthError("Chưa đăng nhập")
+        payload = json.loads(base64.b64decode(raw[7:]).decode("utf-8"))
         user = payload.get("user") or {}
         if not user.get("id"):
             raise VideoAiEasyAuthError("Cookie không hợp lệ")
@@ -248,7 +231,6 @@ class VideoAiEasyClient:
         driving_video_url: str,
         prompt: str = "",
         model_id: str = MODEL_KLING_26,
-        resolution: str | None = None,
     ) -> str:
         body = {
             "mode": "motion-control",
@@ -258,7 +240,6 @@ class VideoAiEasyClient:
             )).strip(),
             "inputImageUrl": input_image_url.strip(),
             "drivingVideoUrl": driving_video_url.strip(),
-            "resolution": normalize_vae_resolution(resolution),
         }
         resp = self._api(
             "POST",
@@ -324,103 +305,3 @@ class VideoAiEasyClient:
                 return False
             print(f"⚠️ VideoAiEasy delete job {job_id}: {e}")
             return False
-
-
-def normalize_vae_resolution(value: str | None) -> str:
-    raw = (value or get_env("VIDEOAIEASY_DEFAULT_RESOLUTION", DEFAULT_VAE_RESOLUTION)).strip().lower()
-    if raw in ("1080", "1080p", "hd", "full_hd", "fullhd"):
-        return "1080p"
-    if raw in ("480", "480p"):
-        return "480p"
-    return "720p"
-
-
-def resolution_for_order(order_data: dict | None) -> str:
-    data = order_data or {}
-    explicit = data.get("vaeResolution") or data.get("resolution") or data.get("videoResolution")
-    if explicit:
-        return normalize_vae_resolution(str(explicit))
-    model_id = str(data.get("modelId") or "").strip()
-    if model_id in KALING_TURBO_MODEL_IDS:
-        return normalize_vae_resolution("1080p")
-    return normalize_vae_resolution(None)
-
-
-def _parse_vae_aspect_ratio(aspect_ratio: str | None) -> float:
-    raw = (aspect_ratio or get_env("VIDEOAIEASY_IMAGE_ASPECT", "9:16")).strip().lower()
-    if raw in ("9:16", "vertical", "portrait", "dọc"):
-        return 9 / 16
-    if raw in ("16:9", "horizontal", "landscape", "ngang"):
-        return 16 / 9
-    if ":" in raw:
-        left, right = raw.split(":", 1)
-        try:
-            a, b = float(left), float(right)
-            if a > 0 and b > 0:
-                return a / b
-        except ValueError:
-            pass
-    return 9 / 16
-
-
-def prepare_character_image_for_vae(
-    image_path: str,
-    *,
-    aspect_ratio: str | None = None,
-) -> tuple[str, bool]:
-    """Pad đen (letterbox/pillarbox) + resize trước upload VideoAiEasy."""
-    try:
-        from PIL import Image
-    except ImportError as e:
-        raise VideoAiEasyError(
-            "Thiếu Pillow — cài: pip install Pillow"
-        ) from e
-
-    import tempfile
-
-    max_long = int(get_env("VIDEOAIEASY_IMAGE_MAX_LONG_EDGE", "2752"))
-    ratio_tol = float(get_env("VIDEOAIEASY_IMAGE_RATIO_TOLERANCE", "0.015"))
-    jpeg_q = int(get_env("VIDEOAIEASY_IMAGE_JPEG_QUALITY", "92"))
-
-    image_path = os.path.abspath(image_path)
-    if not os.path.isfile(image_path):
-        raise VideoAiEasyError(f"File không tồn tại: {image_path}")
-
-    target = _parse_vae_aspect_ratio(aspect_ratio)
-    with Image.open(image_path) as opened:
-        img = opened.convert("RGB")
-    orig_w, orig_h = img.size
-    current = orig_w / orig_h if orig_h else target
-
-    needs_pad = abs(current - target) / target > ratio_tol
-    needs_resize = max(orig_w, orig_h) > max_long
-    if not needs_pad and not needs_resize:
-        return image_path, False
-
-    if needs_pad:
-        if current > target:
-            canvas_w, canvas_h = orig_w, max(1, int(round(orig_w / target)))
-        else:
-            canvas_h, canvas_w = orig_h, max(1, int(round(orig_h * target)))
-        canvas = Image.new("RGB", (canvas_w, canvas_h), (0, 0, 0))
-        canvas.paste(img, ((canvas_w - orig_w) // 2, (canvas_h - orig_h) // 2))
-        img = canvas
-
-    w, h = img.size
-    if max(w, h) > max_long:
-        scale = max_long / max(w, h)
-        img = img.resize(
-            (max(1, int(round(w * scale))), max(1, int(round(h * scale)))),
-            Image.Resampling.LANCZOS,
-        )
-
-    out_w, out_h = img.size
-    fd, out_path = tempfile.mkstemp(suffix=".jpg")
-    os.close(fd)
-    img.save(out_path, format="JPEG", quality=jpeg_q)
-    ar_label = aspect_ratio or get_env("VIDEOAIEASY_IMAGE_ASPECT", "9:16")
-    print(
-        f"🖼️ VAE ảnh {orig_w}×{orig_h} → {out_w}×{out_h} "
-        f"(pad đen + resize, tỉ lệ {ar_label})"
-    )
-    return out_path, True

@@ -9,7 +9,7 @@ import queue
 import requests
 import firebase_admin
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from playwright.sync_api import sync_playwright
@@ -59,92 +59,27 @@ _processing_cache_refresh_at = 0.0
 _pending_order_queue = []
 _pending_queue_lock = threading.Lock()
 _pending_worker_started = False
-
-# Bảo trì nâng cấp — khớp public/script.js UPGRADE_MAINTENANCE (admin test bypass)
-_VN_TZ = timezone(timedelta(hours=7))
-_UPGRADE_MAINTENANCE_START = datetime(2026, 6, 14, 20, 30, tzinfo=_VN_TZ)
-_UPGRADE_MAINTENANCE_END = datetime(2026, 6, 18, 23, 59, tzinfo=_VN_TZ)
-_ADMIN_ROLES = frozenset({"admin", "super-admin"})
-_SUPER_ADMIN_EMAILS = frozenset({
-    "traderfinn0312@gmail.com",
-    "dinhhoangvan.hh@gmail.com",
-})
-_admin_role_cache = {}
-_admin_role_cache_lock = threading.Lock()
-
-
-def _is_upgrade_maintenance_active() -> bool:
-    now = datetime.now(_VN_TZ)
-    return _UPGRADE_MAINTENANCE_START <= now < _UPGRADE_MAINTENANCE_END
-
-
-def _is_admin_order(order_data: dict) -> bool:
-    email = (order_data.get("userEmail") or "").strip().lower()
-    if email in _SUPER_ADMIN_EMAILS:
-        return True
-    user_id = (order_data.get("userId") or "").strip()
-    if not user_id:
-        return False
-    with _admin_role_cache_lock:
-        if user_id in _admin_role_cache:
-            return _admin_role_cache[user_id]
-    is_admin = False
-    try:
-        doc = db.collection("users").document(user_id).get()
-        role = (doc.to_dict() or {}).get("role") if doc.exists else None
-        is_admin = role in _ADMIN_ROLES
-    except Exception as e:
-        print(f"⚠️ Đọc role user {user_id}: {e}")
-    with _admin_role_cache_lock:
-        _admin_role_cache[user_id] = is_admin
-    return is_admin
-
-
-def _should_bot_process_order(order_id: str) -> bool:
-    """Trong cửa sổ bảo trì: bot chỉ nạp đơn của admin (test)."""
-    if not _is_upgrade_maintenance_active():
-        return True
-    try:
-        doc = db.collection("orders").document(order_id).get()
-        if not doc.exists:
-            return False
-        if not _is_admin_order(doc.to_dict() or {}):
-            print(f"⏸️ [{BOT_NAME}] Bảo trì test — bỏ qua đơn {order_id} (không phải admin)")
-            return False
-    except Exception as e:
-        print(f"⚠️ Kiểm tra admin đơn {order_id}: {e}")
-        return False
-    return True
-
 _submitting_orders = set()
 _submitting_orders_lock = threading.Lock()
 MIN_RENDER_SEC = int(os.environ.get("BOT_MIN_RENDER_SEC", "600"))
 VIDEOAIEASY_MIN_RENDER_SEC = int(os.environ.get("VIDEOAIEASY_MIN_RENDER_SEC", "600"))
-VIDEOAIEASY_POLL_INTERVAL_SEC = int(os.environ.get("VIDEOAIEASY_POLL_INTERVAL_SEC", "60"))
 RENDER_PROVIDER_AIDANCING = "aidancing"
 RENDER_PROVIDER_XIAOYANG = "xiaoyang"
 RENDER_PROVIDER_VIDEOAIEASY = "videoaieasy"
-RENDER_PROVIDER_TOOL98 = "tool98"
+RENDER_PROVIDER_ROBONEO = "roboneo"
 _RENDER_PROVIDERS = (
     RENDER_PROVIDER_AIDANCING,
     RENDER_PROVIDER_XIAOYANG,
     RENDER_PROVIDER_VIDEOAIEASY,
-    RENDER_PROVIDER_TOOL98,
+    RENDER_PROVIDER_ROBONEO,
 )
 AIDANCING_TURBO_MODEL_IDS = frozenset({"117"})
 AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
-from user_order_notes import (
-    USER_NOTE_FILES_MISSING,
-    USER_NOTE_ORDER_FAILED,
-    USER_NOTE_SUBMIT_FAILED,
-    USER_NOTE_VIDEO_INVALID,
-    user_note_for_media_validation,
-    user_note_for_render_failure,
-)
-
-USER_NOTE_FILES_INVALID = USER_NOTE_VIDEO_INVALID
+USER_NOTE_ORDER_FAILED = "Đơn hàng xử lý không thành công, hệ thống đã hoàn lại coin."
+USER_NOTE_SUBMIT_FAILED = "Không thể gửi đơn lên hệ thống xử lý, đã hoàn lại coin."
+USER_NOTE_FILES_INVALID = "Ảnh hoặc video quý khách tải lên không hợp lệ, hệ thống đã hoàn lại coin."
 _active_render_provider = RENDER_PROVIDER_XIAOYANG
 _active_render_provider_lock = threading.Lock()
 _processing_cache = {}
@@ -206,8 +141,8 @@ def _order_render_provider(order_data: dict) -> str:
     rp = (order_data.get("renderProvider") or "").strip().lower()
     if rp in _RENDER_PROVIDERS:
         return rp
-    if order_data.get("tool98JobId"):
-        return RENDER_PROVIDER_TOOL98
+    if order_data.get("roboneoTaskId"):
+        return RENDER_PROVIDER_ROBONEO
     if order_data.get("videoaieasyJobId"):
         return RENDER_PROVIDER_VIDEOAIEASY
     if order_data.get("xiaoyangTaskId"):
@@ -371,9 +306,7 @@ def _http_poll_orders(orders_to_check):
             order_data = doc.to_dict()
             err_detail = f'Aidancing job {job_id} {status}: {job.get("errorMessage") or ""}'
             _fail_order_processing(
-                doc, order_data, err_detail,
-                user_note_for_render_failure(job.get("errorMessage")),
-                'render aidancing',
+                doc, order_data, err_detail, USER_NOTE_ORDER_FAILED, 'render aidancing'
             )
         else:
             print(f"⏳ Job {job_id} vẫn {status}")
@@ -422,9 +355,6 @@ def start_render_provider_listener():
 
 
 def _fail_order_processing(doc, order_data, err_detail, system_note, context: str):
-    if xy_motion.enabled_for_bot(BOT_NAME):
-        if xy_motion.fail_or_tool98_fallback(doc, order_data, err_detail, system_note, context):
-            return
     notify_internal_error_telegram(doc.id, order_data, err_detail, context)
     cost_coins = order_data.get("costCoins", 0)
     user_id = order_data.get("userId")
@@ -478,7 +408,7 @@ def _http_poll_xiaoyang_orders(orders_to_check):
                 doc,
                 order_data,
                 f"XiaoYang task {task_id} FAIL: {err or ''}",
-                user_note_for_render_failure(err),
+                USER_NOTE_ORDER_FAILED,
                 "render xiaoyang",
             )
             api.try_delete_task(task_id)
@@ -581,18 +511,21 @@ def _reset_persistent_api():
 
 
 def _min_render_sec_for_order(order_data: dict) -> int:
-    if _order_render_provider(order_data) == RENDER_PROVIDER_VIDEOAIEASY:
+    rp = _order_render_provider(order_data)
+    if rp == RENDER_PROVIDER_VIDEOAIEASY:
         return VIDEOAIEASY_MIN_RENDER_SEC
+    if rp == RENDER_PROVIDER_ROBONEO:
+        return int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
     return MIN_RENDER_SEC
 
 
 def _processing_monitor_state():
-    """Đọc từ RAM — poll sau min_render theo từng engine (VAE: 10p mặc định)."""
+    """Đọc từ RAM — poll sau min_render theo từng engine."""
     now = datetime.now(timezone.utc)
     ad_eligible = []
     xy_eligible = []
     vae_eligible = []
-    tool98_eligible = []
+    rb_eligible = []
     vae_processing_count = 0
     with _processing_cache_lock:
         stale_ids = []
@@ -614,46 +547,36 @@ def _processing_monitor_state():
             min_render_sec = _min_render_sec_for_order(d)
             if submitted_at and (now - submitted_at).total_seconds() <= min_render_sec:
                 continue
-            if rp == RENDER_PROVIDER_TOOL98:
-                if d.get("tool98JobId"):
-                    tool98_eligible.append(doc)
-            elif rp == RENDER_PROVIDER_XIAOYANG:
+            if rp == RENDER_PROVIDER_XIAOYANG:
                 if d.get("xiaoyangTaskId"):
                     xy_eligible.append(doc)
             elif rp == RENDER_PROVIDER_VIDEOAIEASY:
                 if d.get("videoaieasyJobId"):
                     vae_eligible.append(doc)
+            elif rp == RENDER_PROVIDER_ROBONEO:
+                if d.get("roboneoTaskId"):
+                    rb_eligible.append(doc)
             else:
                 job_id = d.get("aidancingJobId")
                 if job_id and job_id != "MANUAL":
                     ad_eligible.append(doc)
-    return ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing_count, vae_processing_count
+    return ad_eligible, xy_eligible, vae_eligible, rb_eligible, processing_count, vae_processing_count
 
 
-def on_processing_orders_snapshot(snapshot, changes, read_time):
-    """Đồng bộ cache từ snapshot đầy đủ — tránh mất đơn khi listener reconnect (GOAWAY)."""
+def on_processing_orders_snapshot(keys, changes, read_time):
+    """Listener: chỉ read Firestore khi đơn vào/ra khỏi processing (không poll lặp)."""
     with _processing_cache_lock:
-        fresh = {}
-        for doc in snapshot:
+        for ch in changes:
+            doc = ch.document
+            oid = doc.id
+            if ch.type.name == 'REMOVED':
+                _processing_cache.pop(oid, None)
+                continue
             d = doc.to_dict() or {}
-            if d.get("status") == "processing":
-                fresh[doc.id] = doc
-        _processing_cache.clear()
-        _processing_cache.update(fresh)
-
-
-def _refresh_processing_cache_from_firestore():
-    fresh = {
-        doc.id: doc
-        for doc in db.collection("orders")
-        .where(filter=FieldFilter("status", "==", "processing"))
-        .stream()
-    }
-    with _processing_cache_lock:
-        _processing_cache.clear()
-        _processing_cache.update(fresh)
-    print(f"🔄 Refresh processing cache: {len(fresh)} đơn")
-    return len(fresh)
+            if d.get('status') == 'processing':
+                _processing_cache[oid] = doc
+            else:
+                _processing_cache.pop(oid, None)
 
 
 def start_processing_listener():
@@ -661,10 +584,6 @@ def start_processing_listener():
         filter=FieldFilter("status", "==", "processing")
     ).on_snapshot(on_processing_orders_snapshot)
     print("👂 Listener processing orders — cache RAM, không query Firestore mỗi lần poll")
-    try:
-        _refresh_processing_cache_from_firestore()
-    except Exception as e:
-        print(f"⚠️ Nạp processing cache lúc khởi động: {e}")
 
 
 def _submit_engine_lock():
@@ -677,26 +596,33 @@ def _maybe_refresh_processing_cache():
     global _processing_cache_refresh_at
     if not use_api_mode():
         return
-    interval = int(os.environ.get("BOT_PROCESSING_CACHE_REFRESH_SEC", "120"))
+    interval = int(os.environ.get("BOT_PROCESSING_CACHE_REFRESH_SEC", "600"))
     now = time.time()
     if now - _processing_cache_refresh_at < interval:
         return
     _processing_cache_refresh_at = now
     try:
-        _refresh_processing_cache_from_firestore()
+        fresh = {
+            doc.id: doc
+            for doc in db.collection("orders")
+            .where(filter=FieldFilter("status", "==", "processing"))
+            .stream()
+        }
+        with _processing_cache_lock:
+            _processing_cache.clear()
+            _processing_cache.update(fresh)
+        print(f"🔄 Refresh processing cache: {len(fresh)} đơn")
     except Exception as e:
         print(f"⚠️ Refresh processing cache: {e}")
 
 
-def _monitor_sleep_seconds(eligible_count, processing_count, *, vae_processing_count=0):
-    """Không có webhook aidancing — chỉ poll; VAE: 1p/lần khi có đơn VAE đang chạy."""
+def _monitor_sleep_seconds(eligible_count, processing_count):
+    """Không có webhook aidancing — chỉ poll; interval dài khi không có việc."""
     idle = int(os.environ.get("BOT_POLL_IDLE_SEC", "300"))
     wait_render = int(os.environ.get("BOT_POLL_WAIT_RENDER_SEC", "120"))
     active = int(os.environ.get("BOT_POLL_ACTIVE_SEC", "90"))
     if processing_count == 0:
         return idle
-    if vae_processing_count > 0:
-        return VIDEOAIEASY_POLL_INTERVAL_SEC
     if eligible_count == 0:
         return wait_render
     return active
@@ -753,8 +679,6 @@ def _pending_order_worker():
             if _pending_order_queue:
                 order_id = _pending_order_queue.pop(0)
         if order_id:
-            if not _should_bot_process_order(order_id):
-                continue
             try:
                 if xy_motion.enabled_for_bot(BOT_NAME):
                     xy_motion.submit_order(order_id)
@@ -1367,49 +1291,26 @@ def _complete_order_with_video(doc, local_vid):
     return True
 
 def check_finished_orders_api():
-    """Monitor Aidancing + XiaoYang + VideoAiEasy — Pure HTTP (không giữ browser_lock)."""
+    """Monitor RoboNeo — Kaling không poll Aidancing/XiaoYang/VideoAiEasy."""
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
-    ad_orders, xy_orders, vae_orders, tool98_orders, _, _ = _processing_monitor_state()
-    if not ad_orders and not xy_orders and not vae_orders and not tool98_orders:
+    _, _, _, rb_orders, _, _ = _processing_monitor_state()
+    if not rb_orders:
         return
 
+    rb_wait = int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
     print(
-        f"\n🔍 [MONITOR/HTTP] Poll Aidancing={len(ad_orders)} XiaoYang={len(xy_orders)} "
-        f"VideoAiEasy={len(vae_orders)} Tool98={len(tool98_orders)} "
-        f"(VAE: sau {VIDEOAIEASY_MIN_RENDER_SEC // 60}p, mỗi {VIDEOAIEASY_POLL_INTERVAL_SEC}s; "
-        f"khác: sau {MIN_RENDER_SEC // 60}p)..."
+        f"\n🔍 [MONITOR/HTTP] Poll RoboNeo={len(rb_orders)} "
+        f"(sau {rb_wait // 60}p từ submittedAt)..."
     )
-    if ad_orders:
+    if rb_orders and xy_motion.enabled_for_bot(BOT_NAME):
         try:
-            _http_poll_orders(ad_orders)
-        except SessionExpiredError as e:
-            print(f"❌ Session hết hạn: {e}")
-            _reset_http_client()
+            import roboneo_motion as rb_motion
+
+            rb_motion.poll_roboneo_orders(rb_orders)
         except Exception as e:
-            err = str(e)
-            print(f"❌ Lỗi monitor Aidancing HTTP: {e}")
-            if any(x in err.lower() for x in ("401", "403", "session expired", "aidancing_cookie")):
-                _reset_http_client()
-    if xy_orders:
-        try:
-            if xy_motion.enabled_for_bot(BOT_NAME):
-                xy_motion.poll_xiaoyang_orders(xy_orders)
-            else:
-                _http_poll_xiaoyang_orders(xy_orders)
-        except Exception as e:
-            print(f"❌ Lỗi monitor XiaoYang: {e}")
-    if vae_orders and xy_motion.enabled_for_bot(BOT_NAME):
-        try:
-            xy_motion.poll_videoaieasy_orders(vae_orders)
-        except Exception as e:
-            print(f"❌ Lỗi monitor VideoAiEasy: {e}")
-    if tool98_orders and xy_motion.enabled_for_bot(BOT_NAME):
-        try:
-            xy_motion.poll_tool98_orders(tool98_orders)
-        except Exception as e:
-            print(f"❌ Lỗi monitor Tool98: {e}")
+            print(f"❌ Lỗi monitor RoboNeo: {e}")
 
 def _mark_order_processing(
     doc_ref,
@@ -1435,6 +1336,31 @@ def _mark_order_processing(
 
 
 def submit_order(order_id):
+    doc_ref = db.collection("orders").document(order_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return
+    data = doc.to_dict() or {}
+    if data.get("status") != "pending":
+        return
+    from client_version import client_version_label, client_version_ok, min_client_version
+
+    if not client_version_ok(data):
+        print(
+            f"⛔ Đơn {order_id} — client cũ v{client_version_label(data)} "
+            f"(cần ≥ {min_client_version()})"
+        )
+        from user_order_notes import USER_NOTE_CLIENT_OUTDATED
+
+        _fail_order_processing(
+            doc,
+            data,
+            f"clientVersion={client_version_label(data)}",
+            USER_NOTE_CLIENT_OUTDATED,
+            "client version",
+        )
+        return
+
     provider = get_active_render_provider()
     if provider == RENDER_PROVIDER_XIAOYANG:
         submit_to_xiaoyang(order_id)
@@ -1472,7 +1398,7 @@ def submit_to_xiaoyang(order_id):
                     doc,
                     data,
                     "Thiếu characterImageLink hoặc referenceVideoLink",
-                    USER_NOTE_FILES_MISSING,
+                    "Thiếu ảnh hoặc video tham chiếu, hệ thống đã hoàn lại coin.",
                     "submit xiaoyang",
                 )
                 return
@@ -1533,10 +1459,7 @@ def submit_to_xiaoyang(order_id):
                         _invalidate_xy_key(key_idx)
                     except NameError:
                         pass
-                if isinstance(e, MediaValidationError):
-                    user_note = user_note_for_media_validation(str(e))
-                else:
-                    user_note = USER_NOTE_SUBMIT_FAILED
+                user_note = USER_NOTE_FILES_INVALID if isinstance(e, MediaValidationError) else USER_NOTE_SUBMIT_FAILED
                 _fail_order_processing(doc, data, str(e), user_note, "submit xiaoyang")
     finally:
         with _submitting_orders_lock:
@@ -1596,8 +1519,7 @@ def submit_to_aidancing(order_id, fallback_reason=None):
 
                 doc_ref.update({
                     'status': 'failed',
-                    'adminNote': firestore.DELETE_FIELD,
-                    'systemNote': USER_NOTE_FILES_MISSING,
+                    'adminNote': 'Ảnh hoặc video quý khách tải lên không tồn tại, hệ thống đã hoàn lại coin.',
                     'updatedAt': firestore.SERVER_TIMESTAMP
                 })
 
@@ -1912,8 +1834,7 @@ def check_finished_orders():
 
                             db.collection('orders').document(doc.id).update({
                                 'status': 'failed',
-                                'adminNote': firestore.DELETE_FIELD,
-                                'systemNote': user_note_for_render_failure(text),
+                                'adminNote': 'Ảnh hoặc video quý khách tải lên không hợp lệ, hệ thống đã hoàn lại coin.',
                                 'updatedAt': firestore.SERVER_TIMESTAMP
                             })
 
@@ -1951,8 +1872,6 @@ def on_pending_orders_snapshot(keys, changes, read_time):
             with _submitting_orders_lock:
                 if oid in _submitting_orders:
                     continue
-            if not _should_bot_process_order(oid):
-                continue
             if oid not in _pending_order_queue:
                 _pending_order_queue.append(oid)
                 print(f"📋 Xếp hàng nạp đơn: {oid} (còn {len(_pending_order_queue)} trong queue)")
@@ -1975,8 +1894,6 @@ def _enqueue_pending_rescan():
                 with _submitting_orders_lock:
                     if oid in _submitting_orders:
                         continue
-                if not _should_bot_process_order(oid):
-                    continue
                 if oid not in _pending_order_queue:
                     _pending_order_queue.append(oid)
                     print(f"🔄 Hàng đợi thử lại đơn pending: {oid}")
@@ -1992,7 +1909,7 @@ def _rescan_pending_orders_loop():
 
 def start_bot():
     global BOT_NAME
-    parser = argparse.ArgumentParser(description='Kaling order bot — aidancing.net + xiaoyang')
+    parser = argparse.ArgumentParser(description='Kaling order bot — RoboNeo only')
     parser.add_argument('--name', required=True, help='Tên bot duy nhất (vd: aidancing-vps1, bot-may-nha)')
     parser.add_argument('--mode', choices=['browser', 'api', 'http'], default=None,
                         help='browser=Playwright; api/http=Pure HTTP (cookie + XY, không Chrome)')
@@ -2004,7 +1921,7 @@ def start_bot():
         print("❌ Tên bot không hợp lệ. Dùng: python bot.py --name aidancing-vps1")
         sys.exit(1)
 
-    print(f"📡 Kaling BOT [{BOT_NAME}] (v1.0 xy+ad - mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
+    print(f"📡 Kaling BOT [{BOT_NAME}] (RoboNeo-only — mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
     cdp_url = os.environ.get("BOT_CDP_URL", "").strip()
     if cdp_url:
         if ensure_cdp_available(cdp_url):
@@ -2013,6 +1930,24 @@ def start_bot():
             print(f"⚠️  BOT_CDP_URL={cdp_url} nhưng Chrome chưa mở CDP!")
             print("    → Mở Chrome CDP ở terminal KHÁC trước, giữ chạy, rồi bot mới nối được.")
     if xy_motion.enabled_for_bot(BOT_NAME):
+        import roboneo_motion as rb_motion
+
+        rb_motion.wire(
+            db=db,
+            bot_name=BOT_NAME,
+            processing_cache=_processing_cache,
+            processing_cache_lock=_processing_cache_lock,
+            is_bot_enabled=is_bot_enabled,
+            pending_submit_backoff_active=_pending_submit_backoff_active,
+            submitting_orders_lock=_submitting_orders_lock,
+            submitting_orders=_submitting_orders,
+            download_file=download_file,
+            session_error_backoff=_session_error_backoff,
+            send_telegram_message=send_telegram_message,
+            notify_internal_error_telegram=notify_internal_error_telegram,
+            complete_order_with_video=_complete_order_with_video,
+            skip_if_order_done=_skip_if_order_done,
+        )
         xy_motion.wire(
             db=db,
             bot_name=BOT_NAME,
@@ -2034,7 +1969,6 @@ def start_bot():
             min_render_sec=MIN_RENDER_SEC,
             vae_min_render_sec=VIDEOAIEASY_MIN_RENDER_SEC,
             skip_if_order_done=_skip_if_order_done,
-            pop_processing_cache=_pop_processing_cache,
         )
 
     start_bot_control_listener()
@@ -2058,25 +1992,25 @@ def start_bot():
             print(f"⚠️  XiaoYang API: {e}")
 
     if use_api_mode():
-        try:
-            _get_http_client()
-            print("✅ Pure HTTP Aidancing — AIDANCING_COOKIE (không cần Chrome/CDP)")
-        except ValueError as e:
-            print(f"⚠️  Chưa cấu hình cookie Aidancing: {e}")
         if xy_motion.enabled_for_bot(BOT_NAME):
             xy_motion.log_accounts_on_startup()
+        else:
+            try:
+                _get_http_client()
+                print("✅ Pure HTTP Aidancing — AIDANCING_COOKIE (không cần Chrome/CDP)")
+            except ValueError as e:
+                print(f"⚠️  Chưa cấu hình cookie Aidancing: {e}")
 
     def monitor_loop():
         while True:
-            ad_eligible, xy_eligible, vae_eligible, tool98_eligible, processing, vae_processing = _processing_monitor_state()
+            ad_eligible, xy_eligible, vae_eligible, rb_eligible, processing, _ = _processing_monitor_state()
             if is_bot_enabled():
                 check_finished_orders()
             if use_api_mode():
-                sleep_sec = _monitor_sleep_seconds(
-                    len(ad_eligible) + len(xy_eligible) + len(vae_eligible) + len(tool98_eligible),
-                    processing,
-                    vae_processing_count=vae_processing,
+                eligible = len(rb_eligible) if xy_motion.enabled_for_bot(BOT_NAME) else (
+                    len(ad_eligible) + len(xy_eligible) + len(vae_eligible) + len(rb_eligible)
                 )
+                sleep_sec = _monitor_sleep_seconds(eligible, processing)
             else:
                 sleep_sec = 60 if processing else int(os.environ.get("BOT_POLL_IDLE_SEC", "300"))
             time.sleep(sleep_sec)

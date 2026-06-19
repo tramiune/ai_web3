@@ -4521,6 +4521,36 @@ section {
   animation: authIconPulse 2.5s ease-in-out infinite;
 }
 
+.client-outdated-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(90deg, #ff4d4d, #ff8c00);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(255, 77, 77, 0.45);
+}
+
+.client-outdated-banner p {
+  margin: 0;
+}
+
+.client-outdated-banner .client-outdated-refresh {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .auth-promo-pills {
   display: flex;
   flex-wrap: wrap;

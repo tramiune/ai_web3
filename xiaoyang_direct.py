@@ -98,7 +98,10 @@ def upload_file_to_r2_public(file_path: str, key: str, content_type: str) -> str
     # Token R2 thường chỉ có Object Write — multipart bị AccessDenied; dùng single PUT (≤5GB).
     with open(file_path, "rb") as f:
         client.put_object(Bucket=bucket, Key=key, Body=f, ContentType=content_type)
-    return f"{public_base}/{key}"
+    # pub-*.r2.dev không serve prefix results/ — dùng Worker (cùng bucket MY_R2_BUCKET).
+    from xiaoyang_media import WORKER_BASE
+
+    return f"{WORKER_BASE}/?file={quote(key)}"
 
 
 def upload_bytes_to_r2_public(data: bytes, key: str, content_type: str) -> str:

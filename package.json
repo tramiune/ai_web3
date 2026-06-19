@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "live-server": "^1.2.2",
+    "wrangler": "^4.98.0"
   },
   "keywords": [],
   "author": "",
