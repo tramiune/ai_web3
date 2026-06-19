@@ -15,11 +15,14 @@ import requests
 from project_env import get_env, load_project_env
 from account_pool import (
     acquire_client_for_job,
+    effective_credits,
     estimate_credits,
     list_accounts,
     list_eligible_accounts,
     max_accounts_per_ip,
     refresh_account_credits,
+    release_reserved,
+    sync_stale_pool_credits,
     update_account_after_job,
     video_duration_sec,
     _pool_path,
@@ -303,6 +306,8 @@ def submit_to_roboneo(order_id: str) -> bool:
             for attempt in range(1, max_attempts + 1):
                 account_email = ""
                 account_id = ""
+                reserved_amt = 0
+                client = None
                 try:
                     if attempt > 1:
                         print(
@@ -310,18 +315,19 @@ def submit_to_roboneo(order_id: str) -> bool:
                             f"(đổi nick, đã loại {len(excluded_nicks)})…"
                         )
 
+                    surface = _roboneo_surface()
                     client, info = acquire_client_for_job(
-                        need, exclude_emails=excluded_nicks
+                        need,
+                        exclude_emails=excluded_nicks,
+                        slot_available=lambda e: _rb_active_count(e)
+                        < ROBONEO_MAX_CONCURRENT_PER_ACCOUNT,
+                        surface=surface,
                     )
                     account_email = info.get("email") or ""
                     account_id = _roboneo_account_id(account_email)
+                    reserved_amt = int(info.get("reserved") or need)
                     _rb_inflight_inc(account_id)
 
-                    active = _rb_active_count(account_email)
-                    if active > ROBONEO_MAX_CONCURRENT_PER_ACCOUNT:
-                        raise RoboNeoError("Nick RoboNeo đầy slot")
-
-                    surface = _roboneo_surface()
                     api_name = _roboneo_api_name()
                     mode = _roboneo_mode()
                     pattern = resolve_motion_mode(mode)
@@ -348,6 +354,8 @@ def submit_to_roboneo(order_id: str) -> bool:
                             credits=amount,
                         )
                         excluded_nicks.add(account_email.strip().lower())
+                        release_reserved(account_email, reserved_amt)
+                        reserved_amt = 0
                         _rb_inflight_dec(account_id)
                         account_id = ""
                         continue
@@ -388,6 +396,8 @@ def submit_to_roboneo(order_id: str) -> bool:
                             credits=amount,
                         )
                         excluded_nicks.add(account_email.strip().lower())
+                        release_reserved(account_email, reserved_amt)
+                        reserved_amt = 0
                         _rb_inflight_dec(account_id)
                         account_id = ""
                         continue
@@ -420,7 +430,13 @@ def submit_to_roboneo(order_id: str) -> bool:
                         roboneo_room_id=room_id,
                         roboneo_account_email=account_email,
                     )
-                    remaining = refresh_account_credits(client, account_email)
+                    remaining = refresh_account_credits(
+                        client,
+                        account_email,
+                        surface=surface,
+                        release_reserved_amount=reserved_amt,
+                    )
+                    reserved_amt = 0
                     update_account_after_job(account_email, remaining)
                     print(f"→ Nick {account_email} còn {remaining} credit sau nạp đơn")
                     session_error_backoff.pop(order_id, None)
@@ -448,6 +464,16 @@ def submit_to_roboneo(order_id: str) -> bool:
                     if account_email:
                         from account_pool import mark_account
 
+                        if reserved_amt > 0:
+                            release_reserved(account_email, reserved_amt)
+                            reserved_amt = 0
+                        if client and not _is_credit_error(e):
+                            try:
+                                refresh_account_credits(
+                                    client, account_email, surface=_roboneo_surface()
+                                )
+                            except Exception:
+                                pass
                         mark_account(account_email, status="depleted", note=str(e))
                         excluded_nicks.add(account_email.strip().lower())
                     if _is_credit_error(e) and attempt < max_attempts:
@@ -572,7 +598,7 @@ def poll_roboneo_orders(orders_to_check):
                 r.raise_for_status()
                 with open(local_path, "wb") as f:
                     f.write(r.content)
-                refresh_account_credits(client, email)
+                refresh_account_credits(client, email, surface=surface)
                 complete(doc, local_path)
             except Exception as e:
                 print(f"⚠️ Lỗi tải/hoàn đơn {doc.id}: {e}")
@@ -588,6 +614,10 @@ def poll_roboneo_orders(orders_to_check):
 
 
 def log_pool_on_startup():
+    surface = _roboneo_surface()
+    synced = sync_stale_pool_credits(surface=surface)
+    if synced:
+        print(f"🔄 Đã sync credit {synced} nick (session, không login thừa)")
     rows = list_eligible_accounts(1)
     all_rows = [a for a in list_accounts() if a.get("status") in ("active", "depleted")]
     known = sum(1 for a in all_rows if a.get("credits") is not None)
@@ -598,7 +628,18 @@ def log_pool_on_startup():
         f"file {path} | "
         f"max {ROBONEO_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick | "
         f"{max_accounts_per_ip()} nick/IP VNsProxy | "
-        f"surface {_roboneo_surface()} | model {_roboneo_api_name()}"
+        f"surface {surface} | model {_roboneo_api_name()}"
     )
-    for row in sorted(all_rows, key=lambda a: -(int(a.get("credits") or 0)))[:10]:
-        print(f"  • {row.get('email')} — {row.get('credits', '?')} credit ({row.get('status')})")
+    for row in sorted(
+        all_rows, key=lambda a: -(effective_credits(a) or int(a.get("credits") or 0))
+    )[:10]:
+        eff = effective_credits(row)
+        reserved = int(row.get("reserved") or 0)
+        raw = row.get("credits", "?")
+        if eff is not None and reserved:
+            label = f"{eff} eff ({raw}−{reserved} giữ)"
+        elif eff is not None:
+            label = str(eff)
+        else:
+            label = str(raw)
+        print(f"  • {row.get('email')} — {label} credit ({row.get('status')})")

@@ -12,14 +12,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from account_pool import (  # noqa: E402
-    _login_once,
+    get_or_refresh_client,
     _pool_path,
     list_accounts,
     mark_account,
     min_reuse_credits,
     update_account_after_job,
 )
-from roboneo_web import RoboNeoError  # noqa: E402
+from roboneo_web import RoboNeoError, resolve_surface  # noqa: E402
+from project_env import get_env  # noqa: E402
 
 
 def main():
@@ -37,6 +38,7 @@ def main():
         statuses.add("locked")
 
     rows = [a for a in list_accounts() if a.get("status") in statuses]
+    surface = resolve_surface(get_env("ROBONEO_SURFACE", "team_studio"))
     print(f"📂 Pool: {_pool_path()} | {len(rows)} nick | min reuse {min_reuse_credits()} credit")
 
     ok = fail = 0
@@ -47,10 +49,12 @@ def main():
             continue
         print(f"[{i}/{len(rows)}] {email} ({row.get('status')})…", end=" ", flush=True)
         try:
-            _client, info = _login_once(email, password, rotate=False)
+            _client, info = get_or_refresh_client(
+                email, password, force_sync=True, surface=surface
+            )
             cr = int(info.get("credits") or 0)
             update_account_after_job(email, cr)
-            print(f"→ {cr} credit")
+            print(f"→ {cr} credit (session sync)")
             ok += 1
         except RoboNeoError as e:
             mark_account(email, status="locked", note=str(e), credits=0)
