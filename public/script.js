@@ -14,6 +14,13 @@ const KALING_VAE_1080_10 = { cost: 7, maxVideoSec: 10, vaeDurationSec: 10, vaeRe
 const KALING_VAE_1080_20 = { cost: 13, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '1080p' };
 const KALING_VAE_1080_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '1080p' };
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_1080_30.maxVideoSec;
+const ROBONEO_TRIAL = {
+    startMs: new Date('2026-06-19T00:00:00+07:00').getTime(),
+    windowMs: 24 * 60 * 60 * 1000,
+    modelKey: 'rbTrial',
+    cost: 3,
+    maxVideoSec: 15,
+};
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -193,9 +200,42 @@ function syncPromo1CoinState(orders, userData = window.__currentUserData) {
 const MODEL_COST_LEGACY_FAST = 3;
 const MODEL_COST_LEGACY_TURBO = 10;
 
+function getUserCreatedAtMs(userData) {
+    const ca = userData?.createdAt;
+    if (!ca) return null;
+    if (typeof ca.toDate === 'function') return ca.toDate().getTime();
+    if (typeof ca.seconds === 'number') return ca.seconds * 1000;
+    if (typeof ca._seconds === 'number') return ca._seconds * 1000;
+    return null;
+}
+
+function isRoboneoTrialEligible(userData) {
+    const createdMs = getUserCreatedAtMs(userData);
+    if (createdMs == null || createdMs < ROBONEO_TRIAL.startMs) return false;
+    return Date.now() < createdMs + ROBONEO_TRIAL.windowMs;
+}
+
+function getRoboneoTrialRemainingMs(userData) {
+    const createdMs = getUserCreatedAtMs(userData);
+    if (createdMs == null) return 0;
+    return Math.max(0, createdMs + ROBONEO_TRIAL.windowMs - Date.now());
+}
+
+function formatRoboneoTrialRemaining(userData) {
+    const ms = getRoboneoTrialRemainingMs(userData);
+    if (ms <= 0) return '';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return t('modals.roboneo_trial_remaining', { h, m });
+}
+
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    return checked ? checked.value : 'vae20';
+    const key = checked ? checked.value : 'vae20';
+    if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
+        return 'vae20';
+    }
+    return key;
 }
 
 function getMaxVideoSecForModel(modelKey) {
@@ -229,8 +269,7 @@ function normalizeOrderCost(model) {
 // Keep them in sync (id + coins + USD value).
 const COIN_PACKAGES = [
     { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '10.000đ',  usdPrice: '$0.49', amount: 10000,  hasBonus: false, oneTime: true },
-    { id: 'creator',    name: 'Creator',    coins: 50,  price: '50.000đ',  usdPrice: '$2.99', amount: 50000,  featured: true, hasBonus: false },
-    { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  hasBonus: true },
+    { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
 ];
 
@@ -339,6 +378,16 @@ function gatewayLabel(gateway) {
 }
 
 const MODELS = {
+    rbTrial: {
+        nameKey: "modals.model_rbTrial",
+        cost: ROBONEO_TRIAL.cost,
+        timeKey: "modals.model_rbTrial_desc",
+        modelId: "130",
+        renderProvider: "roboneo",
+        maxVideoSec: ROBONEO_TRIAL.maxVideoSec,
+        vaeResolution: "720p",
+        roboneoTrial: true,
+    },
     vae10: {
         nameKey: "modals.model_vae10",
         cost: KALING_VAE_10.cost,
@@ -2260,6 +2309,11 @@ window.selectTopup = async (id, method = 'vietqr') => {
 };
 
 window.openOrderModal = () => {
+    updateRoboneoTrialUI(window.__currentUserData);
+    if (isRoboneoTrialEligible(window.__currentUserData)) {
+        const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
+        if (trialRadio) trialRadio.checked = true;
+    }
     updateFirstOrderUI();
     window.switchVideoSource('upload');
     window.openModal('order-modal');
@@ -2290,7 +2344,34 @@ window.openOrderModal = () => {
     });
 };
 
+function updateRoboneoTrialUI(userData = window.__currentUserData) {
+    const wrap = document.getElementById('model-rbtrial-wrap');
+    const countdownEl = document.getElementById('rbtrial-countdown');
+    const eligible = isRoboneoTrialEligible(userData);
+
+    if (wrap) wrap.style.display = eligible ? '' : 'none';
+    if (countdownEl) {
+        countdownEl.textContent = eligible ? formatRoboneoTrialRemaining(userData) : '';
+    }
+
+    if (eligible) {
+        const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
+        const orderModal = document.getElementById('order-modal');
+        const modalOpen = orderModal && orderModal.style.display === 'flex';
+        if (modalOpen && trialRadio && !trialRadio.checked) {
+            trialRadio.checked = true;
+        }
+    } else {
+        const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
+        if (trialRadio?.checked) {
+            const fallback = document.querySelector('input[name="model-type"][value="vae20"]');
+            if (fallback) fallback.checked = true;
+        }
+    }
+}
+
 function updateFirstOrderUI() {
+    updateRoboneoTrialUI(window.__currentUserData);
     const costEl = document.getElementById('submit-cost');
     const offerBanner = document.getElementById('first-order-offer-banner');
     const guestOfferBar = document.getElementById('guest-offer-bar');
@@ -2983,12 +3064,20 @@ async function setupEventListeners() {
                 const userRef = doc(db, "users", currentUser.uid);
                 const userSnap = await runTransaction(db, async (transaction) => {
                     const userDoc = await transaction.get(userRef);
+                    const userData = userDoc.data();
                     const modelKey = modelKeySelected;
                     const serviceType = document.querySelector('input[name="service-type"]:checked').value;
                     let model = normalizeOrderCost({ ...localizedModel(modelKey) });
                     if (modelIdOverride) model.modelId = modelIdOverride;
 
-                    if (userDoc.data().coins < model.cost) {
+                    if (modelKey === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(userData)) {
+                        throw t('modals.roboneo_trial_expired');
+                    }
+                    if (modelKey === ROBONEO_TRIAL.modelKey && Number(model.cost) !== ROBONEO_TRIAL.cost) {
+                        throw t('modals.roboneo_trial_expired');
+                    }
+
+                    if (userData.coins < model.cost) {
                         throw t('modals.insufficient_coins_title');
                     }
                     if (!Number.isFinite(Number(model.cost)) || Number(model.cost) < 1) {
@@ -3046,6 +3135,7 @@ async function setupEventListeners() {
                         serviceLabel: SERVICE_TYPE_MAP()[serviceType] || serviceType,
                         costCoins: model.cost,
                         promo1Coin: !!model.promo1Coin,
+                        roboneoTrial: !!model.roboneoTrial,
                         clientVersion: APP_CLIENT_VERSION,
                         characterImageLink: charUrl,
                         referenceVideoLink: videoUrl,

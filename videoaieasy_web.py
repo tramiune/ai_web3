@@ -54,6 +54,10 @@ class VideoAiEasyError(RuntimeError):
     pass
 
 
+class VideoAiEasyCreditError(VideoAiEasyError):
+    """Nick VAE không đủ coin/xu cho job."""
+
+
 class VideoAiEasyAuthError(VideoAiEasyError):
     pass
 
@@ -371,6 +375,42 @@ def vae_credits_for_duration(duration_sec: int, resolution: str | None = None) -
     if normalize_vae_resolution(resolution) == "1080p":
         return VAE_CREDITS_1080_BY_DURATION.get(dur, 2)
     return VAE_CREDITS_BY_DURATION.get(dur, 1)
+
+
+def profile_credits(profile: dict | None) -> int:
+    if not profile:
+        return 0
+    for key in ("credits", "balance", "coin", "coins"):
+        val = profile.get(key)
+        if val is None:
+            continue
+        try:
+            return max(0, int(val))
+        except (TypeError, ValueError):
+            pass
+    return 0
+
+
+def is_vae_credit_error(err: object) -> bool:
+    if isinstance(err, VideoAiEasyCreditError):
+        return True
+    s = str(err or "").lower()
+    return any(
+        x in s
+        for x in (
+            "credit",
+            "coin",
+            "coins",
+            "balance",
+            "insufficient",
+            "not enough",
+            "không đủ",
+            "hết coin",
+            "hết xu",
+            "402",
+            "payment required",
+        )
+    )
 
 
 def duration_for_order(order_data: dict | None) -> int:

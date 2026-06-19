@@ -45,7 +45,6 @@ const PAYPAL_DEFAULTS = {
 // Keep in sync with COIN_PACKAGES in public/script.js (id + coins).
 const PACKAGES = {
     'starter_v2':  { coins: 10,   priceUsd: 0.49,  name: 'Starter (International)' },
-    'creator':     { coins: 50,   priceUsd: 2.99,  name: 'Creator (International)' },
     'studio':      { coins: 550,  priceUsd: 24.99, name: 'Studio (International)' },
     'pro-studio':  { coins: 1100, priceUsd: 49.99, name: 'Enterprise (International)' }
 };

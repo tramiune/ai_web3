@@ -18,3 +18,7 @@ USER_NOTE_ORDER_FAILED = (
 USER_NOTE_MODEL_UPDATED = (
     "Hệ thống đã cập nhật model mới. Vui lòng tạo lại đơn hàng. Coin đã hoàn lại."
 )
+USER_NOTE_ROBONEO_TRIAL_INVALID = (
+    "Ưu đãi RoboNeo 24h đã hết hạn hoặc không áp dụng cho tài khoản này. "
+    "Vui lòng chọn gói khác và đặt lại. Coin đã hoàn."
+)

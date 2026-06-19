@@ -4579,6 +4579,48 @@ section {
   box-shadow: 0 0 18px rgba(0, 242, 254, 0.15);
 }
 
+.auth-trial-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #e8e8ff;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.12), rgba(168, 85, 247, 0.18));
+  border: 1px solid rgba(0, 242, 254, 0.28);
+}
+
+.auth-trial-banner strong {
+  font-size: 0.9rem;
+}
+
+.model-rbtrial-card {
+  border-color: rgba(0, 242, 254, 0.45) !important;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.12);
+}
+
+.model-trial-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: linear-gradient(135deg, #00f2fe, #a855f7);
+}
+
+.model-trial-countdown {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #00f2fe;
+}
+
 .auth-modal-title {
   font-size: 1.45rem;
   font-weight: 800;

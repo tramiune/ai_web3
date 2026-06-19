@@ -22,10 +22,13 @@ from xiaoyang_web import XiaoyangAuthError, XiaoyangWebClient, XiaoyangWebError
 from videoaieasy_web import (
     VideoAiEasyClient,
     VideoAiEasyAuthError,
+    VideoAiEasyCreditError,
     VideoAiEasyError,
     MODEL_KLING_26,
     MODEL_KLING_30,
+    is_vae_credit_error,
     prepare_character_image_for_vae,
+    profile_credits,
     resolution_for_order,
     duration_for_order,
     vae_credits_for_duration,
@@ -51,7 +54,7 @@ XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 VAE_DURATION_KALING_SEC = 10
-KALING_VAE_MODEL_IDS = frozenset({"124", "125", "126", "128", "129"})
+KALING_VAE_MODEL_IDS = frozenset({"124", "125", "126", "128", "129", "130"})
 
 from user_order_notes import (
     USER_NOTE_CLIENT_OUTDATED,
@@ -193,14 +196,16 @@ def _use_videoaieasy() -> bool:
 
 
 def _kaling_order_provider(order_data: dict) -> str:
-    """Gói 720p/10s (model 124) → RoboNeo; các gói khác → VideoAiEasy."""
+    """Gói RoboNeo (124, 130 trial) → RoboNeo; các gói khác → VideoAiEasy."""
     rp = (order_data.get("renderProvider") or "").strip().lower()
     if rp == RENDER_PROVIDER_ROBONEO:
         return RENDER_PROVIDER_ROBONEO
     if rp == RENDER_PROVIDER_VIDEOAIEASY:
         return RENDER_PROVIDER_VIDEOAIEASY
+    from roboneo_trial import KALING_ROBONEO_MODEL_IDS
+
     model_id = str(order_data.get("modelId") or "").strip()
-    if model_id in KALING_VAE_MODEL_IDS and model_id == "124":
+    if model_id in KALING_ROBONEO_MODEL_IDS:
         return RENDER_PROVIDER_ROBONEO
     return RENDER_PROVIDER_VIDEOAIEASY
 
@@ -336,18 +341,23 @@ def _vae_active_count(account_id: str) -> int:
     return _count_vae_processing_for_account(account_id) + inflight
 
 
+def _videoaieasy_candidates(exclude: set[str] | None = None) -> list[dict]:
+    skip = exclude or set()
+    out: list[tuple[int, dict]] = []
+    for acc in load_videoaieasy_accounts():
+        aid = acc["id"]
+        if aid in skip:
+            continue
+        c = _vae_active_count(aid)
+        if c < VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT:
+            out.append((c, acc))
+    out.sort(key=lambda x: x[0])
+    return [acc for _, acc in out]
+
+
 def _pick_videoaieasy_account():
-    accounts = load_videoaieasy_accounts()
-    if not accounts:
-        return None
-    best = None
-    best_count = VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT
-    for acc in accounts:
-        c = _vae_active_count(acc["id"])
-        if c < VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT and c < best_count:
-            best = acc
-            best_count = c
-    return best
+    candidates = _videoaieasy_candidates()
+    return candidates[0] if candidates else None
 
 
 def _videoaieasy_account_lookup(account_id: str):
@@ -667,32 +677,35 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
     return success
 
 
-def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
+def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str | None]:
+    """Nạp đơn qua 1 nick VAE. Trả (ok, hết coin, lỗi)."""
     if not _g["is_bot_enabled"]():
-        return False
+        return False, False, None
     if _g["pending_submit_backoff_active"](order_id):
-        return False
+        return False, False, None
     submitting_lock = _g["submitting_orders_lock"]
     submitting = _g["submitting_orders"]
     with submitting_lock:
         if order_id in submitting:
-            return False
+            return False, False, None
         submitting.add(order_id)
 
     account_id = account["id"]
     account_email = account.get("email", "")
     _vae_inflight_inc(account_id)
     success = False
+    credit_fail = False
+    err_msg: str | None = None
     try:
         with _submit_engine_lock():
             db = _g["db"]
             doc_ref = db.collection("orders").document(order_id)
             doc = doc_ref.get()
             if not doc.exists:
-                return False
+                return False, False, None
             data = doc.to_dict() or {}
             if data.get("status") != "pending":
-                return False
+                return False, False, None
 
             nick_label = account_email or account_id
             print(f"\n⚡ [NẠP ĐƠN / VideoAiEasy] {order_id} — nick {nick_label}...")
@@ -700,7 +713,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             vid_url = (data.get("referenceVideoLink") or "").strip()
             if not img_url or not vid_url:
                 print(f"❌ Thiếu link ảnh/video cho đơn {order_id}")
-                return False
+                return False, False, None
 
             char_path = None
             vid_path = None
@@ -723,10 +736,15 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()
                 api = _get_vae_web_client(account_id)
-                _ensure_vae_web_session(api, account_email, account.get("password"))
+                profile = _ensure_vae_web_session(api, account_email, account.get("password"))
+                have = profile_credits(profile)
+                if have < vae_credits:
+                    raise VideoAiEasyCreditError(
+                        f"Không đủ credit VAE: cần {vae_credits}, có {have}"
+                    )
                 print(
                     f"🚀 [VideoAiEasy/{nick_label}] Kling 2.6 — "
-                    f"gói {duration_sec}s {resolution} ({vae_credits} xu VAE) · "
+                    f"gói {duration_sec}s {resolution} ({vae_credits} xu VAE, có {have}) · "
                     f"modelId={data.get('modelId')} → {model_id}..."
                 )
                 for attempt in range(1, 3):
@@ -790,13 +808,20 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                 except Exception:
                     pass
                 success = True
+            except VideoAiEasyCreditError as e:
+                credit_fail = True
+                err_msg = str(e)
+                print(f"⚠ VideoAiEasy {nick_label} hết coin: {e}")
             except (requests.RequestException, VideoAiEasyAuthError, VideoAiEasyError) as e:
+                err_msg = str(e)
+                credit_fail = is_vae_credit_error(e)
                 print(f"❌ Nạp VideoAiEasy thất bại {order_id} ({nick_label}): {e}")
                 if isinstance(e, VideoAiEasyAuthError):
                     _reset_vae_web_client(account_id)
-                _g["notify_internal_error_telegram"](
-                    order_id, data, str(e), f"submit videoaieasy/{nick_label}"
-                )
+                if not credit_fail:
+                    _g["notify_internal_error_telegram"](
+                        order_id, data, str(e), f"submit videoaieasy/{nick_label}"
+                    )
             finally:
                 if vae_char_is_tmp and vae_char_path and os.path.exists(vae_char_path):
                     os.remove(vae_char_path)
@@ -810,7 +835,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
         _vae_inflight_dec(account_id)
         with submitting_lock:
             submitting.discard(order_id)
-    return success
+    return success, credit_fail, err_msg
 
 
 def _try_submit_xiaoyang(order_id: str) -> bool:
@@ -826,11 +851,30 @@ def _try_submit_xiaoyang(order_id: str) -> bool:
 def _try_submit_videoaieasy(order_id: str) -> bool:
     if not _use_videoaieasy():
         return False
-    account = _pick_videoaieasy_account()
-    if not account:
-        print(f"📊 Không có nick VideoAiEasy hoặc đầy slot — {order_id}")
+    excluded: set[str] = set()
+    last_credit_err: str | None = None
+    while True:
+        candidates = _videoaieasy_candidates(exclude=excluded)
+        if not candidates:
+            if excluded:
+                print(
+                    f"❌ Hết nick VAE đủ coin cho {order_id}"
+                    + (f" ({last_credit_err})" if last_credit_err else "")
+                )
+            else:
+                print(f"📊 Không có nick VideoAiEasy hoặc đầy slot — {order_id}")
+            return False
+        account = candidates[0]
+        ok, credit_fail, err_msg = submit_to_videoaieasy(order_id, account)
+        if ok:
+            return True
+        if credit_fail:
+            last_credit_err = err_msg
+            excluded.add(account["id"])
+            email = account.get("email") or account["id"]
+            print(f"→ Đổi nick VAE (đã loại {len(excluded)}): {email}")
+            continue
         return False
-    return submit_to_videoaieasy(order_id, account)
 
 
 def submit_order(order_id: str):

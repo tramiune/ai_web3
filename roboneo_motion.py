@@ -252,7 +252,8 @@ def submit_to_roboneo(order_id: str) -> bool:
                 return False
 
             from client_version import client_version_label, client_version_ok, min_client_version
-            from user_order_notes import USER_NOTE_CLIENT_OUTDATED
+            from user_order_notes import USER_NOTE_CLIENT_OUTDATED, USER_NOTE_ROBONEO_TRIAL_INVALID
+            from roboneo_trial import is_roboneo_trial_order, validate_roboneo_trial_order
 
             if not client_version_ok(data):
                 print(
@@ -302,6 +303,32 @@ def submit_to_roboneo(order_id: str) -> bool:
                 raise RoboNeoError("Không tải được ảnh/video từ link đơn hàng")
 
             duration = video_duration_sec(vid_path)
+
+            if is_roboneo_trial_order(data):
+                user_id = data.get("userId")
+                user_data = None
+                if user_id:
+                    try:
+                        udoc = _g["db"].collection("users").document(str(user_id)).get()
+                        if udoc.exists:
+                            user_data = udoc.to_dict() or {}
+                    except Exception as e:
+                        print(f"⚠️ Không đọc được user {user_id}: {e}")
+                ok, reason = validate_roboneo_trial_order(
+                    user_data, data, duration_sec=duration
+                )
+                if not ok:
+                    print(f"⛔ Đơn {order_id} — RoboNeo trial không hợp lệ ({reason})")
+                    _fail_order_processing(
+                        doc,
+                        data,
+                        f"roboneoTrial invalid: {reason}",
+                        USER_NOTE_ROBONEO_TRIAL_INVALID,
+                        "submit roboneo trial",
+                    )
+                    return False
+                print(f"→ RoboNeo trial ~{duration:.1f}s / max {15}s — 3 coin")
+
             need, pick_need = pick_credits_for_job(duration)
             print(
                 f"→ Video ~{duration:.1f}s → cần ~{need} credit RoboNeo "
