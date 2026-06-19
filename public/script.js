@@ -269,6 +269,7 @@ function normalizeOrderCost(model) {
 // Keep them in sync (id + coins + USD value).
 const COIN_PACKAGES = [
     { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '10.000đ',  usdPrice: '$0.49', amount: 10000,  hasBonus: false, oneTime: true },
+    { id: 'creator',    name: 'Creator',    coins: 100, price: '100.000đ', usdPrice: '$5.99', amount: 100000, featured: false, hasBonus: false },
     { id: 'studio',     name: 'Studio',     coins: 550,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
 ];
@@ -2354,14 +2355,7 @@ function updateRoboneoTrialUI(userData = window.__currentUserData) {
         countdownEl.textContent = eligible ? formatRoboneoTrialRemaining(userData) : '';
     }
 
-    if (eligible) {
-        const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
-        const orderModal = document.getElementById('order-modal');
-        const modalOpen = orderModal && orderModal.style.display === 'flex';
-        if (modalOpen && trialRadio && !trialRadio.checked) {
-            trialRadio.checked = true;
-        }
-    } else {
+    if (!eligible) {
         const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
         if (trialRadio?.checked) {
             const fallback = document.querySelector('input[name="model-type"][value="vae20"]');
@@ -2394,11 +2388,37 @@ function updateFirstOrderUI() {
         } else {
             costEl.innerText = '—';
         }
-        if (submitBtn) submitBtn.classList.remove('btn-first-offer');
-        if (submitText) submitText.innerText = t('hero.cta_create');
+        if (submitBtn) {
+            submitBtn.classList.remove('btn-first-offer', 'btn-trial-offer');
+        }
+        const isTrialModel = modelKey === ROBONEO_TRIAL.modelKey
+            && isRoboneoTrialEligible(window.__currentUserData);
+        if (submitBtn && isTrialModel) {
+            submitBtn.classList.add('btn-trial-offer');
+        }
+        const titleEl = document.getElementById('submit-title-line');
+        if (titleEl) {
+            titleEl.innerText = isTrialModel
+                ? t('modals.trial_submit_cta')
+                : t('hero.cta_create');
+        } else if (submitText) {
+            submitText.innerText = isTrialModel
+                ? t('modals.trial_submit_cta')
+                : t('hero.cta_create');
+        }
         if (summaryEl) {
-            summaryEl.innerText = lm ? lm.time : t(`modals.model_${modelKey}_desc`);
-            summaryEl.style.color = '';
+            if (isTrialModel) {
+                const ms = getRoboneoTrialRemainingMs(window.__currentUserData);
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                summaryEl.innerText = ms > 0
+                    ? t('modals.trial_submit_note_time', { h, m })
+                    : t('modals.trial_submit_note');
+                summaryEl.style.color = '';
+            } else {
+                summaryEl.innerText = lm ? lm.time : t(`modals.model_${modelKey}_desc`);
+                summaryEl.style.color = '';
+            }
         }
     }
 }

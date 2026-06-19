@@ -2036,6 +2036,34 @@ button {
   letter-spacing: 0.5px;
 }
 
+#order-submit-btn.btn-trial-offer {
+  background: linear-gradient(135deg, #0891b2 0%, #00f2fe 45%, #20c997 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 0 32px rgba(0, 242, 254, 0.38), 0 8px 24px rgba(32, 201, 151, 0.25) !important;
+  border: 1px solid rgba(0, 242, 254, 0.55) !important;
+}
+
+#order-submit-btn.btn-trial-offer:hover {
+  box-shadow: 0 0 42px rgba(0, 242, 254, 0.52), 0 12px 28px rgba(32, 201, 151, 0.35) !important;
+  filter: brightness(1.06);
+}
+
+#order-submit-btn.btn-trial-offer #submit-title-line {
+  font-size: 1.05rem !important;
+  letter-spacing: 0.02em;
+}
+
+#order-submit-btn.btn-trial-offer #submit-summary-line {
+  opacity: 1 !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#order-submit-btn.btn-trial-offer .btn-cost-tag {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
 @keyframes pulse-gold {
   0% { box-shadow: 0 0 20px rgba(255, 222, 0, 0.6); }
   70% { box-shadow: 0 0 40px 15px rgba(255, 222, 0, 0); }
