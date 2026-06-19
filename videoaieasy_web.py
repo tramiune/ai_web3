@@ -32,6 +32,11 @@ MODEL_KLING_26 = "kling-2.6"
 MODEL_KLING_30 = "kling-3.0"
 QUALITY_MODEL_IDS = frozenset({"127"})
 KALING_TURBO_MODEL_IDS = frozenset({"117"})
+KALING_VAE_10_MODEL_IDS = frozenset({"124"})
+KALING_VAE_20_MODEL_IDS = frozenset({"125"})
+VAE_PACKAGE_10_DURATION_SEC = 10
+VAE_PACKAGE_20_DURATION_SEC = 20
+VAE_CREDITS_BY_DURATION = {10: 1, 20: 2}
 DEFAULT_VAE_RESOLUTION = "720p"
 
 
@@ -234,6 +239,7 @@ class VideoAiEasyClient:
         prompt: str = "",
         model_id: str = MODEL_KLING_26,
         resolution: str | None = None,
+        duration_sec: int | None = None,
     ) -> str:
         body = {
             "mode": "motion-control",
@@ -245,6 +251,8 @@ class VideoAiEasyClient:
             "drivingVideoUrl": driving_video_url.strip(),
             "resolution": normalize_vae_resolution(resolution),
         }
+        if duration_sec is not None:
+            body["durationSec"] = int(duration_sec)
         resp = self._api(
             "POST",
             "/api/jobs",
@@ -329,6 +337,36 @@ def resolution_for_order(order_data: dict | None) -> str:
     if model_id in KALING_TURBO_MODEL_IDS:
         return normalize_vae_resolution("1080p")
     return normalize_vae_resolution(None)
+
+
+def normalize_vae_duration_sec(value: int | float | str | None) -> int:
+    """VAE chỉ có gói 10s (1 xu) hoặc 20s (2 xu)."""
+    try:
+        sec = int(float(value))
+    except (TypeError, ValueError):
+        return VAE_PACKAGE_10_DURATION_SEC
+    if sec >= 15:
+        return VAE_PACKAGE_20_DURATION_SEC
+    return VAE_PACKAGE_10_DURATION_SEC
+
+
+def vae_credits_for_duration(duration_sec: int) -> int:
+    return VAE_CREDITS_BY_DURATION.get(int(duration_sec), 1)
+
+
+def duration_for_order(order_data: dict | None) -> int:
+    """Map đơn Kaling → gói VAE: 10s hoặc 20s."""
+    data = order_data or {}
+    for key in ("vaeDurationSec", "durationSec"):
+        val = data.get(key)
+        if val is not None:
+            return normalize_vae_duration_sec(val)
+    model_id = str(data.get("modelId") or "").strip()
+    if model_id in KALING_VAE_20_MODEL_IDS:
+        return VAE_PACKAGE_20_DURATION_SEC
+    if model_id in KALING_VAE_10_MODEL_IDS:
+        return VAE_PACKAGE_10_DURATION_SEC
+    return VAE_PACKAGE_10_DURATION_SEC
 
 
 def _parse_vae_aspect_ratio(aspect_ratio: str | None) -> float:

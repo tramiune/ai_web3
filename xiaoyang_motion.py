@@ -28,6 +28,8 @@ from videoaieasy_web import (
     QUALITY_MODEL_IDS,
     prepare_character_image_for_vae,
     resolution_for_order,
+    duration_for_order,
+    vae_credits_for_duration,
 )
 from tool98_api import probe_video_duration_seconds, trim_video_to_seconds
 import roboneo_motion as rb_motion
@@ -204,17 +206,6 @@ def _order_target_provider(order_data: dict) -> str:
     if rp in _RENDER_PROVIDERS:
         return rp
     return RENDER_PROVIDER_AIDANCING
-
-
-def _vae_duration_for_order(order_data: dict) -> int:
-    data = order_data or {}
-    explicit = data.get("vaeDurationSec")
-    if explicit is not None:
-        try:
-            return max(1, int(float(explicit)))
-        except (TypeError, ValueError):
-            pass
-    return VAE_DURATION_KALING_SEC
 
 
 def _videoaieasy_model_for_order(order_data: dict) -> str:
@@ -713,7 +704,9 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             session_error_backoff = _g.get("session_error_backoff", {})
             try:
                 model_id = _videoaieasy_model_for_order(data)
-                max_sec = _vae_duration_for_order(data)
+                duration_sec = duration_for_order(data)
+                vae_credits = vae_credits_for_duration(duration_sec)
+                max_sec = duration_sec
                 resolution = resolution_for_order(data)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
@@ -722,7 +715,8 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                 _ensure_vae_web_session(api, account_email, account.get("password"))
                 print(
                     f"🚀 [VideoAiEasy/{nick_label}] Kling 2.6 — "
-                    f"{max_sec}s {resolution} · modelId={data.get('modelId')} → {model_id}..."
+                    f"gói {duration_sec}s {resolution} ({vae_credits} xu VAE) · "
+                    f"modelId={data.get('modelId')} → {model_id}..."
                 )
                 for attempt in range(1, 3):
                     if attempt > 1:
@@ -761,6 +755,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
                     prompt=prompt,
                     model_id=model_id,
                     resolution=resolution,
+                    duration_sec=duration_sec,
                 )
                 print(f"🆔 [VideoAiEasy/{nick_label}] job: {job_id}")
                 _mark_order_processing(
