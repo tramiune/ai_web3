@@ -25,14 +25,12 @@ from videoaieasy_web import (
     VideoAiEasyError,
     MODEL_KLING_26,
     MODEL_KLING_30,
-    QUALITY_MODEL_IDS,
     prepare_character_image_for_vae,
     resolution_for_order,
     duration_for_order,
     vae_credits_for_duration,
 )
 from tool98_api import probe_video_duration_seconds, trim_video_to_seconds
-import roboneo_motion as rb_motion
 
 load_project_env()
 
@@ -63,7 +61,7 @@ from user_order_notes import (
 )
 
 _g: dict = {}
-_active_render_provider = RENDER_PROVIDER_ROBONEO
+_active_render_provider = RENDER_PROVIDER_VIDEOAIEASY
 _active_render_provider_lock = threading.Lock()
 _xy_web_clients: dict = {}
 _xy_web_clients_lock = threading.Lock()
@@ -199,9 +197,6 @@ def _order_target_provider(order_data: dict) -> str:
         return RENDER_PROVIDER_VIDEOAIEASY
     if not order_data:
         return RENDER_PROVIDER_AIDANCING
-    model_id = str(order_data.get("modelId") or "").strip()
-    if model_id in QUALITY_MODEL_IDS:
-        return RENDER_PROVIDER_ROBONEO
     rp = (order_data.get("renderProvider") or "").strip().lower()
     if rp in _RENDER_PROVIDERS:
         return rp
@@ -705,9 +700,9 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> bool:
             try:
                 model_id = _videoaieasy_model_for_order(data)
                 duration_sec = duration_for_order(data)
+                resolution = resolution_for_order(data)
                 vae_credits = vae_credits_for_duration(duration_sec, resolution)
                 max_sec = duration_sec
-                resolution = resolution_for_order(data)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()

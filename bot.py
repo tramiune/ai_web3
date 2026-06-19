@@ -1291,29 +1291,16 @@ def _complete_order_with_video(doc, local_vid):
     return True
 
 def check_finished_orders_api():
-    """Kaling: poll VideoAiEasy (+ RoboNeo nếu còn đơn processing cũ)."""
+    """Kaling: poll VideoAiEasy (VAE)."""
     if not is_bot_enabled():
         return
     _maybe_refresh_processing_cache()
-    _, _, vae_orders, rb_orders, _, _ = _processing_monitor_state()
-    if not rb_orders and not vae_orders:
+    _, _, vae_orders, _, _, _ = _processing_monitor_state()
+    if not vae_orders:
         return
 
-    if rb_orders and xy_motion.enabled_for_bot(BOT_NAME):
-        rb_wait = int(os.environ.get("ROBONEO_MIN_RENDER_SEC", "300"))
-        print(
-            f"\n🔍 [MONITOR/HTTP] Poll RoboNeo (legacy)={len(rb_orders)} "
-            f"(sau {rb_wait // 60}p từ submittedAt)..."
-        )
-        try:
-            import roboneo_motion as rb_motion
-
-            rb_motion.poll_roboneo_orders(rb_orders)
-        except Exception as e:
-            print(f"❌ Lỗi monitor RoboNeo: {e}")
-
     if vae_orders and xy_motion.enabled_for_bot(BOT_NAME):
-        vae_wait = int(os.environ.get("VIDEOAIEASY_MIN_RENDER_SEC", os.environ.get("ROBONEO_MIN_RENDER_SEC", "300")))
+        vae_wait = int(os.environ.get("VIDEOAIEASY_MIN_RENDER_SEC", "300"))
         print(
             f"\n🔍 [MONITOR/HTTP] Poll VideoAiEasy={len(vae_orders)} "
             f"(sau {vae_wait // 60}p từ submittedAt)..."
@@ -1941,24 +1928,6 @@ def start_bot():
             print(f"⚠️  BOT_CDP_URL={cdp_url} nhưng Chrome chưa mở CDP!")
             print("    → Mở Chrome CDP ở terminal KHÁC trước, giữ chạy, rồi bot mới nối được.")
     if xy_motion.enabled_for_bot(BOT_NAME):
-        import roboneo_motion as rb_motion
-
-        rb_motion.wire(
-            db=db,
-            bot_name=BOT_NAME,
-            processing_cache=_processing_cache,
-            processing_cache_lock=_processing_cache_lock,
-            is_bot_enabled=is_bot_enabled,
-            pending_submit_backoff_active=_pending_submit_backoff_active,
-            submitting_orders_lock=_submitting_orders_lock,
-            submitting_orders=_submitting_orders,
-            download_file=download_file,
-            session_error_backoff=_session_error_backoff,
-            send_telegram_message=send_telegram_message,
-            notify_internal_error_telegram=notify_internal_error_telegram,
-            complete_order_with_video=_complete_order_with_video,
-            skip_if_order_done=_skip_if_order_done,
-        )
         xy_motion.wire(
             db=db,
             bot_name=BOT_NAME,
@@ -2018,7 +1987,7 @@ def start_bot():
             if is_bot_enabled():
                 check_finished_orders()
             if use_api_mode():
-                eligible = len(rb_eligible) if xy_motion.enabled_for_bot(BOT_NAME) else (
+                eligible = len(vae_eligible) if xy_motion.enabled_for_bot(BOT_NAME) else (
                     len(ad_eligible) + len(xy_eligible) + len(vae_eligible) + len(rb_eligible)
                 )
                 sleep_sec = _monitor_sleep_seconds(eligible, processing)
