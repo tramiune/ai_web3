@@ -8,6 +8,113 @@ export { APP_CLIENT_VERSION };
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
+const TOPUP_COMPLAINT_DELAY_MS = 5 * 60 * 1000;
+
+let topupComplaintTimer = null;
+
+function resetTopupComplaintUi() {
+    if (topupComplaintTimer) {
+        clearTimeout(topupComplaintTimer);
+        topupComplaintTimer = null;
+    }
+    const btn = document.getElementById('btn-topup-complaint');
+    const hint = document.getElementById('topup-complaint-hint');
+    if (hint) {
+        hint.style.display = '';
+        hint.textContent = t('payment.complaint_hint');
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('topup-complaint-btn--waiting');
+        btn.textContent = t('payment.complaint_btn_wait', { mins: 5 });
+    }
+}
+
+function scheduleTopupComplaintButton() {
+    resetTopupComplaintUi();
+    topupComplaintTimer = setTimeout(() => {
+        topupComplaintTimer = null;
+        const ctx = window.__topupComplaintCtx;
+        const btn = document.getElementById('btn-topup-complaint');
+        const hint = document.getElementById('topup-complaint-hint');
+        if (!ctx || ctx.reported) return;
+        if (hint) {
+            hint.textContent = t('payment.complaint_hint_ready');
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('topup-complaint-btn--waiting');
+            btn.textContent = t('payment.complaint_btn');
+        }
+    }, TOPUP_COMPLAINT_DELAY_MS);
+}
+
+function clearTopupComplaintState() {
+    if (topupComplaintTimer) {
+        clearTimeout(topupComplaintTimer);
+        topupComplaintTimer = null;
+    }
+}
+
+function escapeTelegramHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+window.reportTopupComplaint = async () => {
+    const ctx = window.__topupComplaintCtx;
+    if (!ctx) {
+        showToast(t('payment.complaint_error'));
+        return;
+    }
+    const elapsed = Date.now() - (ctx.openedAt || 0);
+    if (elapsed < TOPUP_COMPLAINT_DELAY_MS) {
+        const mins = Math.max(1, Math.ceil((TOPUP_COMPLAINT_DELAY_MS - elapsed) / 60000));
+        showToast(t('payment.complaint_wait', { mins }));
+        return;
+    }
+    if (ctx.reported) {
+        showToast(t('payment.complaint_already_sent'));
+        return;
+    }
+
+    const btn = document.getElementById('btn-topup-complaint');
+    if (btn) btn.disabled = true;
+
+    const openedLocal = new Date(ctx.openedAt).toLocaleString('vi-VN');
+    const waitedMin = Math.max(1, Math.round(elapsed / 60000));
+    const msg = [
+        '🆘 <b>[Kaling] KHIẾU NẠI NẠP COIN</b>',
+        '',
+        `👤 Tên: ${escapeTelegramHtml(ctx.userName || 'N/A')}`,
+        `📧 Email: ${escapeTelegramHtml(ctx.userEmail || 'N/A')}`,
+        `🆔 UID: <code>${escapeTelegramHtml(ctx.userId || '')}</code>`,
+        `📦 Gói: ${escapeTelegramHtml(ctx.packageName || 'N/A')} (${ctx.coins || 0} coin)`,
+        `💵 Số tiền: ${Number(ctx.amount || 0).toLocaleString('vi-VN')}đ`,
+        `📝 Nội dung CK: <code>${escapeTelegramHtml(ctx.transferContent || '')}</code>`,
+        `🔑 Topup ID: <code>${escapeTelegramHtml(ctx.topupId || 'unknown')}</code>`,
+        `🕒 Mở QR: ${escapeTelegramHtml(openedLocal)} (đã chờ ~${waitedMin} phút)`,
+        '',
+        '👉 Kiểm tra Casso + duyệt thủ công nếu đã nhận tiền.'
+    ].join('\n');
+
+    try {
+        await sendTelegramMessage(msg);
+        ctx.reported = true;
+        showToast(t('payment.complaint_sent'));
+        if (btn) {
+            btn.textContent = t('payment.complaint_already_sent');
+            btn.classList.add('topup-complaint-btn--sent');
+        }
+    } catch (e) {
+        console.error('[TopupComplaint]', e);
+        if (btn) btn.disabled = false;
+        showToast(t('payment.complaint_error'));
+    }
+};
+
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
 const KALING_VAE_1080_10 = { cost: 7, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '1080p' };
@@ -2197,6 +2304,7 @@ window.openModal = (id) => {
 
 window.closeModal = (id) => {
     if (id === 'auth-modal') return; // non-dismissible
+    if (id === 'topup-modal') clearTopupComplaintState();
     document.getElementById(id).style.display = 'none';
 };
 
@@ -2267,6 +2375,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
     const { db, collection, addDoc, updateDoc, serverTimestamp, query, where, getDocs } = window.firebase;
     let transferContent = "";
+    let pendingTopupId = null;
     const TOPUP_PREFIX = "KL"; // Prefix Casso — Kaling (kaling.cloud)
     
     try {
@@ -2282,6 +2391,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
         if (!snapshot.empty) {
             const existingRef = snapshot.docs[0].ref;
             const existingDoc = snapshot.docs[0].data();
+            pendingTopupId = snapshot.docs[0].id;
             const staleCoins = Number(existingDoc.coins) !== Number(selectedTopupPackage.coins);
             const staleAmount = Number(existingDoc.amount) !== Number(selectedTopupPackage.amount);
 
@@ -2304,7 +2414,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
             const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
             transferContent = `${TOPUP_PREFIX}${selectedTopupPackage.coins}${randomStr}`;
             
-            await addDoc(collection(db, "topups"), {
+            const newTopupRef = await addDoc(collection(db, "topups"), {
                 userId: currentUser.uid,
                 userEmail: currentUser.email,
                 userName: currentUser.displayName,
@@ -2317,6 +2427,7 @@ window.selectTopup = async (id, method = 'vietqr') => {
                 createdAt: serverTimestamp(),
                 isAutomated: true
             });
+            pendingTopupId = newTopupRef.id;
             console.log("📝 Đã tạo bản ghi nạp tiền mới:", transferContent);
         }
     } catch (err) {
@@ -2324,6 +2435,21 @@ window.selectTopup = async (id, method = 'vietqr') => {
         const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
         transferContent = `${TOPUP_PREFIX}${selectedTopupPackage.coins}${randomStr}`;
     }
+
+    window.__topupComplaintCtx = {
+        topupId: pendingTopupId,
+        transferContent,
+        coins: selectedTopupPackage.coins,
+        amount: selectedTopupPackage.amount,
+        packageName: selectedTopupPackage.name,
+        packageId: selectedTopupPackage.id,
+        userId: currentUser.uid,
+        userEmail: currentUser.email || '',
+        userName: currentUser.displayName || currentUser.email || '',
+        openedAt: Date.now(),
+        reported: false
+    };
+    scheduleTopupComplaintButton();
 
     document.getElementById('topup-package-info').innerHTML = `
         <div class="topup-info-card">

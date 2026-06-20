@@ -48,7 +48,15 @@ window.TRANSLATIONS = {
             paypal_cancelled: "Bạn đã hủy thanh toán PayPal.",
             paypal_error: "Lỗi PayPal: {msg}",
             paypal_render_error: "Lỗi hiển thị PayPal: {msg}",
-            paypal_load_error: "Lỗi tải PayPal: {msg}"
+            paypal_load_error: "Lỗi tải PayPal: {msg}",
+            complaint_hint: "Coin thường tự cộng trong 1–3 phút. Sau 5 phút chưa thấy, bấm nút bên dưới.",
+            complaint_hint_ready: "Đã quá 5 phút? Bấm gửi khiếu nại — admin sẽ kiểm tra và cộng coin thủ công.",
+            complaint_btn: "Chưa nhận coin? Gửi khiếu nại",
+            complaint_btn_wait: "Gửi khiếu nại (sau {mins} phút)",
+            complaint_sent: "Đã gửi khiếu nại. Admin sẽ kiểm tra sớm!",
+            complaint_already_sent: "Đã gửi khiếu nại cho đơn này rồi.",
+            complaint_wait: "Vui lòng chờ thêm {mins} phút sau khi chuyển khoản.",
+            complaint_error: "Không gửi được khiếu nại. Thử lại hoặc chat Telegram."
         },
         build_channel: {
             coming_soon_title: "Tính năng đang phát triển",
@@ -757,7 +765,15 @@ window.TRANSLATIONS = {
             paypal_cancelled: "You cancelled the PayPal payment.",
             paypal_error: "PayPal error: {msg}",
             paypal_render_error: "PayPal display error: {msg}",
-            paypal_load_error: "Failed to load PayPal: {msg}"
+            paypal_load_error: "Failed to load PayPal: {msg}",
+            complaint_hint: "Coins usually arrive in 1–3 minutes. If nothing after 5 minutes, tap below.",
+            complaint_hint_ready: "Over 5 minutes? Send a complaint — admin will verify and credit manually.",
+            complaint_btn: "No coins yet? Report issue",
+            complaint_btn_wait: "Report issue (after {mins} min)",
+            complaint_sent: "Complaint sent. Admin will check soon!",
+            complaint_already_sent: "Complaint already sent for this order.",
+            complaint_wait: "Please wait {mins} more minute(s) after transferring.",
+            complaint_error: "Could not send complaint. Try again or chat on Telegram."
         },
         build_channel: {
             coming_soon_title: "Feature in development",

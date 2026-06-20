@@ -1284,6 +1284,35 @@ button {
   gap: 15px;
 }
 
+.topup-complaint-wrap {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.topup-complaint-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.topup-complaint-btn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 10px;
+}
+
+.topup-complaint-btn--waiting {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.topup-complaint-btn--sent {
+  opacity: 0.75;
+}
+
 .coin-visual-wrapper {
   background: rgba(0, 242, 254, 0.1);
   width: 50px;
