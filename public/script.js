@@ -38,6 +38,33 @@ function formatCoinAmount(value) {
     return String(normalizeCoins(value));
 }
 
+function hasApprovedTopupHistory() {
+    return (FB_CACHE.myTopups || []).some((t) => t.status === 'approved');
+}
+
+async function ensureMyTopupsLoaded() {
+    if (fbHas('myTopups') && Array.isArray(FB_CACHE.myTopups)) {
+        return FB_CACHE.myTopups;
+    }
+    if (!currentUser || !window.firebase) return [];
+    const { db, collection, query, where, getDocs } = window.firebase;
+    const snap = await getDocs(query(collection(db, 'topups'), where('userId', '==', currentUser.uid)));
+    FB_CACHE.myTopups = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return FB_CACHE.myTopups;
+}
+
+function promptInsufficientCoinsAndTopup() {
+    window.niceConfirm({
+        title: t('modals.insufficient_coins_title'),
+        message: t('modals.insufficient_coins_msg'),
+        icon: '💰',
+        onConfirm: () => {
+            closeModal('order-modal');
+            if (window.openPricingModal) window.openPricingModal();
+        }
+    });
+}
+
 async function getVideoDurationFromUrl(url) {
     if (!url) return null;
     try {
@@ -3006,6 +3033,16 @@ async function setupEventListeners() {
                 return;
             }
 
+            try {
+                await ensureMyTopupsLoaded();
+                if (!hasApprovedTopupHistory()) {
+                    promptInsufficientCoinsAndTopup();
+                    return;
+                }
+            } catch (topupCheckErr) {
+                console.warn('[topup-check] failed:', topupCheckErr);
+            }
+
             const { db, doc, collection, runTransaction, serverTimestamp } = window.firebase;
             const submitBtn = document.getElementById('order-submit-btn');
             const progressDiv = document.getElementById('upload-progress');
@@ -3236,15 +3273,7 @@ async function setupEventListeners() {
             } catch (error) {
                 console.error(error);
                 if (error === t('modals.insufficient_coins_title')) {
-                    window.niceConfirm({
-                        title: t('modals.insufficient_coins_title'),
-                        message: t('modals.insufficient_coins_msg'),
-                        icon: "💰",
-                        onConfirm: () => {
-                            closeModal('order-modal');
-                            if (window.openPricingModal) window.openPricingModal();
-                        }
-                    });
+                    promptInsufficientCoinsAndTopup();
                 } else if (error === t('modals.promo1coin_daily_limit') || error === t('modals.promo1coin_max_reached')) {
                     showToast(error);
                     syncPromo1CoinState(FB_CACHE.myOrders || [], window.__currentUserData);
