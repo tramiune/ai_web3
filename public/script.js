@@ -8,7 +8,7 @@ export { APP_CLIENT_VERSION };
 
 const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
 const TELEGRAM_CHAT_ID = '6067707939';
-const TOPUP_COMPLAINT_DELAY_MS = 5 * 60 * 1000;
+const TOPUP_COMPLAINT_DELAY_MS = 30 * 1000;
 
 let topupComplaintTimer = null;
 
@@ -26,7 +26,7 @@ function resetTopupComplaintUi() {
     if (btn) {
         btn.disabled = true;
         btn.classList.add('topup-complaint-btn--waiting');
-        btn.textContent = t('payment.complaint_btn_wait', { mins: 5 });
+        btn.textContent = t('payment.complaint_btn_wait', { secs: 30 });
     }
 }
 
@@ -71,8 +71,8 @@ window.reportTopupComplaint = async () => {
     }
     const elapsed = Date.now() - (ctx.openedAt || 0);
     if (elapsed < TOPUP_COMPLAINT_DELAY_MS) {
-        const mins = Math.max(1, Math.ceil((TOPUP_COMPLAINT_DELAY_MS - elapsed) / 60000));
-        showToast(t('payment.complaint_wait', { mins }));
+        const secs = Math.max(1, Math.ceil((TOPUP_COMPLAINT_DELAY_MS - elapsed) / 1000));
+        showToast(t('payment.complaint_wait', { secs }));
         return;
     }
     if (ctx.reported) {
@@ -84,7 +84,7 @@ window.reportTopupComplaint = async () => {
     if (btn) btn.disabled = true;
 
     const openedLocal = new Date(ctx.openedAt).toLocaleString('vi-VN');
-    const waitedMin = Math.max(1, Math.round(elapsed / 60000));
+    const waitedSec = Math.max(1, Math.round(elapsed / 1000));
     const msg = [
         '🆘 <b>[Kaling] KHIẾU NẠI NẠP COIN</b>',
         '',
@@ -95,7 +95,7 @@ window.reportTopupComplaint = async () => {
         `💵 Số tiền: ${Number(ctx.amount || 0).toLocaleString('vi-VN')}đ`,
         `📝 Nội dung CK: <code>${escapeTelegramHtml(ctx.transferContent || '')}</code>`,
         `🔑 Topup ID: <code>${escapeTelegramHtml(ctx.topupId || 'unknown')}</code>`,
-        `🕒 Mở QR: ${escapeTelegramHtml(openedLocal)} (đã chờ ~${waitedMin} phút)`,
+        `🕒 Mở QR: ${escapeTelegramHtml(openedLocal)} (đã chờ ~${waitedSec} giây)`,
         '',
         '👉 Kiểm tra Casso + duyệt thủ công nếu đã nhận tiền.'
     ].join('\n');
