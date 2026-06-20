@@ -1382,6 +1382,16 @@
             </linearGradient>
         </defs>
     </svg>
+    <!-- Blocking overlay while trimming video on submit (non-dismissible) -->
+    <div id="video-trim-overlay" class="video-trim-overlay" style="display: none;" aria-hidden="true"
+        role="alertdialog" aria-modal="true" aria-labelledby="video-trim-title">
+        <div class="video-trim-card">
+            <div class="video-trim-spinner" aria-hidden="true"></div>
+            <h3 id="video-trim-title" class="video-trim-title" data-i18n="modals.video_trim_title">Đang cắt video...</h3>
+            <p id="video-trim-desc" class="video-trim-desc" data-i18n="modals.video_trim_wait">Vui lòng không tắt trang hoặc chuyển tab.</p>
+        </div>
+    </div>
+
     <!-- Forced Auth Modal (non-dismissible) -->
     <div id="auth-modal" class="auth-modal-overlay" style="display: none;">
         <div class="auth-modal-card">

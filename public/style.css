@@ -5024,3 +5024,82 @@ section {
   border-color: rgba(255, 80, 80, 1) !important;
 }
 
+/* ========== Video trim blocking overlay (submit) ========== */
+body.video-trim-active {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.video-trim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(5, 5, 8, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: all;
+}
+
+.video-trim-card {
+  background: linear-gradient(145deg, rgba(30, 20, 60, 0.97), rgba(15, 10, 35, 0.98));
+  border: 1px solid rgba(138, 43, 226, 0.35);
+  border-radius: 20px;
+  padding: 2rem 1.75rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(138, 43, 226, 0.2), 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.video-trim-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1.25rem;
+  border-radius: 50%;
+  border: 3px solid rgba(138, 43, 226, 0.2);
+  border-top-color: var(--primary, #8a2be2);
+  animation: videoTrimSpin 0.9s linear infinite;
+}
+
+@keyframes videoTrimSpin {
+  to { transform: rotate(360deg); }
+}
+
+.video-trim-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.video-trim-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.video-trim-hint-badge {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+  background: rgba(138, 43, 226, 0.88);
+  pointer-events: none;
+  z-index: 2;
+}
+
+#preview-video-container,
+#preview-tiktok-video-container {
+  position: relative;
+}
