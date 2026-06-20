@@ -3483,16 +3483,6 @@ async function setupEventListeners() {
                 return;
             }
 
-            try {
-                await ensureMyTopupsLoaded();
-                if (!hasApprovedTopupHistory()) {
-                    promptInsufficientCoinsAndTopup();
-                    return;
-                }
-            } catch (topupCheckErr) {
-                console.warn('[topup-check] failed:', topupCheckErr);
-            }
-
             const { db, doc, collection, runTransaction, serverTimestamp } = window.firebase;
             const submitBtn = document.getElementById('order-submit-btn');
             const progressDiv = document.getElementById('upload-progress');
