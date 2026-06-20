@@ -302,6 +302,13 @@ def submit_to_roboneo(order_id: str) -> bool:
             if not char_path or not vid_path:
                 raise RoboNeoError("Không tải được ảnh/video từ link đơn hàng")
 
+            try:
+                from order_media import trim_reference_video_for_order
+
+                vid_path = trim_reference_video_for_order(vid_path, data)
+            except Exception as trim_err:
+                print(f"⚠️ Server trim thất bại {order_id}: {trim_err}")
+
             duration = video_duration_sec(vid_path)
 
             if is_roboneo_trial_order(data):

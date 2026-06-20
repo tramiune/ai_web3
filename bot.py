@@ -1553,6 +1553,13 @@ def submit_to_aidancing(order_id, fallback_reason=None):
                 if vid_path and os.path.exists(vid_path): os.remove(vid_path)
                 return
 
+            try:
+                from order_media import trim_reference_video_for_order
+
+                vid_path = trim_reference_video_for_order(vid_path, data)
+            except Exception as trim_err:
+                print(f"⚠️ Server trim thất bại {order_id}: {trim_err}")
+
             if use_api_mode():
                 try:
                     model_id = data.get('modelId', '124')

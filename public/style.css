@@ -5033,7 +5033,7 @@ body.video-trim-active {
 .video-trim-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100010;
+  z-index: 100300;
   display: flex;
   align-items: center;
   justify-content: center;
