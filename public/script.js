@@ -117,8 +117,6 @@ window.reportTopupComplaint = async () => {
 
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
-const KALING_VAE_1080_10 = { cost: 7, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '1080p' };
-const KALING_VAE_1080_20 = { cost: 13, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '1080p' };
 const KALING_VAE_1080_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '1080p' };
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_1080_30.maxVideoSec;
 const ROBONEO_TRIAL = {
@@ -553,26 +551,6 @@ const MODELS = {
         maxVideoSec: KALING_VAE_20.maxVideoSec,
         vaeDurationSec: KALING_VAE_20.vaeDurationSec,
         vaeResolution: KALING_VAE_20.vaeResolution,
-    },
-    vae1080_10: {
-        nameKey: "modals.model_vae1080_10",
-        cost: KALING_VAE_1080_10.cost,
-        timeKey: "modals.model_vae1080_10_desc",
-        modelId: "126",
-        renderProvider: "videoaieasy",
-        maxVideoSec: KALING_VAE_1080_10.maxVideoSec,
-        vaeDurationSec: KALING_VAE_1080_10.vaeDurationSec,
-        vaeResolution: KALING_VAE_1080_10.vaeResolution,
-    },
-    vae1080_20: {
-        nameKey: "modals.model_vae1080_20",
-        cost: KALING_VAE_1080_20.cost,
-        timeKey: "modals.model_vae1080_20_desc",
-        modelId: "128",
-        renderProvider: "videoaieasy",
-        maxVideoSec: KALING_VAE_1080_20.maxVideoSec,
-        vaeDurationSec: KALING_VAE_1080_20.vaeDurationSec,
-        vaeResolution: KALING_VAE_1080_20.vaeResolution,
     },
     vae1080_30: {
         nameKey: "modals.model_vae1080_30",

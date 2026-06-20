@@ -17,6 +17,7 @@ serviceAccountKey.json
 account_pool.json
 videoaieasy_session_*.json
 bot_chrome_profile/
+.run/
 *.mp4
 *.png
 !public/favicon.png

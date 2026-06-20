@@ -10,9 +10,18 @@ from videoaieasy_web import duration_for_order
 
 
 def max_reference_video_sec_for_order(order_data: dict | None) -> float:
-    if is_roboneo_trial_order(order_data):
+    """Giới hạn giây video motion theo gói — server cắt nếu upload dài hơn."""
+    data = order_data or {}
+    if is_roboneo_trial_order(data):
         return float(TRIAL_MAX_SEC)
-    return float(duration_for_order(order_data))
+    for key in ("maxVideoSec", "vaeDurationSec", "durationSec"):
+        val = data.get(key)
+        if val is not None:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                pass
+    return float(duration_for_order(data))
 
 
 def trim_reference_video_for_order(vid_path: str | Path, order_data: dict | None) -> str:

@@ -1878,6 +1878,13 @@ def check_finished_orders():
     except Exception as e:
         print(f"❌ Lỗi monitor: {e}")
 
+def _enqueue_pending_order(order_id):
+    """Đưa đơn vào hàng đợi nạp (retry slot VAE, v.v.)."""
+    _ensure_pending_worker()
+    with _pending_queue_lock:
+        if order_id not in _pending_order_queue:
+            _pending_order_queue.append(order_id)
+
 def on_pending_orders_snapshot(keys, changes, read_time):
     if not is_bot_enabled():
         return
@@ -1939,6 +1946,10 @@ def start_bot():
         print("❌ Tên bot không hợp lệ. Dùng: python bot.py --name aidancing-vps1")
         sys.exit(1)
 
+    from bot_singleton import acquire_bot_instance_lock
+
+    acquire_bot_instance_lock(BOT_NAME)
+
     print(f"📡 Kaling BOT [{BOT_NAME}] (VideoAiEasy — mode={os.environ.get('BOT_MODE', 'browser')}) đang khởi động...")
     cdp_url = os.environ.get("BOT_CDP_URL", "").strip()
     if cdp_url:
@@ -1987,6 +1998,7 @@ def start_bot():
             min_render_sec=MIN_RENDER_SEC,
             vae_min_render_sec=VIDEOAIEASY_MIN_RENDER_SEC,
             skip_if_order_done=_skip_if_order_done,
+            enqueue_pending_order=_enqueue_pending_order,
         )
 
     start_bot_control_listener()

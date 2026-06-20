@@ -1,16 +1,12 @@
 #!/bin/bash
-# Chạy Kaling bot trên Mac (một instance duy nhất — không chạy song song VPS).
+# Chạy Kaling bot trên Mac — chỉ 1 instance (lock file + script).
 set -eo pipefail
 cd "$(dirname "$0")"
-if pgrep -f "python3 bot.py --name kaling_vps_bot" >/dev/null 2>&1; then
-  echo "Kaling bot đã chạy: $(pgrep -f 'python3 bot.py --name kaling_vps_bot' | head -1)"
-  exit 0
+if [ -f .env ]; then
+  set -a
+  set +u
+  # shellcheck disable=SC1091
+  source .env 2>/dev/null || true
+  set +a
 fi
-set -a
-set +u
-source .env
-set -u
-set +a
-export PYTHONUNBUFFERED=1
-nohup python3 bot.py --name kaling_vps_bot --mode api >> bot_restart.log 2>&1 &
-echo "Started Kaling bot PID $!"
+exec ./scripts/run-bot-single.sh kaling_vps_bot --mode api

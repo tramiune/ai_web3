@@ -24,7 +24,6 @@ from account_pool import (
     refresh_account_credits,
     release_reserved,
     required_credits_from_cost,
-    sync_stale_pool_credits,
     update_account_after_job,
     video_duration_sec,
     _pool_path,
@@ -240,6 +239,7 @@ def submit_to_roboneo(order_id: str) -> bool:
     vid_path = None
     data: dict = {}
     doc_ref = None
+    max_attempts = int(get_env("ROBONEO_SUBMIT_ATTEMPTS", "3"))
     try:
         with _submit_engine_lock():
             db = _g["db"]
@@ -285,7 +285,6 @@ def submit_to_roboneo(order_id: str) -> bool:
             vid_path = None
             download_file = _g["download_file"]
             session_error_backoff = _g.get("session_error_backoff", {})
-            max_attempts = int(get_env("ROBONEO_SUBMIT_ATTEMPTS", "3"))
             excluded_nicks: set[str] = set()
             last_credit_err: str | None = None
             need = 0
@@ -351,7 +350,15 @@ def submit_to_roboneo(order_id: str) -> bool:
                     if attempt > 1:
                         print(
                             f"→ Retry RoboNeo {attempt}/{max_attempts} "
-                            f"(đổi nick, đã loại {len(excluded_nicks)})…"
+                            f"(xoay IP, đã loại {len(excluded_nicks)} nick)…"
+                        )
+                        from account_pool import rotate_proxy_for_retry
+
+                        rotate_proxy_for_retry()
+                    else:
+                        print(
+                            f"→ RoboNeo lần {attempt}/{max_attempts} "
+                            f"(đã loại {len(excluded_nicks)} nick)…"
                         )
 
                     surface = _roboneo_surface()
@@ -525,14 +532,12 @@ def submit_to_roboneo(order_id: str) -> bool:
             if success:
                 return True
 
-            # Hết nick — giữ pending, retry sau (không hoàn coin khách)
-            backoff_sec = int(get_env("ROBONEO_CREDIT_BACKOFF_SEC", "120"))
-            session_error_backoff[order_id] = time.time() + backoff_sec
             err_msg = last_credit_err or f"Không có nick đủ credit sau {max_attempts} lần"
-            print(f"⏸ Đơn {order_id} chờ retry sau {backoff_sec}s — {err_msg}")
-            _g["notify_internal_error_telegram"](
-                order_id, data, err_msg, "submit roboneo (thiếu credit, sẽ retry)"
+            print(
+                f"⚠ RoboNeo thử {max_attempts} lần không được ({order_id}) — "
+                f"chuyển VAE: {err_msg}"
             )
+            session_error_backoff.pop(order_id, None)
             return False
     except (
         requests.RequestException,
@@ -540,27 +545,11 @@ def submit_to_roboneo(order_id: str) -> bool:
         RoboNeoGatewayError,
         RoboNeoError,
     ) as e:
-        if _is_credit_error(e):
-            backoff_sec = int(get_env("ROBONEO_CREDIT_BACKOFF_SEC", "120"))
-            _g.get("session_error_backoff", {})[order_id] = time.time() + backoff_sec
-            print(f"⏸ Đơn {order_id} chờ retry sau {backoff_sec}s — {e}")
-            _g["notify_internal_error_telegram"](
-                order_id, data, str(e), "submit roboneo (thiếu credit, sẽ retry)"
-            )
-            return False
-        print(f"❌ Nạp RoboNeo thất bại {order_id}: {e}")
-        _g["notify_internal_error_telegram"](order_id, data, str(e), "submit roboneo")
-        if doc_ref is not None:
-            doc = doc_ref.get()
-            data = doc.to_dict() or {}
-            if data.get("status") == "pending":
-                _fail_order_processing(
-                    doc,
-                    data,
-                    str(e),
-                    USER_NOTE_SUBMIT_FAILED,
-                    "submit roboneo",
-                )
+        session_error_backoff.pop(order_id, None)
+        print(
+            f"⚠ RoboNeo thử {max_attempts} lần không được ({order_id}) — "
+            f"chuyển VAE: {e}"
+        )
         return False
     finally:
         if char_path and os.path.exists(char_path):
@@ -651,10 +640,8 @@ def poll_roboneo_orders(orders_to_check):
 
 
 def log_pool_on_startup():
+    """In thống kê pool — không login/sync credit lúc startup (tránh 45130 cùng IP)."""
     surface = _roboneo_surface()
-    synced = sync_stale_pool_credits(surface=surface)
-    if synced:
-        print(f"🔄 Đã sync credit {synced} nick (session, không login thừa)")
     floor = min_pick_credits()
     rows = list_eligible_accounts(floor)
     all_rows = [a for a in list_accounts() if a.get("status") == "active"]

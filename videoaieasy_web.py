@@ -9,6 +9,8 @@ import json
 import mimetypes
 import os
 import re
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -47,6 +49,12 @@ VAE_PACKAGE_20_DURATION_SEC = 20
 VAE_PACKAGE_30_DURATION_SEC = 30
 VAE_CREDITS_BY_DURATION = {10: 1, 20: 2, 30: 3}
 VAE_CREDITS_1080_BY_DURATION = {10: 2, 20: 4, 30: 6}
+# VAE API: 10 coins = 1 xu (profile.coins)
+VAE_COINS_720P_BY_DURATION = {10: 10, 20: 20, 30: 30}
+VAE_COINS_1080P_BY_DURATION = {10: 20, 20: 40, 30: 60}
+VAE_API_MODEL_MOTION_720P = "weavy-kling-26"
+VAE_API_MODEL_MOTION_1080P = "pixverse"
+VAE_MAX_UPLOAD_BYTES = int(get_env("VIDEOAIEASY_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 DEFAULT_VAE_RESOLUTION = "720p"
 
 
@@ -259,18 +267,22 @@ class VideoAiEasyClient:
         resolution: str | None = None,
         duration_sec: int | None = None,
     ) -> str:
+        res = normalize_vae_resolution(resolution)
+        dur = normalize_vae_duration_sec(duration_sec)
+        api_model = vae_motion_api_model(res)
         body = {
             "mode": "motion-control",
-            "modelId": model_id,
+            "modelId": api_model,
             "prompt": (prompt or get_env(
                 "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
             )).strip(),
             "inputImageUrl": input_image_url.strip(),
             "drivingVideoUrl": driving_video_url.strip(),
-            "resolution": normalize_vae_resolution(resolution),
+            "durationSec": dur,
         }
-        if duration_sec is not None:
-            body["durationSec"] = int(duration_sec)
+        # weavy-kling-26 (720p tiết kiệm): web VAE không gửi resolution — kling-2.6+720p → server ép 15s, 30 coins
+        if api_model == VAE_API_MODEL_MOTION_1080P:
+            body["resolution"] = res
         resp = self._api(
             "POST",
             "/api/jobs",
@@ -370,11 +382,28 @@ def normalize_vae_duration_sec(value: int | float | str | None) -> int:
     return VAE_PACKAGE_10_DURATION_SEC
 
 
-def vae_credits_for_duration(duration_sec: int, resolution: str | None = None) -> int:
+def vae_motion_api_model(resolution: str | None) -> str:
+    """ModelId đúng trên VAE motion-control (khác alias nội bộ kling-2.6)."""
+    if normalize_vae_resolution(resolution) == "1080p":
+        return VAE_API_MODEL_MOTION_1080P
+    return VAE_API_MODEL_MOTION_720P
+
+
+def vae_coins_for_duration(duration_sec: int, resolution: str | None = None) -> int:
+    """Số coins VAE trừ (10 coins = 1 xu trên profile)."""
     dur = int(duration_sec)
     if normalize_vae_resolution(resolution) == "1080p":
-        return VAE_CREDITS_1080_BY_DURATION.get(dur, 2)
-    return VAE_CREDITS_BY_DURATION.get(dur, 1)
+        return VAE_COINS_1080P_BY_DURATION.get(dur, 20)
+    return VAE_COINS_720P_BY_DURATION.get(dur, 10)
+
+
+def vae_credits_for_duration(duration_sec: int, resolution: str | None = None) -> int:
+    """Alias — trả coins VAE (không phải xu)."""
+    return vae_coins_for_duration(duration_sec, resolution)
+
+
+def vae_xu_for_duration(duration_sec: int, resolution: str | None = None) -> float:
+    return vae_coins_for_duration(duration_sec, resolution) / 10.0
 
 
 def profile_credits(profile: dict | None) -> int:
@@ -415,11 +444,16 @@ def is_vae_credit_error(err: object) -> bool:
 
 def duration_for_order(order_data: dict | None) -> int:
     """Map đơn Kaling → gói VAE: 10s, 20s hoặc 30s."""
+    from roboneo_trial import is_roboneo_trial_order
+
     data = order_data or {}
     for key in ("vaeDurationSec", "durationSec"):
         val = data.get(key)
         if val is not None:
             return normalize_vae_duration_sec(val)
+    if is_roboneo_trial_order(data):
+        # Gói thử RoboNeo 12s — fallback VAE dùng gói tiết kiệm 10s (1 xu).
+        return VAE_PACKAGE_10_DURATION_SEC
     model_id = str(data.get("modelId") or "").strip()
     if model_id in KALING_VAE_1080_30_MODEL_IDS:
         return VAE_PACKAGE_30_DURATION_SEC
@@ -508,3 +542,110 @@ def prepare_character_image_for_vae(
         f"(pad đen + resize, tỉ lệ {ar_label})"
     )
     return out_path, True
+
+
+def _ffmpeg_bin() -> str | None:
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        import shutil
+
+        return shutil.which("ffmpeg")
+
+
+def prepare_motion_video_for_vae_upload(
+    source_path: str,
+    *,
+    max_seconds: float | None = None,
+    max_bytes: int | None = None,
+) -> tuple[str, bool]:
+    """Cắt video về đúng gói 10/20/30s trước upload — VAE tính xu theo video thật, không chỉ durationSec API."""
+    src = Path(source_path)
+    if not src.is_file():
+        raise VideoAiEasyError(f"File không tồn tại: {source_path}")
+
+    limit = max_bytes if max_bytes is not None else VAE_MAX_UPLOAD_BYTES
+    ffmpeg = _ffmpeg_bin()
+    work_path = src
+    work_tmp = False
+
+    if max_seconds is not None and max_seconds > 0 and ffmpeg:
+        fd, outp = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
+        trim_out = Path(outp)
+        cmd = [
+            ffmpeg, "-y", "-i", str(work_path),
+            "-t", str(max_seconds),
+            "-c", "copy", "-movflags", "+faststart", str(trim_out),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            cmd = [
+                ffmpeg, "-y", "-i", str(work_path),
+                "-t", str(max_seconds),
+                "-c:v", "libx264", "-preset", "fast", "-crf", "28",
+                "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
+                str(trim_out),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0 and trim_out.is_file():
+            if work_tmp and work_path != src:
+                try:
+                    work_path.unlink()
+                except OSError:
+                    pass
+            work_path = trim_out
+            work_tmp = True
+            print(f"✂️ Cắt video motion → {max_seconds}s (VAE gói {int(max_seconds)}s)")
+        elif max_seconds is not None:
+            raise VideoAiEasyError(
+                f"Không cắt được video về {max_seconds}s — VAE sẽ tính xu theo video dài hơn gói"
+            )
+    elif max_seconds is not None and max_seconds > 0 and not ffmpeg:
+        raise VideoAiEasyError("Thiếu ffmpeg — không cắt video VAE theo gói được")
+
+    size = work_path.stat().st_size
+    if size <= limit:
+        return str(work_path), work_tmp
+
+    if not ffmpeg:
+        raise VideoAiEasyError(
+            f"Video {size / (1024 * 1024):.1f}MB > giới hạn VAE "
+            f"{limit / (1024 * 1024):.0f}MB — cần ffmpeg để nén"
+        )
+
+    mb = size / (1024 * 1024)
+    print(f"📦 Video {mb:.1f}MB > {limit / (1024 * 1024):.0f}MB — nén trước upload VAE...")
+    for crf in (28, 32, 36):
+        fd, outp = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
+        out_path = Path(outp)
+        cmd = [ffmpeg, "-y", "-i", str(work_path)]
+        if max_seconds is not None and max_seconds > 0:
+            cmd.extend(["-t", str(max_seconds)])
+        cmd.extend([
+            "-c:v", "libx264", "-preset", "fast", "-crf", str(crf),
+            "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
+            str(out_path),
+        ])
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0 or not out_path.is_file():
+            continue
+        if out_path.stat().st_size <= limit:
+            if work_tmp and work_path != src:
+                try:
+                    work_path.unlink()
+                except OSError:
+                    pass
+            print(f"✅ Nén VAE OK (crf {crf}) → {out_path.stat().st_size / (1024 * 1024):.1f}MB")
+            return str(out_path), True
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+
+    raise VideoAiEasyError(
+        f"Video vẫn > {limit / (1024 * 1024):.0f}MB sau khi nén — chọn video ngắn/nhẹ hơn"
+    )

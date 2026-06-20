@@ -87,11 +87,9 @@ send "pip3 install -q -r requirements.txt\r"
 expect -re {\$ |# }
 send "python3 -m playwright install chromium\r"
 expect -re {\$ |# }
-send "pkill -f 'python3 bot.py --name kaling_vps_bot' 2>/dev/null || true\r"
+send "bash scripts/run-bot-single.sh kaling_vps_bot --mode api\r"
 expect -re {\$ |# }
-send "set -a && set +u && source .env && set +a && PYTHONUNBUFFERED=1 nohup python3 bot.py --name kaling_vps_bot --mode api >> bot_restart.log 2>&1 &\r"
-expect -re {\$ |# }
-send "sleep 5 && pgrep -af kaling_vps_bot && tail -15 bot_restart.log\r"
+send "sleep 5 && pgrep -af 'bot.py --name kaling_vps_bot' && tail -15 bot_restart.log\r"
 expect -re {\$ |# }
 send "exit\r"
 expect eof

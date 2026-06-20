@@ -28,10 +28,14 @@ from videoaieasy_web import (
     MODEL_KLING_30,
     is_vae_credit_error,
     prepare_character_image_for_vae,
+    prepare_motion_video_for_vae_upload,
     profile_credits,
     resolution_for_order,
     duration_for_order,
     vae_credits_for_duration,
+    vae_coins_for_duration,
+    vae_motion_api_model,
+    vae_xu_for_duration,
 )
 from tool98_api import probe_video_duration_seconds, trim_video_to_seconds
 
@@ -47,7 +51,8 @@ _RENDER_PROVIDERS = (
     RENDER_PROVIDER_VIDEOAIEASY,
     RENDER_PROVIDER_ROBONEO,
 )
-VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("VIDEOAIEASY_MAX_CONCURRENT", "4"))
+VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("VIDEOAIEASY_MAX_CONCURRENT", "50"))
+VIDEOAIEASY_SLOT_RETRY_SEC = int(get_env("VIDEOAIEASY_SLOT_RETRY_SEC", "20"))
 AIDANCING_TURBO_MODEL_IDS = frozenset({"117"})
 AIDANCING_FAST_MODEL_IDS = frozenset({"124", "125"})
 XIAOYANG_MODAL_STANDARD = "motion_v26"
@@ -111,7 +116,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
     _g["print"](
-        "🎬 Kaling: gói 720p/10s → RoboNeo · gói 720p/20s & 1080p → VideoAiEasy (VAE)"
+        "🎬 Kaling: gói RoboNeo 720p → RoboNeo · VAE/1080p → VideoAiEasy · video dài hơn gói → server cắt"
     )
 
 
@@ -195,17 +200,39 @@ def _use_videoaieasy() -> bool:
     return enabled_for_bot(_g.get("bot_name"))
 
 
-def _kaling_order_provider(order_data: dict) -> str:
-    """Gói RoboNeo (124, 130 trial) → RoboNeo; các gói khác → VideoAiEasy."""
-    rp = (order_data.get("renderProvider") or "").strip().lower()
-    if rp == RENDER_PROVIDER_ROBONEO:
-        return RENDER_PROVIDER_ROBONEO
-    if rp == RENDER_PROVIDER_VIDEOAIEASY:
-        return RENDER_PROVIDER_VIDEOAIEASY
-    from roboneo_trial import KALING_ROBONEO_MODEL_IDS
+def _probe_order_video_duration(order_data: dict) -> float | None:
+    url = (order_data.get("referenceVideoLink") or "").strip()
+    if not url:
+        return None
+    try:
+        return probe_video_duration_seconds(url)
+    except Exception as e:
+        print(f"⚠️ Không probe được duration video: {e}")
+        return None
 
+
+def _kaling_uses_roboneo(order_data: dict) -> bool:
+    """720p gói RoboNeo (124, 130) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói."""
+    from roboneo_trial import KALING_ROBONEO_MODEL_IDS, is_roboneo_trial_order
+
+    if resolution_for_order(order_data) != "720p":
+        return False
+    if is_roboneo_trial_order(order_data):
+        return True
     model_id = str(order_data.get("modelId") or "").strip()
     if model_id in KALING_ROBONEO_MODEL_IDS:
+        return True
+    rp = (order_data.get("renderProvider") or "").strip().lower()
+    return rp == RENDER_PROVIDER_ROBONEO
+
+
+def _kaling_order_provider(
+    order_data: dict,
+    *,
+    video_duration_sec: float | None = None,
+) -> str:
+    """Gói RoboNeo 720p → RoboNeo; gói VAE/1080p → VideoAiEasy. Video dài → server cắt, không đổi provider."""
+    if _kaling_uses_roboneo(order_data):
         return RENDER_PROVIDER_ROBONEO
     return RENDER_PROVIDER_VIDEOAIEASY
 
@@ -730,22 +757,23 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str
                 model_id = _videoaieasy_model_for_order(data)
                 duration_sec = duration_for_order(data)
                 resolution = resolution_for_order(data)
-                vae_credits = vae_credits_for_duration(duration_sec, resolution)
-                max_sec = duration_sec
+                vae_coins = vae_coins_for_duration(duration_sec, resolution)
+                vae_xu = vae_xu_for_duration(duration_sec, resolution)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()
                 api = _get_vae_web_client(account_id)
                 profile = _ensure_vae_web_session(api, account_email, account.get("password"))
                 have = profile_credits(profile)
-                if have < vae_credits:
+                if have < vae_coins:
                     raise VideoAiEasyCreditError(
-                        f"Không đủ credit VAE: cần {vae_credits}, có {have}"
+                        f"Không đủ coin VAE: cần {vae_coins} ({vae_xu:g} xu), có {have}"
                     )
+                api_model = vae_motion_api_model(resolution)
                 print(
-                    f"🚀 [VideoAiEasy/{nick_label}] Kling 2.6 — "
-                    f"gói {duration_sec}s {resolution} ({vae_credits} xu VAE, có {have}) · "
-                    f"modelId={data.get('modelId')} → {model_id}..."
+                    f"🚀 [VideoAiEasy/{nick_label}] {api_model} — "
+                    f"gói {duration_sec}s {resolution} ({vae_xu:g} xu / {vae_coins} coins, có {have}) · "
+                    f"modelId={data.get('modelId')} → VAE {api_model}..."
                 )
                 for attempt in range(1, 3):
                     if attempt > 1:
@@ -762,17 +790,17 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str
                 vae_char_path, vae_char_is_tmp = prepare_character_image_for_vae(
                     char_path, aspect_ratio=aspect
                 )
-                vid_upload_path = vid_path
-                dur = probe_video_duration_seconds(vid_path)
-                if dur is None or dur > max_sec + 0.25:
-                    fd, outp = tempfile.mkstemp(suffix=".mp4")
-                    os.close(fd)
-                    trim_video_to_seconds(
-                        Path(vid_path), max_seconds=max_sec, output=Path(outp)
+                vid_upload_path, vid_trim_tmp_flag = prepare_motion_video_for_vae_upload(
+                    vid_path, max_seconds=duration_sec
+                )
+                if vid_trim_tmp_flag:
+                    vid_trim_tmp = vid_upload_path
+                probed = probe_video_duration_seconds(vid_upload_path)
+                if probed is not None:
+                    print(
+                        f"📏 Video upload VAE: {probed:.1f}s "
+                        f"(gói {duration_sec}s → {vae_xu_for_duration(duration_sec, resolution):g} xu)"
                     )
-                    vid_upload_path = outp
-                    vid_trim_tmp = outp
-                    print(f"✂️ Cắt video motion → {max_sec}s (VAE)")
 
                 print("📤 Upload ảnh lên videoaieasy.hdgr.online...")
                 image_url = api.upload_file(vae_char_path, kind="image")
@@ -848,9 +876,54 @@ def _try_submit_xiaoyang(order_id: str) -> bool:
     return submit_to_xiaoyang(order_id, account)
 
 
-def _try_submit_videoaieasy(order_id: str) -> bool:
+def _defer_vae_slot_wait(order_id: str):
+    wait = max(5, VIDEOAIEASY_SLOT_RETRY_SEC)
+    backoff = _g.get("session_error_backoff")
+    if backoff is not None:
+        backoff[order_id] = time.time() + wait
+    enqueue = _g.get("enqueue_pending_order")
+    if enqueue:
+        threading.Timer(wait, lambda oid=order_id: enqueue(oid)).start()
+    print(
+        f"⏸ VAE đầy slot ({VIDEOAIEASY_MAX_CONCURRENT_PER_ACCOUNT} đơn/nick) "
+        f"— thử lại sau {wait}s: {order_id}"
+    )
+
+
+def _handle_vae_submit_result(order_id: str, result: str) -> bool:
+    """True = đã xử lý xong (ok hoặc chờ slot); False = cần fail đơn."""
+    if result == "ok":
+        return True
+    doc_ref = _g["db"].collection("orders").document(order_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return True
+    data = doc.to_dict() or {}
+    if data.get("status") != "pending":
+        return True
+    if result == "slot_full":
+        _defer_vae_slot_wait(order_id)
+        return True
+    if _g["pending_submit_backoff_active"](order_id):
+        print(f"⏸ VideoAiEasy chờ nick/slot — đơn {order_id}")
+        return True
+    reason = {
+        "credit_exhausted": "Hết nick VAE đủ coin",
+        "failed": "Không nạp được VideoAiEasy",
+    }.get(result, "Không nạp được VideoAiEasy")
+    _fail_order_processing(
+        doc,
+        data,
+        reason,
+        USER_NOTE_SUBMIT_FAILED,
+        "submit videoaieasy",
+    )
+    return True
+
+
+def _try_submit_videoaieasy(order_id: str) -> str:
     if not _use_videoaieasy():
-        return False
+        return "failed"
     excluded: set[str] = set()
     last_credit_err: str | None = None
     while True:
@@ -861,24 +934,27 @@ def _try_submit_videoaieasy(order_id: str) -> bool:
                     f"❌ Hết nick VAE đủ coin cho {order_id}"
                     + (f" ({last_credit_err})" if last_credit_err else "")
                 )
-            else:
-                print(f"📊 Không có nick VideoAiEasy hoặc đầy slot — {order_id}")
-            return False
+                return "credit_exhausted"
+            print(f"📊 VAE đầy slot — chờ xử lý xong ({order_id})")
+            return "slot_full"
         account = candidates[0]
         ok, credit_fail, err_msg = submit_to_videoaieasy(order_id, account)
         if ok:
-            return True
+            return "ok"
         if credit_fail:
             last_credit_err = err_msg
             excluded.add(account["id"])
             email = account.get("email") or account["id"]
             print(f"→ Đổi nick VAE (đã loại {len(excluded)}): {email}")
             continue
-        return False
+        return "failed"
 
 
 def submit_order(order_id: str):
-    """Kaling: RoboNeo (720p/10s) hoặc VideoAiEasy (các gói còn lại)."""
+    """Kaling: RoboNeo (720p + video ≤12s) hoặc VideoAiEasy (còn lại)."""
+    if _g["pending_submit_backoff_active"](order_id):
+        return
+
     db = _g["db"]
     doc_ref = db.collection("orders").document(order_id)
     doc = doc_ref.get()
@@ -904,7 +980,21 @@ def submit_order(order_id: str):
         )
         return
 
-    provider = _kaling_order_provider(data)
+    video_dur = _probe_order_video_duration(data)
+    provider = _kaling_order_provider(data, video_duration_sec=video_dur)
+    from order_media import max_reference_video_sec_for_order
+
+    max_sec = max_reference_video_sec_for_order(data)
+    dur_label = f" · video ~{video_dur:.1f}s" if video_dur is not None else ""
+    if video_dur is not None and video_dur > max_sec + 0.15:
+        trim_note = f" — server cắt → {max_sec:.0f}s"
+    else:
+        trim_note = f" — max {max_sec:.0f}s"
+    if provider == RENDER_PROVIDER_ROBONEO:
+        print(f"→ RoboNeo{dur_label}{trim_note}")
+    else:
+        print(f"→ VideoAiEasy{dur_label}{trim_note}")
+
     if provider == RENDER_PROVIDER_ROBONEO:
         import roboneo_motion as rb_motion
 
@@ -914,13 +1004,13 @@ def submit_order(order_id: str):
         data = doc.to_dict() or {}
         if data.get("status") != "pending":
             return
-        # RoboNeo hết nick / thiếu credit / lỗi proxy → fallback VAE (720p/10s vẫn render được)
         print(
-            f"🔄 RoboNeo không nạp được đơn {order_id} "
-            f"(nick/credit/proxy) → fallback VideoAiEasy (VAE)"
+            f"🔄 RoboNeo thử 3 lần không được đơn {order_id} "
+            f"→ fallback VideoAiEasy (VAE)"
         )
         _g.get("session_error_backoff", {}).pop(order_id, None)
-        if _try_submit_videoaieasy(order_id):
+        result = _try_submit_videoaieasy(order_id)
+        if result == "ok":
             try:
                 short_id = order_id[-6:].upper()
                 _g["send_telegram_message"](
@@ -930,12 +1020,12 @@ def submit_order(order_id: str):
             except Exception:
                 pass
             return
+        if result == "slot_full":
+            _defer_vae_slot_wait(order_id)
+            return
         doc = doc_ref.get()
         data = doc.to_dict() or {}
         if data.get("status") != "pending":
-            return
-        if _g["pending_submit_backoff_active"](order_id):
-            print(f"⏸ RoboNeo+VAE chờ slot — đơn {order_id}")
             return
         _fail_order_processing(
             doc,
@@ -946,22 +1036,13 @@ def submit_order(order_id: str):
         )
         return
 
-    if _try_submit_videoaieasy(order_id):
+    result = _try_submit_videoaieasy(order_id)
+    if result == "ok":
         return
-    doc = doc_ref.get()
-    data = doc.to_dict() or {}
-    if data.get("status") != "pending":
+    if result == "slot_full":
+        _defer_vae_slot_wait(order_id)
         return
-    if _g["pending_submit_backoff_active"](order_id):
-        print(f"⏸ VideoAiEasy chờ nick/slot — đơn {order_id}")
-        return
-    _fail_order_processing(
-        doc,
-        data,
-        "Không nạp được VideoAiEasy",
-        USER_NOTE_SUBMIT_FAILED,
-        "submit videoaieasy",
-    )
+    _handle_vae_submit_result(order_id, result)
 
 
 def poll_xiaoyang_orders(orders_to_check):

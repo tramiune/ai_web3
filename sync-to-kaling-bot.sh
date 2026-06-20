@@ -1,5 +1,5 @@
 #!/bin/bash
-# Đồng bộ code từ repo dev → ~/kaling-bot (bot chạy launchd từ đây).
+# Đồng bộ code từ repo dev → ~/kaling-bot (deploy lên VPS; KHÔNG chạy bot trên Mac).
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DST="$HOME/kaling-bot"
@@ -8,4 +8,4 @@ rsync -a --delete \
   --exclude 'bot_restart.log' --exclude 'bot_launchd.log' \
   "$SRC/" "$DST/"
 echo "Synced → $DST"
-echo "Restart bot: launchctl kickstart -k gui/$(id -u)/com.kaling.bot"
+echo "Bot chỉ chạy trên VPS — Mac launchd đã tắt (com.kaling.bot disabled)."
