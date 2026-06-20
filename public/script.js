@@ -867,21 +867,39 @@ export async function initAppLogic() {
 
     // (Intro modal removed; login-required uses auth-modal)
 
-    const { auth, onAuthStateChanged } = window.firebase;
+    const { auth, onAuthStateChanged, signOut } = window.firebase;
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUser = user;
-            if (isInAppBrowser()) {
-                showInAppBrowserBanner();
+    onAuthStateChanged(auth, async (user) => {
+        try {
+            if (requiresExternalBrowser()) {
+                if (user) {
+                    try {
+                        await signOut(auth);
+                    } catch (e) {
+                        console.warn('[Auth] signOut in external-browser gate:', e);
+                    }
+                }
+                currentUser = null;
+                handleUserLoggedOut(false);
+                return;
             }
-            handleUserLoggedIn(user).catch((e) => {
-                console.error("Auth profile error:", e);
-                showToast(t('common.error_auth', { msg: e.message || e.code || 'Firestore' }));
-            });
-        } else {
+
+            if (user) {
+                currentUser = user;
+                try {
+                    await handleUserLoggedIn(user);
+                } catch (e) {
+                    console.error("Auth profile error:", e);
+                    showToast(t('common.error_auth', { msg: e.message || e.code || 'Firestore' }));
+                }
+                return;
+            }
+
             currentUser = null;
-            handleUserLoggedOut();
+            handleUserLoggedOut(true);
+        } catch (e) {
+            console.error("Auth Change Error:", e);
+            showToast(t('common.error_auth', { msg: e.message || e.code || 'Auth' }));
         }
     });
 
@@ -918,8 +936,12 @@ function isStandaloneBrowser() {
     return (isChrome || isSafari) && !isInAppBrowser();
 }
 
-function showInAppBrowserBanner() {
-    if (!isInAppBrowser()) return;
+function requiresExternalBrowser() {
+    return !isStandaloneBrowser();
+}
+
+function showExternalBrowserRequiredModal() {
+    if (!requiresExternalBrowser()) return;
     const authModal = document.getElementById('auth-modal');
     if (authModal) authModal.style.display = 'none';
     const modal = document.getElementById('inapp-browser-modal');
@@ -927,6 +949,29 @@ function showInAppBrowserBanner() {
     modal.hidden = false;
     document.body.classList.add('inapp-modal-open');
     applyTranslations();
+}
+
+function promptGoogleSignIn(autoPopup = false) {
+    if (requiresExternalBrowser()) {
+        showExternalBrowserRequiredModal();
+        return;
+    }
+    const authModal = document.getElementById('auth-modal');
+    if (!authModal) return;
+    const v = document.getElementById('auth-banner-video');
+    if (v && !v.src) {
+        v.src = 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4';
+    }
+    const googleBtn = document.getElementById('google-login-btn');
+    const inAppNote = document.getElementById('inapp-auth-note');
+    if (googleBtn) googleBtn.style.display = '';
+    if (inAppNote) inAppNote.style.display = 'none';
+    authModal.style.display = 'flex';
+    applyTranslations();
+    if (autoPopup && !window.__googleSignInAutoAttempted) {
+        window.__googleSignInAutoAttempted = true;
+        setTimeout(() => login(), 600);
+    }
 }
 
 window.copyPageLinkForExternal = async (url) => {
@@ -981,6 +1026,15 @@ window.openExternalBrowser = async (targetUrl) => {
 
     await copyPageLinkSilent(url);
 
+    const tryOpen = (href) => {
+        try {
+            const opened = window.open(href, '_blank');
+            return opened != null;
+        } catch {
+            return false;
+        }
+    };
+
     if (isAndroid) {
         try {
             const parsed = new URL(url);
@@ -989,7 +1043,7 @@ window.openExternalBrowser = async (targetUrl) => {
                 `#Intent;scheme=${parsed.protocol.replace(':', '')};` +
                 `package=com.android.chrome;` +
                 `S.browser_fallback_url=${encodeURIComponent(url)};end`;
-            window.location.href = intent;
+            tryOpen(intent);
             showToast(t('modals.inapp_open_attempt'));
             return;
         } catch (e) {
@@ -999,19 +1053,9 @@ window.openExternalBrowser = async (targetUrl) => {
 
     if (isIOS) {
         const noProto = url.replace(/^https?:\/\//, '');
-        try {
-            window.location.href = `x-safari-https://${noProto}`;
+        if (tryOpen(`x-safari-https://${noProto}`) || tryOpen(`googlechromes://${noProto}`)) {
             showToast(t('modals.inapp_open_attempt'));
             return;
-        } catch (e) {
-            console.warn('[OpenBrowser] iOS Safari scheme failed:', e);
-        }
-        try {
-            window.location.href = `googlechromes://${noProto}`;
-            showToast(t('modals.inapp_open_attempt'));
-            return;
-        } catch (e) {
-            console.warn('[OpenBrowser] iOS Chrome scheme failed:', e);
         }
     }
 
@@ -1020,31 +1064,8 @@ window.openExternalBrowser = async (targetUrl) => {
 
 // --- Browser Detection ---
 function detectInAppBrowser() {
-    const isInApp = isInAppBrowser();
-    const isSupported = isStandaloneBrowser();
-
-    if (isInApp) {
-        showInAppBrowserBanner();
-    }
-
-    if (!isSupported) {
-        const googleBtn = document.getElementById('google-login-btn');
-        const googleDivider = document.querySelector('.google-auth-divider');
-        const inAppNote = document.getElementById('inapp-auth-note');
-        const authEmailBtn = document.getElementById('auth-email-btn');
-        const authModalDesc = document.getElementById('auth-modal-desc');
-
-        if (googleBtn) googleBtn.style.display = 'none';
-        if (googleDivider) googleDivider.style.display = 'none';
-        if (inAppNote) inAppNote.style.display = 'block';
-        if (authEmailBtn) {
-            authEmailBtn.setAttribute('data-i18n', 'modals.auth_btn_register');
-            authEmailBtn.innerText = t('modals.auth_btn_register');
-        }
-        if (authModalDesc) {
-            authModalDesc.setAttribute('data-i18n', 'modals.auth_desc_register');
-            authModalDesc.innerHTML = t('modals.auth_desc_register');
-        }
+    if (requiresExternalBrowser()) {
+        showExternalBrowserRequiredModal();
     }
 }
 
@@ -1327,6 +1348,11 @@ window.useTrendShortcut = (id, url) => {
 };
 
 async function login() {
+    if (requiresExternalBrowser()) {
+        showExternalBrowserRequiredModal();
+        showToast(t('modals.inapp_browser_sub'));
+        return;
+    }
     const { auth, GoogleAuthProvider, signInWithPopup } = window.firebase;
     const provider = new GoogleAuthProvider();
     try {
@@ -1653,22 +1679,22 @@ function navigateFromURLParam() {
     }
 }
 
-function handleUserLoggedOut() {
-    // In TikTok/FB in-app browser: only show Chrome/Safari prompt, not login
-    if (isInAppBrowser()) {
-        showInAppBrowserBanner();
-        const authModalHidden = document.getElementById('auth-modal');
-        if (authModalHidden) authModalHidden.style.display = 'none';
-    } else {
-        const authModal = document.getElementById('auth-modal');
-        if (authModal) authModal.style.display = 'flex';
-    }
+function handleUserLoggedOut(autoGoogleSignIn = false) {
     const v = document.getElementById('auth-banner-video');
     if (v && !v.src) {
         v.src = 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4';
     }
 
-    document.getElementById('login-btn').style.display = 'flex';
+    if (requiresExternalBrowser()) {
+        showExternalBrowserRequiredModal();
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) loginBtn.style.display = 'none';
+    } else {
+        promptGoogleSignIn(autoGoogleSignIn);
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) loginBtn.style.display = 'flex';
+    }
+
     document.getElementById('user-profile-menu').style.display = 'none';
     const navbarCoin = document.getElementById('navbar-coin-widget');
     if (navbarCoin) navbarCoin.style.display = 'none';
@@ -3021,9 +3047,7 @@ async function setupEventListeners() {
             e.preventDefault();
 
             if (!currentUser) {
-                // Nếu chưa đăng nhập thì hiện Auth Modal
-                const authModal = document.getElementById('auth-modal');
-                if (authModal) authModal.style.display = 'flex';
+                promptGoogleSignIn(false);
                 showToast(t('common.toast_login_required'));
                 return;
             }

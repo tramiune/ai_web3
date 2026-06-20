@@ -7,7 +7,7 @@ from project_env import get_env, load_project_env
 load_project_env()
 
 # Bump khi deploy frontend breaking — đồng bộ với public/app-version.js
-APP_CLIENT_VERSION = 15
+APP_CLIENT_VERSION = 16
 
 
 def _parse_version(value) -> tuple[int, ...]:
