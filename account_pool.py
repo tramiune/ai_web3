@@ -31,6 +31,54 @@ def _pool_path() -> Path:
     return POOL_FILE
 
 
+def pool_sync_lock_path() -> Path:
+    return _pool_path().parent / ".pool_sync.lock"
+
+
+def is_pool_sync_running() -> bool:
+    """True khi đang sync credit hàng loạt — bot nên bỏ qua RoboNeo, dùng VAE."""
+    load_project_env()
+    flag = (get_env("ROBONEO_POOL_SYNCING") or "").strip().lower()
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    lock = pool_sync_lock_path()
+    if not lock.is_file():
+        return False
+    try:
+        pid = int((lock.read_text(encoding="utf-8") or "").strip().split()[0])
+    except (TypeError, ValueError, OSError):
+        return True
+    try:
+        import os
+
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        try:
+            lock.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False
+
+
+def acquire_pool_sync_lock() -> bool:
+    lock = pool_sync_lock_path()
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if is_pool_sync_running():
+        return False
+    import os
+
+    lock.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    return True
+
+
+def release_pool_sync_lock() -> None:
+    try:
+        pool_sync_lock_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def credits_per_15s() -> float:
     load_project_env()
     return float(get_env("ROBONEO_CREDITS_PER_15S", "115") or "115")

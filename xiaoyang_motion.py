@@ -1025,6 +1025,31 @@ def submit_order(order_id: str):
         print(f"→ VideoAiEasy{dur_label}{trim_note}")
 
     if provider == RENDER_PROVIDER_ROBONEO:
+        from account_pool import is_pool_sync_running
+
+        if is_pool_sync_running():
+            print(
+                f"⏳ Pool RoboNeo đang sync credit — bỏ qua RoboNeo đơn {order_id}, dùng VAE"
+            )
+            result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
+            if result == "ok":
+                return
+            if result == "slot_full":
+                _defer_vae_slot_wait(order_id)
+                return
+            doc = doc_ref.get()
+            data = doc.to_dict() or {}
+            if data.get("status") != "pending":
+                return
+            _fail_order_processing(
+                doc,
+                data,
+                "Pool sync đang chạy — không nạp được VAE",
+                USER_NOTE_SUBMIT_FAILED,
+                "submit vae during pool sync",
+            )
+            return
+
         import roboneo_motion as rb_motion
 
         if rb_motion.submit_to_roboneo(order_id):
