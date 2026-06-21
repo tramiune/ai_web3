@@ -81,6 +81,8 @@ def validate_roboneo_trial_order(
         return False, "cost"
     if not is_roboneo_trial_eligible(user_data):
         return False, "expired"
-    if duration_sec is not None and duration_sec > TRIAL_MAX_SEC + 0.15:
+    # ffmpeg trim (nhất là stream copy) có thể để metadata dài hơn chút (ví dụ 12.2s).
+    # Cho phép dung sai rộng hơn để tránh false-negative cho đơn trial đã được cắt về 12s.
+    if duration_sec is not None and duration_sec > TRIAL_MAX_SEC + 0.6:
         return False, "duration"
     return True, ""

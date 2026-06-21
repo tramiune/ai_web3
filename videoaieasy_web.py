@@ -282,7 +282,7 @@ class VideoAiEasyClient:
             "drivingVideoUrl": driving_video_url.strip(),
             "durationSec": dur,
         }
-        # kling-2.6 (Pro): gửi resolution 720p. weavy-kling-26 (fallback 5 coin): không gửi resolution.
+        # kling-2.6 / pixverse: gửi resolution. weavy-kling-26 (Pro/HD/fallback): không gửi resolution.
         if vae_model == MODEL_KLING_26:
             body["resolution"] = res
         elif vae_model == VAE_API_MODEL_MOTION_1080P:
@@ -386,9 +386,17 @@ def normalize_vae_duration_sec(value: int | float | str | None) -> int:
     return VAE_PACKAGE_10_DURATION_SEC
 
 
-def vae_motion_api_model(resolution: str | None, *, weavy: bool = False) -> str:
-    """weavy-kling-26 = fallback RoboNeo 5 coin. kling-2.6 = Pro 10 coin."""
+def vae_motion_api_model(
+    resolution: str | None,
+    *,
+    weavy: bool = False,
+    model_id: str | None = None,
+) -> str:
+    """weavy-kling-26 = RoboNeo fallback 10s, Pro 20s, HD 30s. kling-2.6/pixverse = gói cũ."""
     if weavy:
+        return VAE_API_MODEL_WEAVY
+    mid = str(model_id or "").strip()
+    if mid in KALING_VAE_20_MODEL_IDS or mid in KALING_VAE_1080_30_MODEL_IDS:
         return VAE_API_MODEL_WEAVY
     if normalize_vae_resolution(resolution) == "1080p":
         return VAE_API_MODEL_MOTION_1080P
@@ -464,7 +472,7 @@ def duration_for_order(order_data: dict | None) -> int:
     if model_id in KALING_VAE_1080_30_MODEL_IDS:
         return VAE_PACKAGE_30_DURATION_SEC
     if model_id in KALING_VAE_20_MODEL_IDS:
-        return VAE_PACKAGE_15_DURATION_SEC
+        return VAE_PACKAGE_20_DURATION_SEC
     if model_id in KALING_VAE_1080_20_MODEL_IDS:
         return VAE_PACKAGE_20_DURATION_SEC
     if model_id in KALING_VAE_1080_10_MODEL_IDS or model_id in KALING_VAE_10_MODEL_IDS:

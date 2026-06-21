@@ -116,7 +116,7 @@ window.reportTopupComplaint = async () => {
 };
 
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
-const KALING_VAE_20 = { cost: 10, maxVideoSec: 15, vaeDurationSec: 15, vaeResolution: '720p' };
+const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
 const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {

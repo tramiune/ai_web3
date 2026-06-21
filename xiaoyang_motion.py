@@ -26,6 +26,8 @@ from videoaieasy_web import (
     VideoAiEasyError,
     MODEL_KLING_26,
     MODEL_KLING_30,
+    KALING_VAE_20_MODEL_IDS,
+    KALING_VAE_1080_30_MODEL_IDS,
     is_vae_credit_error,
     prepare_character_image_for_vae,
     prepare_motion_video_for_vae_upload,
@@ -118,7 +120,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
     _g["print"](
-        "🎬 Kaling: 5 coin/trial → RoboNeo (fail → weavy 10s) · Pro → kling-2.6 15s · HD 30s → kling-2.6 30s"
+        "🎬 Kaling: 5 coin/trial → RoboNeo (fail → weavy 10s) · Pro → weavy-kling 20s · HD 30s → weavy-kling 30s"
     )
 
 
@@ -251,7 +253,10 @@ def _order_target_provider(order_data: dict) -> str:
 
 
 def _videoaieasy_model_for_order(order_data: dict) -> str:
-    """Kaling VAE: Kling 2.6 (720p qua resolution_for_order)."""
+    """Kaling VAE: Pro/HD 30s → weavy-kling-26; gói khác giữ kling-2.6."""
+    model_id = str((order_data or {}).get("modelId") or "").strip()
+    if model_id in KALING_VAE_20_MODEL_IDS or model_id in KALING_VAE_1080_30_MODEL_IDS:
+        return VAE_API_MODEL_WEAVY
     return MODEL_KLING_26
 
 
@@ -774,7 +779,11 @@ def submit_to_videoaieasy(
                     )
                 else:
                     duration_sec = duration_for_order(data)
-                    api_model = vae_motion_api_model(resolution, weavy=False)
+                    api_model = vae_motion_api_model(
+                        resolution,
+                        weavy=False,
+                        model_id=str(data.get("modelId") or ""),
+                    )
                     vae_coins = vae_coins_for_duration(duration_sec, resolution)
                     vae_xu = vae_xu_for_duration(duration_sec, resolution)
                 prompt = (data.get("prompt") or get_env(
