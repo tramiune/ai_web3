@@ -3537,6 +3537,11 @@ async function setupEventListeners() {
                 return;
             }
 
+            if (normalizeCoins(window.__currentUserData?.coins) < 1) {
+                promptInsufficientCoinsAndTopup();
+                return;
+            }
+
             const { db, doc, collection, runTransaction, serverTimestamp } = window.firebase;
             const submitBtn = document.getElementById('order-submit-btn');
             const progressDiv = document.getElementById('upload-progress');
