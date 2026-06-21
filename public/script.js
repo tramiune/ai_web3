@@ -116,8 +116,9 @@ window.reportTopupComplaint = async () => {
 };
 
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
-const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
-const MAX_VIDEO_DURATION_SEC = KALING_VAE_20.maxVideoSec;
+const KALING_VAE_20 = { cost: 10, maxVideoSec: 15, vaeDurationSec: 15, vaeResolution: '720p' };
+const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
+const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {
     startMs: new Date('2026-06-19T00:00:00+07:00').getTime(),
     windowMs: 24 * 60 * 60 * 1000,
@@ -550,6 +551,16 @@ const MODELS = {
         maxVideoSec: KALING_VAE_20.maxVideoSec,
         vaeDurationSec: KALING_VAE_20.vaeDurationSec,
         vaeResolution: KALING_VAE_20.vaeResolution,
+    },
+    vae1080_30: {
+        nameKey: "modals.model_vae1080_30",
+        cost: KALING_VAE_30.cost,
+        timeKey: "modals.model_vae1080_30_desc",
+        modelId: "129",
+        renderProvider: "videoaieasy",
+        maxVideoSec: KALING_VAE_30.maxVideoSec,
+        vaeDurationSec: KALING_VAE_30.vaeDurationSec,
+        vaeResolution: KALING_VAE_30.vaeResolution,
     },
 };
 

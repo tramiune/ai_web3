@@ -45,12 +45,13 @@ KALING_VAE_1080_MODEL_IDS = (
     | KALING_VAE_1080_30_MODEL_IDS
 )
 VAE_PACKAGE_10_DURATION_SEC = 10
+VAE_PACKAGE_15_DURATION_SEC = 15
 VAE_PACKAGE_20_DURATION_SEC = 20
 VAE_PACKAGE_30_DURATION_SEC = 30
-VAE_CREDITS_BY_DURATION = {10: 1, 20: 2, 30: 3}
+VAE_CREDITS_BY_DURATION = {10: 1, 15: 2, 20: 2, 30: 3}
 VAE_CREDITS_1080_BY_DURATION = {10: 2, 20: 4, 30: 6}
 # VAE API: 10 coins = 1 xu (profile.coins)
-VAE_COINS_720P_BY_DURATION = {10: 10, 20: 20, 30: 30}
+VAE_COINS_720P_BY_DURATION = {10: 10, 15: 15, 20: 20, 30: 30}
 VAE_COINS_1080P_BY_DURATION = {10: 20, 20: 40, 30: 60}
 VAE_API_MODEL_WEAVY = "weavy-kling-26"
 VAE_API_MODEL_MOTION_1080P = "pixverse"
@@ -378,8 +379,10 @@ def normalize_vae_duration_sec(value: int | float | str | None) -> int:
         return VAE_PACKAGE_10_DURATION_SEC
     if sec >= 25:
         return VAE_PACKAGE_30_DURATION_SEC
-    if sec >= 15:
+    if sec >= 20:
         return VAE_PACKAGE_20_DURATION_SEC
+    if sec >= 15:
+        return VAE_PACKAGE_15_DURATION_SEC
     return VAE_PACKAGE_10_DURATION_SEC
 
 
@@ -460,7 +463,9 @@ def duration_for_order(order_data: dict | None) -> int:
     model_id = str(data.get("modelId") or "").strip()
     if model_id in KALING_VAE_1080_30_MODEL_IDS:
         return VAE_PACKAGE_30_DURATION_SEC
-    if model_id in KALING_VAE_1080_20_MODEL_IDS or model_id in KALING_VAE_20_MODEL_IDS:
+    if model_id in KALING_VAE_20_MODEL_IDS:
+        return VAE_PACKAGE_15_DURATION_SEC
+    if model_id in KALING_VAE_1080_20_MODEL_IDS:
         return VAE_PACKAGE_20_DURATION_SEC
     if model_id in KALING_VAE_1080_10_MODEL_IDS or model_id in KALING_VAE_10_MODEL_IDS:
         return VAE_PACKAGE_10_DURATION_SEC

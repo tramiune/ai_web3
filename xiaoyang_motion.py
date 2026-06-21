@@ -118,7 +118,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
     _g["print"](
-        "🎬 Kaling: 5 coin/trial → RoboNeo, fail → VAE weavy-kling-26 10s · Pro 10 coin → VAE kling-2.6 20s"
+        "🎬 Kaling: 5 coin/trial → RoboNeo (fail → weavy 10s) · Pro → kling-2.6 15s · HD 30s → kling-2.6 30s"
     )
 
 
