@@ -119,9 +119,14 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
-    _g["print"](
-        "🎬 Kaling: 5 coin/trial → RoboNeo (fail → weavy 10s) · Pro → weavy-kling 20s · HD 30s → weavy-kling 30s"
-    )
+    if _kaling_roboneo_enabled():
+        _g["print"](
+            "🎬 Kaling: 5 coin/trial → RoboNeo (fail → weavy 10s) · Pro → weavy-kling 20s · HD 30s → weavy-kling 30s"
+        )
+    else:
+        _g["print"](
+            "🎬 Kaling: ROBONEO_DISABLED — mọi đơn qua VideoAiEasy (VAE)"
+        )
 
 
 def _xiaoyang_account_id(email: str) -> str:
@@ -215,8 +220,17 @@ def _probe_order_video_duration(order_data: dict) -> float | None:
         return None
 
 
+def _kaling_roboneo_enabled() -> bool:
+    """ROBONEO_DISABLED=1 → bỏ RoboNeo, mọi đơn Kaling qua VAE."""
+    load_project_env()
+    raw = (get_env("ROBONEO_DISABLED") or "").strip().lower()
+    return raw not in ("1", "true", "yes", "on")
+
+
 def _kaling_uses_roboneo(order_data: dict) -> bool:
     """720p gói RoboNeo (124, 130) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói."""
+    if not _kaling_roboneo_enabled():
+        return False
     from roboneo_trial import KALING_ROBONEO_MODEL_IDS, is_roboneo_trial_order
 
     if resolution_for_order(order_data) != "720p":
