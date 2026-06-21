@@ -6,12 +6,6 @@ cd "$ROOT"
 LOG="${ROOT}/pool_sync.log"
 {
   echo "=== pool sync start $(date '+%Y-%m-%d %H:%M:%S %Z') pid=$$ ==="
-  set -a
-  if [ -f .env ]; then
-    # shellcheck disable=SC1091
-    source .env 2>/dev/null || true
-  fi
-  set +a
   python3 scripts/refresh_pool_credits.py --all --force-login
   ec=$?
   echo "=== pool sync end $(date '+%Y-%m-%d %H:%M:%S %Z') exit=$ec ==="
