@@ -4443,7 +4443,7 @@ function renderAdminEngineBalances() {
     if (ad.error) {
         adHtml = `<div style="margin-bottom:0.25rem;"><strong>${t('admin.engine_balances_ad')}</strong><br><span style="color:#ff6b6b;">${escapeHTML(ad.error)}</span></div>`;
     } else {
-        adHtml = `<div><strong>${t('admin.engine_balances_ad')}</strong><br>• <strong>${ad.coins ?? '—'}</strong> coin</div>`;
+        adHtml = `<div><strong>${t('admin.engine_balances_ad')}</strong><br>• ${escapeHTML(ad.email || '—')}: <strong>${ad.coins ?? '—'}</strong> coin</div>`;
     }
 
     box.innerHTML =

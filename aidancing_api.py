@@ -7,16 +7,21 @@ Cấu hình sau (một trong hai):
 
 from __future__ import annotations
 
+import base64
+import json
 import mimetypes
 import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 import requests
 
 AIDANCING_ORIGIN = os.environ.get("AIDANCING_ORIGIN", "https://aidancing.net")
 DASHBOARD_URL = f"{AIDANCING_ORIGIN}/dashboard"
+DASHBOARD_PATHS = ("/dashboard", "/en/dashboard", "/vi/dashboard")
+_SKIP_AIDANCING_EMAILS = frozenset({"support@aidancing.net", "bootstrap-icons@1.11.3"})
 
 
 class SessionExpiredError(RuntimeError):
@@ -44,6 +49,40 @@ def parse_balance_from_dashboard_html(html: str) -> float | None:
             except ValueError:
                 pass
     return None
+
+
+def parse_account_email_from_dashboard_html(html: str) -> str | None:
+    """Email nick Aidancing trong HTML dashboard (menu user)."""
+    for match in re.findall(r"[\w.+-]+@[\w.-]+\.\w+", html or ""):
+        email = match.strip()
+        low = email.lower()
+        if low in _SKIP_AIDANCING_EMAILS or "bootstrap-icons" in low:
+            continue
+        if low.endswith("@aidancing.net"):
+            continue
+        return email
+    return None
+
+
+def parse_google_sub_from_cookie(cookie: str) -> str | None:
+    """JWT ACCESS_TOKEN trong cookie — chỉ có google sub, không có email."""
+    raw = (cookie or "").strip()
+    token = ""
+    for part in raw.split(";"):
+        part = part.strip()
+        if part.startswith("ACCESS_TOKEN="):
+            token = part.split("=", 1)[1].strip()
+            break
+    if not token or token.count(".") < 2:
+        return None
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        data = json.loads(base64.urlsafe_b64decode(payload))
+        sub = str(data.get("sub") or "").strip()
+        return sub or None
+    except (ValueError, json.JSONDecodeError):
+        return None
 
 
 def load_cookie() -> str:
@@ -103,20 +142,38 @@ class AidancingApiClient:
         r.raise_for_status()
         return r.json()
 
-    def get_balance(self) -> float:
-        """Số credit/coin trên dashboard — GET /dashboard + parse cp-balance."""
+    def get_account(self) -> dict[str, Any]:
+        """Email + coin từ dashboard HTML (cookie session)."""
         self.list_jobs(page=0, size=1)
-        r = self.session.get(DASHBOARD_URL, timeout=30)
-        self._check_auth(r)
-        if r.status_code in (401, 403):
-            raise SessionExpiredError(
-                "Session expired or unauthorized — cập nhật AIDANCING_COOKIE trong .env"
-            )
-        r.raise_for_status()
-        bal = parse_balance_from_dashboard_html(r.text or "")
-        if bal is None:
-            raise RuntimeError("Session OK — không đọc coin từ dashboard HTML")
-        return bal
+        google_sub = parse_google_sub_from_cookie(self._cookie)
+        last_html_len = 0
+        for path in DASHBOARD_PATHS:
+            url = f"{AIDANCING_ORIGIN}{path}"
+            r = self.session.get(url, timeout=30, headers={"Referer": url})
+            self._check_auth(r)
+            if r.status_code in (401, 403):
+                raise SessionExpiredError(
+                    "Session expired or unauthorized — cập nhật AIDANCING_COOKIE trong .env"
+                )
+            r.raise_for_status()
+            html = r.text or ""
+            last_html_len = len(html)
+            bal = parse_balance_from_dashboard_html(html)
+            if bal is not None:
+                email = parse_account_email_from_dashboard_html(html)
+                return {
+                    "email": email or google_sub or "?",
+                    "coins": bal,
+                    "googleSub": google_sub,
+                }
+        raise RuntimeError(
+            "Session OK — không đọc coin từ dashboard HTML "
+            f"(đã thử {', '.join(DASHBOARD_PATHS)}; last len={last_html_len})"
+        )
+
+    def get_balance(self) -> float:
+        """Số credit/coin trên dashboard — thử /dashboard và /en/dashboard (locale)."""
+        return float(self.get_account()["coins"])
 
     def find_job(self, job_id) -> dict | None:
         found = self.find_jobs_by_ids([job_id])

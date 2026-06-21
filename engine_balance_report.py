@@ -81,7 +81,7 @@ def collect_engine_balances() -> dict[str, Any]:
     except ImportError:
         pass
 
-    aid_row: dict[str, Any] = {"coins": None, "error": ""}
+    aid_row: dict[str, Any] = {"email": "", "coins": None, "error": ""}
     cookie = (get_env("AIDANCING_COOKIE") or "").strip()
     if not cookie:
         aid_row["error"] = "Thiếu AIDANCING_COOKIE"
@@ -89,7 +89,9 @@ def collect_engine_balances() -> dict[str, Any]:
         try:
             from aidancing_api import AidancingApiClient, SessionExpiredError
 
-            aid_row["coins"] = AidancingApiClient(cookie=cookie).get_balance()
+            info = AidancingApiClient(cookie=cookie).get_account()
+            aid_row["email"] = str(info.get("email") or "")
+            aid_row["coins"] = info.get("coins")
         except SessionExpiredError as e:
             aid_row["error"] = str(e)[:300]
         except Exception as e:
@@ -156,7 +158,8 @@ def format_engine_balance_report(site: str, data: dict[str, Any]) -> str:
     if ad.get("error"):
         lines.append(f"  • {ad['error']}")
     else:
-        lines.append(f"  • {ad.get('coins')} coin")
+        nick = ad.get("email") or "?"
+        lines.append(f"  • {nick}: {ad.get('coins')} coin")
     lines.append("")
     return "\n".join(lines)
 
