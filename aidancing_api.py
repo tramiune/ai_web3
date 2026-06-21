@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import mimetypes
 import os
+import re
 import time
 from pathlib import Path
 
@@ -20,6 +21,29 @@ DASHBOARD_URL = f"{AIDANCING_ORIGIN}/dashboard"
 
 class SessionExpiredError(RuntimeError):
     """Cookie/JSESSIONID hết hạn hoặc không hợp lệ."""
+
+
+def parse_balance_from_dashboard_html(html: str) -> float | None:
+    """Đọc số credit header dashboard (span.cp-balance > span)."""
+    text = html or ""
+    if "accounts.google.com" in text and "cp-balance" not in text:
+        return None
+    for pat in (
+        r'class="cp-balance"[^>]*>\s*<span>\s*([\d]+(?:\.\d+)?)\s*</span>',
+        r'cp-balance[\s\S]{0,120}?<span>\s*([\d]+(?:\.\d+)?)\s*</span>',
+        r'"balance"\s*:\s*([\d.]+)',
+        r'"coinBalance"\s*:\s*([\d.]+)',
+        r'"coins"\s*:\s*([\d.]+)',
+    ):
+        m = re.search(pat, text, re.I)
+        if m:
+            try:
+                val = float(m.group(1))
+                if 0 <= val < 1_000_000:
+                    return val
+            except ValueError:
+                pass
+    return None
 
 
 def load_cookie() -> str:
@@ -78,6 +102,21 @@ class AidancingApiClient:
         self._check_auth(r)
         r.raise_for_status()
         return r.json()
+
+    def get_balance(self) -> float:
+        """Số credit/coin trên dashboard — GET /dashboard + parse cp-balance."""
+        self.list_jobs(page=0, size=1)
+        r = self.session.get(DASHBOARD_URL, timeout=30)
+        self._check_auth(r)
+        if r.status_code in (401, 403):
+            raise SessionExpiredError(
+                "Session expired or unauthorized — cập nhật AIDANCING_COOKIE trong .env"
+            )
+        r.raise_for_status()
+        bal = parse_balance_from_dashboard_html(r.text or "")
+        if bal is None:
+            raise RuntimeError("Session OK — không đọc coin từ dashboard HTML")
+        return bal
 
     def find_job(self, job_id) -> dict | None:
         found = self.find_jobs_by_ids([job_id])

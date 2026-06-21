@@ -255,6 +255,17 @@ def _kaling_order_provider(
     return RENDER_PROVIDER_VIDEOAIEASY
 
 
+def _kaling_vae_weavy_economy(order_data: dict | None) -> bool:
+    """Gói RoboNeo/trial (124, 130) trên VAE → weavy-kling-26 10s (1 xu). kling-2.6 cùng gói bị trừ 3 xu."""
+    from roboneo_trial import KALING_ROBONEO_MODEL_IDS, is_roboneo_trial_order
+
+    data = order_data or {}
+    if is_roboneo_trial_order(data):
+        return True
+    model_id = str(data.get("modelId") or "").strip()
+    return model_id in KALING_ROBONEO_MODEL_IDS
+
+
 def _order_target_provider(order_data: dict) -> str:
     if enabled_for_bot(_g.get("bot_name")):
         return _kaling_order_provider(order_data)
@@ -1104,7 +1115,11 @@ def submit_order(order_id: str):
         )
         return
 
-    result = _try_submit_videoaieasy(order_id)
+    weavy_economy = _kaling_vae_weavy_economy(data)
+    if weavy_economy:
+        note = " (RoboNeo tắt — VAE-only)" if not _kaling_roboneo_enabled() else ""
+        print(f"→ VAE weavy-kling-26 · 10s · 1 xu{note}")
+    result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=weavy_economy)
     if result == "ok":
         return
     if result == "slot_full":

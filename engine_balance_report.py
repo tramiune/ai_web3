@@ -26,22 +26,6 @@ def _load_xy_api_keys() -> list[str]:
     return [single] if single else []
 
 
-def _parse_aidancing_balance_html(html: str) -> float | None:
-    for pat in (
-        r'"balance"\s*:\s*([\d.]+)',
-        r'"coinBalance"\s*:\s*([\d.]+)',
-        r'"coins"\s*:\s*([\d.]+)',
-        r'class="[^"]*balance[^"]*"[^>]*>\s*([\d.]+)',
-    ):
-        m = re.search(pat, html or "", re.I)
-        if m:
-            try:
-                return float(m.group(1))
-            except ValueError:
-                pass
-    return None
-
-
 def collect_engine_balances() -> dict[str, Any]:
     load_project_env()
     from xiaoyang_motion import load_videoaieasy_accounts, load_xiaoyang_accounts
@@ -99,33 +83,15 @@ def collect_engine_balances() -> dict[str, Any]:
 
     aid_row: dict[str, Any] = {"coins": None, "error": ""}
     cookie = (get_env("AIDANCING_COOKIE") or "").strip()
-    origin = (get_env("AIDANCING_ORIGIN") or "https://aidancing.net").rstrip("/")
     if not cookie:
         aid_row["error"] = "Thiếu AIDANCING_COOKIE"
     else:
         try:
-            from aidancing_api import AidancingApiClient
+            from aidancing_api import AidancingApiClient, SessionExpiredError
 
-            AidancingApiClient(cookie=cookie).list_jobs(page=0, size=1)
-            r = requests.get(
-                f"{origin}/dashboard",
-                headers={
-                    "Cookie": cookie,
-                    "User-Agent": get_env(
-                        "AIDANCING_USER_AGENT",
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    ),
-                },
-                timeout=30,
-            )
-            if r.status_code in (401, 403):
-                aid_row["error"] = f"Session hết hạn (HTTP {r.status_code})"
-            else:
-                bal = _parse_aidancing_balance_html(r.text or "")
-                if bal is not None:
-                    aid_row["coins"] = bal
-                else:
-                    aid_row["error"] = "Session OK — không đọc coin từ HTML"
+            aid_row["coins"] = AidancingApiClient(cookie=cookie).get_balance()
+        except SessionExpiredError as e:
+            aid_row["error"] = str(e)[:300]
         except Exception as e:
             aid_row["error"] = str(e)[:300]
 
