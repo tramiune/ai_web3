@@ -32,6 +32,8 @@ from videoaieasy_web import (
     profile_credits,
     resolution_for_order,
     duration_for_order,
+    VAE_API_MODEL_WEAVY,
+    VAE_PACKAGE_10_DURATION_SEC,
     vae_credits_for_duration,
     vae_coins_for_duration,
     vae_motion_api_model,
@@ -116,7 +118,7 @@ def apply_render_provider_from_bot_data(data: dict, source=""):
 def start_render_provider_listener():
     apply_render_provider_from_bot_data({})
     _g["print"](
-        "🎬 Kaling: gói RoboNeo 720p → RoboNeo · VAE/1080p → VideoAiEasy · video dài hơn gói → server cắt"
+        "🎬 Kaling: 5 coin/trial → RoboNeo, fail → VAE weavy-kling-26 10s · Pro 10 coin → VAE kling-2.6 20s"
     )
 
 
@@ -704,7 +706,12 @@ def submit_to_xiaoyang(order_id: str, account: dict) -> bool:
     return success
 
 
-def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str | None]:
+def submit_to_videoaieasy(
+    order_id: str,
+    account: dict,
+    *,
+    vae_weavy_fallback: bool = False,
+) -> tuple[bool, bool, str | None]:
     """Nạp đơn qua 1 nick VAE. Trả (ok, hết coin, lỗi)."""
     if not _g["is_bot_enabled"]():
         return False, False, None
@@ -755,10 +762,21 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str
             model_id = MODEL_KLING_26
             try:
                 model_id = _videoaieasy_model_for_order(data)
-                duration_sec = duration_for_order(data)
                 resolution = resolution_for_order(data)
-                vae_coins = vae_coins_for_duration(duration_sec, resolution)
-                vae_xu = vae_xu_for_duration(duration_sec, resolution)
+                if vae_weavy_fallback:
+                    duration_sec = VAE_PACKAGE_10_DURATION_SEC
+                    api_model = VAE_API_MODEL_WEAVY
+                    vae_coins = vae_coins_for_duration(duration_sec, resolution)
+                    vae_xu = vae_xu_for_duration(duration_sec, resolution)
+                    print(
+                        f"→ VAE fallback RoboNeo: {api_model} · {duration_sec}s · "
+                        f"{vae_xu:g} xu ({vae_coins} coins)"
+                    )
+                else:
+                    duration_sec = duration_for_order(data)
+                    api_model = vae_motion_api_model(resolution, weavy=False)
+                    vae_coins = vae_coins_for_duration(duration_sec, resolution)
+                    vae_xu = vae_xu_for_duration(duration_sec, resolution)
                 prompt = (data.get("prompt") or get_env(
                     "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
                 )).strip()
@@ -769,7 +787,6 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str
                     raise VideoAiEasyCreditError(
                         f"Không đủ coin VAE: cần {vae_coins} ({vae_xu:g} xu), có {have}"
                     )
-                api_model = vae_motion_api_model(resolution)
                 print(
                     f"🚀 [VideoAiEasy/{nick_label}] {api_model} — "
                     f"gói {duration_sec}s {resolution} ({vae_xu:g} xu / {vae_coins} coins, có {have}) · "
@@ -813,6 +830,7 @@ def submit_to_videoaieasy(order_id: str, account: dict) -> tuple[bool, bool, str
                     model_id=model_id,
                     resolution=resolution,
                     duration_sec=duration_sec,
+                    api_model=api_model,
                 )
                 print(f"🆔 [VideoAiEasy/{nick_label}] job: {job_id}")
                 _mark_order_processing(
@@ -921,7 +939,7 @@ def _handle_vae_submit_result(order_id: str, result: str) -> bool:
     return True
 
 
-def _try_submit_videoaieasy(order_id: str) -> str:
+def _try_submit_videoaieasy(order_id: str, *, vae_weavy_fallback: bool = False) -> str:
     if not _use_videoaieasy():
         return "failed"
     excluded: set[str] = set()
@@ -938,7 +956,9 @@ def _try_submit_videoaieasy(order_id: str) -> str:
             print(f"📊 VAE đầy slot — chờ xử lý xong ({order_id})")
             return "slot_full"
         account = candidates[0]
-        ok, credit_fail, err_msg = submit_to_videoaieasy(order_id, account)
+        ok, credit_fail, err_msg = submit_to_videoaieasy(
+            order_id, account, vae_weavy_fallback=vae_weavy_fallback
+        )
         if ok:
             return "ok"
         if credit_fail:
@@ -1005,11 +1025,11 @@ def submit_order(order_id: str):
         if data.get("status") != "pending":
             return
         print(
-            f"🔄 RoboNeo thử 3 lần không được đơn {order_id} "
-            f"→ fallback VideoAiEasy (VAE)"
+            f"🔄 RoboNeo fail đơn {order_id} "
+            f"→ fallback VAE weavy-kling-26 (10s · 1 xu)"
         )
         _g.get("session_error_backoff", {}).pop(order_id, None)
-        result = _try_submit_videoaieasy(order_id)
+        result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
         if result == "ok":
             try:
                 short_id = order_id[-6:].upper()

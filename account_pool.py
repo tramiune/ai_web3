@@ -47,6 +47,13 @@ def max_accounts_per_ip() -> int:
     return max(1, int(get_env("PROXY_ACCOUNTS_PER_IP", "2") or "2"))
 
 
+def auto_buy_enabled() -> bool:
+    """False khi ROBONEO_AUTO_BUY=0 — chỉ dùng nick có sẵn trong pool, không gọi huanaihub."""
+    load_project_env()
+    raw = (get_env("ROBONEO_AUTO_BUY", "1") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
 def _ensure_pool_defaults(data: dict[str, Any]) -> None:
     if "current_ip_emails" not in data:
         old_used = int(data.get("accounts_on_current_ip") or 0)
@@ -631,7 +638,7 @@ def acquire_client_for_job(
     surface: str | None = None,
 ) -> tuple[RoboNeoWebClient, dict[str, Any]]:
     """
-    Chọn nick pool đủ credit; không có thì mua nick mới.
+    Chọn nick pool đủ credit; mua nick mới qua huanaihub chỉ khi ROBONEO_AUTO_BUY bật.
     VNsProxy: tối đa PROXY_ACCOUNTS_PER_IP (mặc định 2) nick/IP, chỉ xoay khi hết slot hoặc lỗi;
     chờ PROXY_ROTATE_COOLDOWN_SEC (60s) trước mỗi lần xoay.
     """
@@ -669,6 +676,12 @@ def acquire_client_for_job(
             print(f"⚠ Nick pool fail: {e}")
             mark_account(email, status="locked", note=str(e))
             excluded.add(email.strip().lower())
+
+    if not auto_buy_enabled():
+        raise RoboNeoError(
+            f"Không có nick pool đủ {floor} credit "
+            f"(ROBONEO_AUTO_BUY=0 — thêm nick thủ công vào pool)"
+        )
 
     last_err: Exception | None = None
     force_rotate = False

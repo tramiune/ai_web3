@@ -52,7 +52,7 @@ VAE_CREDITS_1080_BY_DURATION = {10: 2, 20: 4, 30: 6}
 # VAE API: 10 coins = 1 xu (profile.coins)
 VAE_COINS_720P_BY_DURATION = {10: 10, 20: 20, 30: 30}
 VAE_COINS_1080P_BY_DURATION = {10: 20, 20: 40, 30: 60}
-VAE_API_MODEL_MOTION_720P = "weavy-kling-26"
+VAE_API_MODEL_WEAVY = "weavy-kling-26"
 VAE_API_MODEL_MOTION_1080P = "pixverse"
 VAE_MAX_UPLOAD_BYTES = int(get_env("VIDEOAIEASY_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 DEFAULT_VAE_RESOLUTION = "720p"
@@ -266,13 +266,14 @@ class VideoAiEasyClient:
         model_id: str = MODEL_KLING_26,
         resolution: str | None = None,
         duration_sec: int | None = None,
+        api_model: str | None = None,
     ) -> str:
         res = normalize_vae_resolution(resolution)
         dur = normalize_vae_duration_sec(duration_sec)
-        api_model = vae_motion_api_model(res)
+        vae_model = (api_model or model_id or MODEL_KLING_26).strip()
         body = {
             "mode": "motion-control",
-            "modelId": api_model,
+            "modelId": vae_model,
             "prompt": (prompt or get_env(
                 "VIDEOAIEASY_PROMPT", "Follow the reference motion naturally"
             )).strip(),
@@ -280,8 +281,10 @@ class VideoAiEasyClient:
             "drivingVideoUrl": driving_video_url.strip(),
             "durationSec": dur,
         }
-        # weavy-kling-26 (720p tiết kiệm): web VAE không gửi resolution — kling-2.6+720p → server ép 15s, 30 coins
-        if api_model == VAE_API_MODEL_MOTION_1080P:
+        # kling-2.6 (Pro): gửi resolution 720p. weavy-kling-26 (fallback 5 coin): không gửi resolution.
+        if vae_model == MODEL_KLING_26:
+            body["resolution"] = res
+        elif vae_model == VAE_API_MODEL_MOTION_1080P:
             body["resolution"] = res
         resp = self._api(
             "POST",
@@ -363,9 +366,7 @@ def resolution_for_order(order_data: dict | None) -> str:
     explicit = data.get("vaeResolution") or data.get("resolution") or data.get("videoResolution")
     if explicit:
         return normalize_vae_resolution(str(explicit))
-    model_id = str(data.get("modelId") or "").strip()
-    if model_id in KALING_VAE_1080_MODEL_IDS or model_id in KALING_TURBO_MODEL_IDS:
-        return normalize_vae_resolution("1080p")
+    # Kaling: UI có thể ghi 1080p nhưng render thực luôn 720p.
     return normalize_vae_resolution(None)
 
 
@@ -382,11 +383,13 @@ def normalize_vae_duration_sec(value: int | float | str | None) -> int:
     return VAE_PACKAGE_10_DURATION_SEC
 
 
-def vae_motion_api_model(resolution: str | None) -> str:
-    """ModelId đúng trên VAE motion-control (khác alias nội bộ kling-2.6)."""
+def vae_motion_api_model(resolution: str | None, *, weavy: bool = False) -> str:
+    """weavy-kling-26 = fallback RoboNeo 5 coin. kling-2.6 = Pro 10 coin."""
+    if weavy:
+        return VAE_API_MODEL_WEAVY
     if normalize_vae_resolution(resolution) == "1080p":
         return VAE_API_MODEL_MOTION_1080P
-    return VAE_API_MODEL_MOTION_720P
+    return MODEL_KLING_26
 
 
 def vae_coins_for_duration(duration_sec: int, resolution: str | None = None) -> int:
