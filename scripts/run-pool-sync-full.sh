@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 LOG="${ROOT}/pool_sync.log"
 {
-  echo "=== pool sync start $(date -Is) pid=$$ ==="
+  echo "=== pool sync start $(date '+%Y-%m-%d %H:%M:%S %Z') pid=$$ ==="
   set -a
   if [ -f .env ]; then
     # shellcheck disable=SC1091
@@ -14,6 +14,6 @@ LOG="${ROOT}/pool_sync.log"
   set +a
   python3 scripts/refresh_pool_credits.py --all --force-login
   ec=$?
-  echo "=== pool sync end $(date -Is) exit=$ec ==="
+  echo "=== pool sync end $(date '+%Y-%m-%d %H:%M:%S %Z') exit=$ec ==="
   exit "$ec"
 } >>"$LOG" 2>&1
