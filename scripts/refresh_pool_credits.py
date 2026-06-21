@@ -12,14 +12,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from account_pool import (  # noqa: E402
+    _clear_current_ip_usage,
+    _load_pool,
     _login_once,
     _pool_path,
+    _save_pool,
     acquire_pool_sync_lock,
     get_or_refresh_client,
     list_accounts,
     mark_account,
     min_pick_credits,
     release_pool_sync_lock,
+    rotate_proxy_for_retry,
     update_account_after_job,
 )
 from roboneo_web import RoboNeoError, resolve_surface  # noqa: E402
@@ -123,6 +127,14 @@ def main() -> int:
         f"📂 Pool: {_pool_path()} | {len(rows)} nick | "
         f"force_login={force_login} | min pick {min_pick_credits()} credit"
     )
+
+    if force_login:
+        data = _load_pool()
+        _clear_current_ip_usage(data)
+        data["last_proxy_rotate_at"] = 0
+        _save_pool(data)
+        print("🔄 Xoay IP trước batch sync (2 nick/IP)…")
+        rotate_proxy_for_retry()
 
     ok = fail = 0
     ge120 = 0
