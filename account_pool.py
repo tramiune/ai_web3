@@ -45,8 +45,11 @@ def is_pool_sync_running() -> bool:
     if not lock.is_file():
         return False
     try:
-        pid = int((lock.read_text(encoding="utf-8") or "").strip().split()[0])
-    except (TypeError, ValueError, OSError):
+        raw = (lock.read_text(encoding="utf-8") or "").strip()
+        if not raw:
+            return True
+        pid = int(raw.split()[0])
+    except (TypeError, ValueError, IndexError, OSError):
         return True
     try:
         import os
@@ -159,7 +162,36 @@ def _should_rotate_for_new_buy(data: dict[str, Any]) -> bool:
     return len(_current_ip_emails(data)) >= max_accounts_per_ip()
 
 
+def is_proxy_error(err: object) -> bool:
+    """Lỗi hạ tầng proxy — không phải lỗi nick."""
+    s = str(err or "").lower()
+    return any(
+        x in s
+        for x in (
+            "proxyerror",
+            "cannot connect to proxy",
+            "connection refused",
+            "connect timeout",
+            "connection timed out",
+            "connection reset",
+            "proxy connection",
+            "errno 61",
+            "errno 54",
+            "tunnel connection failed",
+            "bad gateway",
+            "502",
+            "503",
+            "504",
+            "ip mới",
+            "không kết nối được sau xoay",
+            "không có proxy sống",
+        )
+    )
+
+
 def _should_force_rotate_on_error(err: object) -> bool:
+    if is_proxy_error(err):
+        return True
     s = str(err or "").lower()
     return any(
         x in s
@@ -171,7 +203,6 @@ def _should_force_rotate_on_error(err: object) -> bool:
             "400",
             "bad request",
             "vnsproxy",
-            "proxy",
             "45130",
             "login fail",
             "403",
@@ -184,6 +215,43 @@ def _should_force_rotate_on_error(err: object) -> bool:
             "không mua",
             "too many",
         )
+    )
+
+
+def _proxy_probe_retries() -> int:
+    load_project_env()
+    return max(1, int(get_env("ROBONEO_PROXY_PROBE_RETRIES", "5") or "5"))
+
+
+def _resolve_live_proxy(
+    key: str,
+    province_id: int | None,
+    *,
+    force_rotate: bool,
+) -> tuple[dict[str, str], str]:
+    """Lấy proxy VNsProxy sống — tự xoay nếu IP hiện tại chết."""
+    from roboneo_proxy import proxy_dict_rotate_with_fallback
+
+    rotate_next = force_rotate
+    last_host = ""
+    for attempt in range(1, _proxy_probe_retries() + 1):
+        data = _load_pool()
+        if rotate_next:
+            _wait_proxy_rotate_cooldown(data)
+            proxies, host, _ = proxy_dict_rotate_with_fallback(key, province_id=province_id)
+            data = _load_pool()
+            data["last_proxy_rotate_at"] = int(time.time())
+            _clear_current_ip_usage(data)
+            _save_pool(data)
+        else:
+            proxies, host = proxy_dict_from_key(key, rotate=False, province_id=province_id)
+        last_host = host
+        if probe_proxy(proxies):
+            return proxies, host
+        print(f"⚠ IP {host} không kết nối — xoay IP ({attempt}/{_proxy_probe_retries()})…")
+        rotate_next = True
+    raise RoboNeoError(
+        f"Không có proxy sống sau {_proxy_probe_retries()} lần (IP cuối {last_host})"
     )
 
 
@@ -216,12 +284,7 @@ def _rotate_proxy_if_needed(data: dict[str, Any], *, force: bool) -> bool:
     province_raw = (get_env("ROBONEO_PROXY_PROVINCE_ID") or "").strip()
     province_id = int(province_raw) if province_raw else None
 
-    from roboneo_proxy import proxy_dict_rotate_with_fallback
-
-    proxies, host, rotated = proxy_dict_rotate_with_fallback(key, province_id=province_id)
-    if not probe_proxy(proxies):
-        raise RoboNeoError(f"IP mới {host} không kết nối được sau xoay")
-
+    proxies, host = _resolve_live_proxy(key, province_id, force_rotate=True)
     data = _load_pool()
     data["last_proxy_rotate_at"] = int(time.time())
     _clear_current_ip_usage(data)
@@ -503,21 +566,13 @@ def _login_once(email: str, password: str, *, rotate: bool = False) -> tuple[Rob
         used = len(_current_ip_emails(data))
         limit = max_accounts_per_ip()
         must_rotate = _must_rotate_before_login(data, email, rotate=rotate)
-        if must_rotate:
-            if not rotate and used >= limit:
-                print(f"→ Đã {used}/{limit} nick trên IP — xoay IP trước login {email}…")
-            _wait_proxy_rotate_cooldown(data)
-            from roboneo_proxy import proxy_dict_rotate_with_fallback
-
-            proxies, host, _ = proxy_dict_rotate_with_fallback(key, province_id=province_id)
-            data = _load_pool()
-            data["last_proxy_rotate_at"] = int(time.time())
-            _clear_current_ip_usage(data)
-            _save_pool(data)
-        else:
-            proxies, host = proxy_dict_from_key(key, rotate=False, province_id=province_id)
-            if used > 0:
-                print(f"→ Login trên IP hiện tại ({used}/{limit} nick đã login)")
+        if must_rotate and not rotate and used >= limit:
+            print(f"→ Đã {used}/{limit} nick trên IP — xoay IP trước login {email}…")
+        elif not must_rotate and used > 0:
+            print(f"→ Login trên IP hiện tại ({used}/{limit} nick đã login)")
+        proxies, host = _resolve_live_proxy(
+            key, province_id, force_rotate=must_rotate
+        )
 
     resp = roboneo_login(email, password, proxies=proxies)
     client = RoboNeoWebClient(account_id=account_id)

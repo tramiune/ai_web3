@@ -4390,6 +4390,71 @@ window.setRenderProvider = async (provider) => {
     }
 };
 
+function renderAdminEngineBalances() {
+    const box = document.getElementById('admin-engine-balances');
+    const updatedEl = document.getElementById('admin-engine-balances-updated');
+    if (!box) return;
+
+    const bot = (FB_CACHE.adminBots || []).find(b => b.id === RENDER_PROVIDER_BOT_ID)
+        || (FB_CACHE.adminBots || [])[0];
+    const data = bot && bot.engineBalances;
+    const updated = bot && (bot.engineBalancesUpdatedAt || bot.engineBalancesUpdated);
+
+    if (updatedEl) {
+        const dt = safeToDate(updated);
+        updatedEl.textContent = dt
+            ? t('admin.engine_balances_updated', {
+                time: dt.toLocaleString(currentLang === 'en' ? 'en-US' : 'vi-VN')
+            })
+            : '';
+    }
+
+    if (!data) {
+        box.innerHTML = `<span style="opacity:0.55;">${t('admin.engine_balances_empty')}</span>`;
+        return;
+    }
+
+    const fmtRow = (label, items, valueKey, unit) => {
+        if (!items || !items.length) {
+            return `<div style="margin-bottom:0.75rem;"><strong>${escapeHTML(label)}</strong><br><span style="opacity:0.55;">—</span></div>`;
+        }
+        const lines = items.map(r => {
+            if (r.error) {
+                return `<div>• ${escapeHTML(r.email)}: <span style="color:#ff6b6b;">${escapeHTML(String(r.error).slice(0, 80))}</span></div>`;
+            }
+            const val = r[valueKey];
+            const extra = valueKey === 'coins' && r.xu != null ? ` (${r.xu} xu)` : '';
+            return `<div>• ${escapeHTML(r.email)}: <strong>${val}</strong> ${unit}${extra}</div>`;
+        }).join('');
+        const total = (data.totals || {});
+        let totalLine = '';
+        if (valueKey === 'coins' && total.vaeCoins != null) {
+            totalLine = `<div style="margin-top:0.35rem; opacity:0.85;">→ ${t('admin.engine_balances_total')}: <strong>${total.vaeCoins}</strong> coins (${total.vaeXu} xu)</div>`;
+        } else if (valueKey === 'credits' && label.includes('API') && total.xiaoyangApiCredits != null) {
+            totalLine = `<div style="margin-top:0.35rem; opacity:0.85;">→ ${t('admin.engine_balances_total')}: <strong>${total.xiaoyangApiCredits}</strong> credits</div>`;
+        } else if (valueKey === 'credits' && total.xiaoyangWebCredits != null) {
+            totalLine = `<div style="margin-top:0.35rem; opacity:0.85;">→ ${t('admin.engine_balances_total')}: <strong>${total.xiaoyangWebCredits}</strong> credits</div>`;
+        }
+        return `<div style="margin-bottom:0.75rem;"><strong>${escapeHTML(label)}</strong>${lines}${totalLine}</div>`;
+    };
+
+    const ad = data.aidancing || {};
+    let adHtml;
+    if (ad.error) {
+        adHtml = `<div style="margin-bottom:0.25rem;"><strong>${t('admin.engine_balances_ad')}</strong><br><span style="color:#ff6b6b;">${escapeHTML(ad.error)}</span></div>`;
+    } else {
+        adHtml = `<div><strong>${t('admin.engine_balances_ad')}</strong><br>• <strong>${ad.coins ?? '—'}</strong> coin</div>`;
+    }
+
+    box.innerHTML =
+        fmtRow(t('admin.engine_balances_vae'), data.vae, 'coins', 'coins') +
+        fmtRow(t('admin.engine_balances_xy'), data.xiaoyangWeb, 'credits', 'credits') +
+        (data.xiaoyangApi && data.xiaoyangApi.length
+            ? fmtRow(`${t('admin.engine_balances_xy')} (API)`, data.xiaoyangApi, 'credits', 'credits')
+            : '') +
+        adHtml;
+}
+
 function subscribeAdminBots() {
     if (!window.__isAdmin) return;
 
@@ -4397,6 +4462,7 @@ function subscribeAdminBots() {
 
     if (fbHas('adminBots')) {
         renderAdminBots();
+        renderAdminEngineBalances();
         return;
     }
 
@@ -4404,6 +4470,7 @@ function subscribeAdminBots() {
     fbSub('adminBots', onSnapshot(collection(db, 'bots'), (snapshot) => {
         FB_CACHE.adminBots = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         scheduleRenderAdminBots();
+        renderAdminEngineBalances();
     }, (err) => {
         console.error('Admin bots snapshot error:', err);
         showToast(t('admin.toast_load_error', { msg: err.message }));
