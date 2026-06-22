@@ -144,8 +144,23 @@ class AidancingApiClient:
 
     def get_account(self) -> dict[str, Any]:
         """Email + coin từ dashboard HTML (cookie session)."""
+        last_err = ""
+        for attempt in range(3):
+            try:
+                return self._fetch_account_from_dashboard()
+            except RuntimeError as e:
+                last_err = str(e)
+                if attempt < 2:
+                    time.sleep(1.5)
+                    continue
+                raise RuntimeError(last_err) from e
+        raise RuntimeError(last_err or "Aidancing get_account failed")
+
+    def _fetch_account_from_dashboard(self) -> dict[str, Any]:
         self.list_jobs(page=0, size=1)
         google_sub = parse_google_sub_from_cookie(self._cookie)
+        best: dict[str, Any] | None = None
+        best_html_len = 0
         last_html_len = 0
         for path in DASHBOARD_PATHS:
             url = f"{AIDANCING_ORIGIN}{path}"
@@ -155,17 +170,24 @@ class AidancingApiClient:
                 raise SessionExpiredError(
                     "Session expired or unauthorized — cập nhật AIDANCING_COOKIE trong .env"
                 )
+            if r.status_code == 404:
+                continue
             r.raise_for_status()
             html = r.text or ""
             last_html_len = len(html)
             bal = parse_balance_from_dashboard_html(html)
             if bal is not None:
                 email = parse_account_email_from_dashboard_html(html)
-                return {
+                row = {
                     "email": email or google_sub or "?",
                     "coins": bal,
                     "googleSub": google_sub,
                 }
+                if len(html) >= best_html_len:
+                    best = row
+                    best_html_len = len(html)
+        if best:
+            return best
         raise RuntimeError(
             "Session OK — không đọc coin từ dashboard HTML "
             f"(đã thử {', '.join(DASHBOARD_PATHS)}; last len={last_html_len})"

@@ -26,9 +26,30 @@ def _load_xy_api_keys() -> list[str]:
     return [single] if single else []
 
 
+def _collect_aidancing_row() -> dict[str, Any]:
+    aid_row: dict[str, Any] = {"email": "", "coins": None, "error": ""}
+    cookie = (get_env("AIDANCING_COOKIE") or "").strip()
+    if not cookie:
+        aid_row["error"] = "Thiếu AIDANCING_COOKIE"
+        return aid_row
+    try:
+        from aidancing_api import AidancingApiClient, SessionExpiredError
+
+        info = AidancingApiClient(cookie=cookie).get_account()
+        aid_row["email"] = str(info.get("email") or "")
+        aid_row["coins"] = info.get("coins")
+    except SessionExpiredError as e:
+        aid_row["error"] = str(e)[:300]
+    except Exception as e:
+        aid_row["error"] = str(e)[:300]
+    return aid_row
+
+
 def collect_engine_balances() -> dict[str, Any]:
     load_project_env()
     from xiaoyang_motion import load_videoaieasy_accounts, load_xiaoyang_accounts
+
+    aid_row = _collect_aidancing_row()
 
     vae_rows: list[dict[str, Any]] = []
     for acc in load_videoaieasy_accounts():
@@ -80,22 +101,6 @@ def collect_engine_balances() -> dict[str, Any]:
             xy_api_rows.append(row)
     except ImportError:
         pass
-
-    aid_row: dict[str, Any] = {"email": "", "coins": None, "error": ""}
-    cookie = (get_env("AIDANCING_COOKIE") or "").strip()
-    if not cookie:
-        aid_row["error"] = "Thiếu AIDANCING_COOKIE"
-    else:
-        try:
-            from aidancing_api import AidancingApiClient, SessionExpiredError
-
-            info = AidancingApiClient(cookie=cookie).get_account()
-            aid_row["email"] = str(info.get("email") or "")
-            aid_row["coins"] = info.get("coins")
-        except SessionExpiredError as e:
-            aid_row["error"] = str(e)[:300]
-        except Exception as e:
-            aid_row["error"] = str(e)[:300]
 
     def _sum_int(rows: list[dict], key: str) -> int:
         return sum(int(r[key]) for r in rows if r.get(key) is not None and not r.get("error"))
@@ -164,12 +169,39 @@ def format_engine_balance_report(site: str, data: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _merge_stale_aidancing(data: dict[str, Any], prev: dict[str, Any] | None) -> dict[str, Any]:
+    """Giữ coin Aidancing cũ nếu lần quét mới chỉ lỗi parse HTML tạm thời."""
+    if not prev:
+        return data
+    prev_ad = prev.get("aidancing") or {}
+    new_ad = data.get("aidancing") or {}
+    err = str(new_ad.get("error") or "")
+    if not err or prev_ad.get("coins") is None or prev_ad.get("error"):
+        return data
+    if "Session OK" not in err and "không đọc coin" not in err:
+        return data
+    merged_ad = {
+        "email": prev_ad.get("email") or new_ad.get("email") or "",
+        "coins": prev_ad.get("coins"),
+        "error": "",
+    }
+    out = dict(data)
+    out["aidancing"] = merged_ad
+    totals = dict(out.get("totals") or {})
+    totals["aidancingCoins"] = merged_ad.get("coins")
+    out["totals"] = totals
+    return out
+
+
 def sync_engine_balances_to_firestore(db, bot_name: str) -> dict[str, Any]:
     """Ghi engineBalances lên Firestore bots/{bot_name} — admin đọc được."""
     from firebase_admin import firestore
 
-    data = collect_engine_balances()
-    db.collection("bots").document(bot_name).set(
+    doc_ref = db.collection("bots").document(bot_name)
+    snap = doc_ref.get()
+    prev = (snap.to_dict() or {}).get("engineBalances") if snap.exists else None
+    data = _merge_stale_aidancing(collect_engine_balances(), prev)
+    doc_ref.set(
         {
             "engineBalances": data,
             "engineBalancesUpdatedAt": firestore.SERVER_TIMESTAMP,
