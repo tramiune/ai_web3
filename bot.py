@@ -1949,6 +1949,78 @@ def _rescan_pending_orders_loop():
         time.sleep(SESSION_ERROR_BACKOFF_SEC)
         _enqueue_pending_rescan()
 
+
+def _firestore_ts_seconds(ts) -> float:
+    if ts is None:
+        return 0.0
+    if hasattr(ts, "timestamp"):
+        return float(ts.timestamp())
+    try:
+        return float(ts)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+_batch_channel_trigger_lock = threading.Lock()
+_batch_channel_trigger_running = False
+
+
+def _run_batch_channel_trigger():
+    global _batch_channel_trigger_running
+    with _batch_channel_trigger_lock:
+        if _batch_channel_trigger_running:
+            return
+        _batch_channel_trigger_running = True
+    try:
+        import subprocess
+
+        root = os.path.dirname(os.path.abspath(__file__))
+        proc = subprocess.run(
+            [sys.executable, os.path.join(root, "batch_channel.py"), "--poll-trigger"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=7200,
+        )
+        if proc.stdout:
+            print(proc.stdout.rstrip())
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "").strip()
+            print(f"⚠️ batch channel「Chạy thử ngay」exit {proc.returncode}: {err[:500]}")
+    except Exception as e:
+        print(f"⚠️ batch channel「Chạy thử ngay」: {e}")
+    finally:
+        with _batch_channel_trigger_lock:
+            _batch_channel_trigger_running = False
+
+
+def start_batch_channel_listener():
+    """User bấm Chạy thử / Làm ngay trên web → bot chạy batch (mọi user có config riêng)."""
+    col_ref = db.collection("batchChannelConfig")
+
+    def on_snapshot(col_snapshot, changes, read_time):
+        if not changes:
+            return
+        for change in changes:
+            doc = change.document
+            if not getattr(doc, "exists", False):
+                continue
+            data = doc.to_dict() or {}
+            requested = data.get("runNowRequestedAt")
+            if not requested:
+                continue
+            handled = data.get("runNowHandledAt")
+            if _firestore_ts_seconds(handled) >= _firestore_ts_seconds(requested):
+                continue
+            owner = (data.get("createdBy") or doc.id).strip() or doc.id
+            print(f"🚀 batch channel — lệnh chạy từ user {owner}")
+            threading.Thread(target=_run_batch_channel_trigger, daemon=True).start()
+            break
+
+    col_ref.on_snapshot(on_snapshot)
+    print("👂 Lắng nghe batchChannelConfig — Chạy thử / Làm ngay (mọi user)")
+
+
 def start_bot():
     global BOT_NAME
     parser = argparse.ArgumentParser(description='Kaling order bot — VideoAiEasy Kling 2.6')
@@ -2075,6 +2147,7 @@ def start_bot():
 
     db.collection('orders').where(filter=FieldFilter("status", "==", "pending")).on_snapshot(on_pending_orders_snapshot)
     _enqueue_pending_rescan()
+    start_batch_channel_listener()
 
     print(f"🟢 [{BOT_NAME}] Đang trực — lắng nghe Firestore (bật/tắt từ Admin)...")
     while True:

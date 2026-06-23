@@ -352,6 +352,29 @@ class VideoAiEasyClient:
             print(f"⚠️ VideoAiEasy delete job {job_id}: {e}")
             return False
 
+    def create_wardrobe_job(
+        self,
+        *,
+        person_image_url: str,
+        clothes_image_url: str,
+        wardrobe_replace: str = "full",
+    ) -> str:
+        """Thay đồ full bộ — POST /api/wardrobe (ai-wardrobe)."""
+        replace = (wardrobe_replace or "full").strip() or "full"
+        body = {
+            "personImageUrl": person_image_url.strip(),
+            "clothesImageUrl": clothes_image_url.strip(),
+            "wardrobeReplace": replace,
+        }
+        resp = self._api(
+            "POST",
+            "/api/wardrobe",
+            json=body,
+            headers={"Content-Type": "application/json"},
+            timeout=int(get_env("VIDEOAIEASY_CREATE_TIMEOUT_SEC", "120")),
+        )
+        return str(resp["data"]["jobId"])
+
 
 def normalize_vae_resolution(value: str | None) -> str:
     raw = (value or get_env("VIDEOAIEASY_DEFAULT_RESOLUTION", DEFAULT_VAE_RESOLUTION)).strip().lower()
@@ -665,3 +688,93 @@ def prepare_motion_video_for_vae_upload(
     raise VideoAiEasyError(
         f"Video vẫn > {limit / (1024 * 1024):.0f}MB sau khi nén — chọn video ngắn/nhẹ hơn"
     )
+
+
+def normalize_vae_public_url(url: str | None) -> str:
+    """CDN VAE đôi khi trả URL có xuống dòng giữa host và path."""
+    return re.sub(r"\s+", "", (url or "").strip())
+
+
+def poll_vae_job(
+    client: VideoAiEasyClient,
+    job_id: str,
+    *,
+    label: str = "vae",
+    timeout_sec: int | None = None,
+    interval_sec: float | None = None,
+) -> dict:
+    timeout = int(
+        timeout_sec if timeout_sec is not None else get_env("VIDEOAIEASY_WARDROBE_TIMEOUT_SEC", "1800")
+    )
+    deadline = time.time() + timeout
+    pause = float(interval_sec if interval_sec is not None else get_env("VIDEOAIEASY_WARDROBE_POLL_SEC", "10"))
+    last = ""
+    while time.time() < deadline:
+        job = client.get_job(job_id)
+        status = (job.get("status") or "").lower()
+        if status != last:
+            last = status
+            print(f"   [{label}] job {job_id}: {status}")
+        if status == "done":
+            return job
+        if status in ("failed", "expired", "error"):
+            raise VideoAiEasyError(job.get("error_message") or f"Job {status}")
+        time.sleep(pause)
+    raise VideoAiEasyError(f"Job {job_id} timeout sau {timeout}s")
+
+
+def _videoaieasy_account_id(email: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", (email or "").strip().lower()).strip("_") or "default"
+
+
+def load_videoaieasy_accounts() -> list[dict]:
+    accounts: list[dict] = []
+    raw = (get_env("VIDEOAIEASY_ACCOUNTS") or "").strip()
+    if raw:
+        if raw.startswith("["):
+            try:
+                for item in json.loads(raw):
+                    email = (item.get("email") or "").strip()
+                    password = item.get("password") or ""
+                    if email and password:
+                        accounts.append({
+                            "id": _videoaieasy_account_id(email),
+                            "email": email,
+                            "password": password,
+                        })
+            except json.JSONDecodeError as e:
+                raise VideoAiEasyError(f"VIDEOAIEASY_ACCOUNTS JSON lỗi: {e}") from e
+        else:
+            for part in raw.split(","):
+                part = part.strip()
+                if ":" not in part:
+                    continue
+                email, password = part.split(":", 1)
+                email, password = email.strip(), password.strip()
+                if email and password:
+                    accounts.append({
+                        "id": _videoaieasy_account_id(email),
+                        "email": email,
+                        "password": password,
+                    })
+    if not accounts:
+        email = (get_env("VIDEOAIEASY_EMAIL") or "").strip()
+        password = get_env("VIDEOAIEASY_PASSWORD") or ""
+        if email and password:
+            accounts.append({
+                "id": _videoaieasy_account_id(email),
+                "email": email,
+                "password": password,
+            })
+    return accounts
+
+
+def get_batch_vae_client() -> tuple[VideoAiEasyClient, dict]:
+    accounts = load_videoaieasy_accounts()
+    if not accounts:
+        raise VideoAiEasyError("Thiếu VIDEOAIEASY_ACCOUNTS / VIDEOAIEASY_EMAIL trong .env")
+    acc = accounts[0]
+    client = VideoAiEasyClient(acc["id"])
+    client.ensure_session(acc["email"], acc["password"])
+    print(f"🔑 VAE wardrobe: {acc['email']} ({acc['id']})")
+    return client, acc
