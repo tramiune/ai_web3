@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="icon-32.png" sizes="32x32">
     <link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
@@ -140,14 +140,12 @@
                             <span id="dropdown-user-email">email@gmail.com</span>
                         </div>
                         <hr class="dropdown-divider">
-                        <!-- Tạm ẩn: Xây kênh 1000fl
                         <a href="javascript:void(0)" class="dropdown-item premium-nav-item" onclick="window.navTo('build-channel-page')">
                             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                             </svg>
                             <span data-i18n="navbar.build_channel">Xây kênh 1000 fl / 21 ngày</span>
                         </a>
-                        -->
                         <a href="javascript:void(0)" id="nav-referral-item" class="dropdown-item" style="display: none;" onclick="window.navTo('referral-page')">
                             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -367,6 +365,11 @@
                     <div class="myvideo-actions">
                         <button class="btn-topup-inline" onclick="window.openTopupModal()" type="button">
                             <span class="btn-topup-inline__label">Nạp coin</span>
+                        </button>
+                        <button type="button" id="home-auto-video-btn" class="btn-auto-video has-new-badge" onclick="window.openBatchChannelModal()">
+                            <span class="btn-auto-video__icon" aria-hidden="true">✨</span>
+                            <span data-i18n="dashboard.auto_video_btn">Tạo video tự động</span>
+                            <span class="auto-video-new-badge" data-i18n="dashboard.auto_video_new">MỚI</span>
                         </button>
                         <button class="btn-primary" onclick="window.openOrderModal()" data-i18n="dashboard.create_new" style="white-space: nowrap;">+ Tạo video mới</button>
                     </div>
@@ -801,6 +804,89 @@
                     </div>
                     <button class="btn-primary" onclick="window.makeAdmin()" style="width: 100%;" data-i18n="admin.grant_admin_btn">Cấp quyền Admin</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch channel modal (auto TikTok → outfit → video) -->
+    <div id="batch-channel-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content batch-channel-modal-content">
+            <span class="modal-close" onclick="closeModal('batch-channel-modal')" aria-label="Close">&times;</span>
+            <div class="modal-header">
+                <h2 data-i18n="build_channel.title">Xây kênh tự động</h2>
+                <p data-i18n="build_channel.subtitle">Lấy video TikTok → thay nguyên bộ đồ → tạo video AI.</p>
+            </div>
+            <div class="modal-body batch-channel-modal-body">
+                <section class="batch-channel-panel glass-card">
+                    <div class="batch-panel-head">
+                        <h3 data-i18n="build_channel.setup_title">Thiết lập nhanh</h3>
+                    </div>
+                    <ol class="batch-steps">
+                        <li class="batch-step">
+                            <span class="batch-step-num">1</span>
+                            <div class="batch-step-body">
+                                <div class="batch-field-label" data-i18n="build_channel.step1_title">Ảnh nhân vật của bạn</div>
+                                <p class="batch-field-hint" data-i18n="build_channel.step1_hint">Ảnh rõ mặt + toàn thân, nền đơn giản.</p>
+                                <div id="batch-template-zone" class="upload-zone upload-zone--small batch-template-zone">
+                                    <input type="file" id="batch-template-input" accept="image/*" hidden>
+                                    <div id="batch-template-preview" class="batch-template-preview"></div>
+                                    <span data-i18n="build_channel.template_pick">Chọn ảnh</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="batch-step">
+                            <span class="batch-step-num">2</span>
+                            <div class="batch-step-body">
+                                <div class="batch-field-label" data-i18n="build_channel.step2_title">Link kênh TikTok</div>
+                                <p class="batch-field-hint" data-i18n="build_channel.step2_hint">Hệ thống lấy video đăng hôm qua trên kênh này.</p>
+                                <input type="url" id="batch-channel-url" class="form-control" placeholder="https://www.tiktok.com/@username" data-i18n="build_channel.channel_placeholder">
+                            </div>
+                        </li>
+                        <li class="batch-step">
+                            <span class="batch-step-num">3</span>
+                            <div class="batch-step-body">
+                                <div class="batch-field-label" data-i18n="build_channel.step3_title">Chạy</div>
+                                <p class="batch-field-hint" data-i18n="build_channel.step3_hint">Không bật lịch thì bấm nút để tạo video ngay. Tick chạy mỗi ngày để chọn giờ và bật lịch tự động.</p>
+                                <label class="batch-daily-row">
+                                    <input type="checkbox" id="batch-daily-checkbox">
+                                    <span data-i18n="build_channel.daily_checkbox">Chạy mỗi ngày</span>
+                                </label>
+                                <div id="batch-cron-hour-wrap" class="batch-inline-field" style="display:none;">
+                                    <label class="batch-field-label" data-i18n="build_channel.cron_hour_label">Giờ chạy tự động (VN)</label>
+                                    <input type="number" id="batch-cron-hour" class="form-control" min="0" max="23" value="3" style="max-width:88px;">
+                                    <p class="batch-field-hint" data-i18n="build_channel.cron_hour_hint">Mặc định 3:00 sáng — có thể đổi giờ khác.</p>
+                                </div>
+                                <div class="batch-actions">
+                                    <button type="button" class="btn-primary" id="batch-channel-main-btn" onclick="window.handleBatchChannelMainAction()">Tạo video ngay</button>
+                                </div>
+                            </div>
+                        </li>
+                    </ol>
+                    <details class="batch-advanced">
+                        <summary data-i18n="build_channel.advanced_toggle">Tùy chọn nâng cao</summary>
+                        <div class="batch-advanced-body">
+                            <div class="batch-field">
+                                <label class="batch-field-label" data-i18n="build_channel.source_mode_label">Nguồn video</label>
+                                <div class="batch-source-tabs">
+                                    <button type="button" class="batch-source-tab active" data-mode="tiktok" data-i18n="build_channel.source_tiktok">TikTok hôm qua</button>
+                                    <button type="button" class="batch-source-tab" data-mode="orders" data-i18n="build_channel.source_orders">Video đơn cũ</button>
+                                </div>
+                                <input type="radio" name="batch-source-mode" id="batch-source-tiktok" value="tiktok" checked hidden>
+                                <input type="radio" name="batch-source-mode" id="batch-source-orders" value="orders" hidden>
+                            </div>
+                            <div id="batch-channel-tiktok-wrap" class="batch-inline-field">
+                                <label class="batch-field-label" data-i18n="build_channel.yesterday_count_label">Giới hạn số video</label>
+                                <input type="number" id="batch-yesterday-count" class="form-control" min="0" max="50" value="0">
+                                <p class="batch-field-hint" data-i18n="build_channel.yesterday_count_hint">0 = tất cả video hôm qua.</p>
+                            </div>
+                            <div id="batch-channel-orders-wrap" class="batch-field" style="display:none;">
+                                <label class="batch-field-label" data-i18n="build_channel.orders_pick_label">Chọn đơn nguồn</label>
+                                <div id="batch-channel-orders-pick" class="batch-order-pick-list"></div>
+                            </div>
+                        </div>
+                    </details>
+                    <p id="batch-channel-status" class="batch-status-text"></p>
+                </section>
             </div>
         </div>
     </div>
@@ -1261,7 +1347,7 @@
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         import { firebaseConfig, ADMIN_EMAILS } from "./firebase-config.js";
-        import { initAppLogic } from "./script.js?v=2";
+        import { initAppLogic } from "./script.js?v=3";
 
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);

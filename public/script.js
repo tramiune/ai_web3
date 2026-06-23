@@ -1683,6 +1683,8 @@ async function handleUserLoggedIn(user) {
             window.__isAdmin = isAdmin;
             window.__isSuperAdmin = isSuperAdmin;
 
+            updateBatchChannelNewBadge();
+
             if (isAdmin) {
                 const adminProfileItem = document.getElementById('admin-dropdown-item-profile');
                 if (adminProfileItem) adminProfileItem.style.display = 'flex';
@@ -1746,6 +1748,9 @@ function navigateFromURLParam() {
             showTopupHistory();
         } else if (page === 'admin-panel' && window.__isAdmin) {
             showAdminPanel();
+        } else if (page === 'build-channel-page' && currentUser) {
+            showDashboard();
+            window.openBatchChannelModal();
         } else if (page === 'user-dashboard') {
             showDashboard();
         } else {
@@ -1840,9 +1845,7 @@ function showTopupHistory() {
 }
 
 function showBuildChannel() {
-    hideAllPages();
-    document.getElementById('build-channel-page').style.display = 'block';
-    window.scrollTo(0, 0);
+    window.openBatchChannelModal();
 }
 
 function showAdminPanel() {
@@ -6640,4 +6643,455 @@ async function payReferralCommissionClient(topupId, referredUserId, baseCoins, g
     console.log(`[Referral] Recorded ${commissionAmount} ${cur} commission for ${referrerId} (topup ${topupId})`);
 }
 window.payReferralCommissionClient = payReferralCommissionClient;
+
+
+// --- Batch channel (modal on home) ---
+const BATCH_CHANNEL_NEW_KEY = 'kaling_batch_auto_video_seen_v1';
+const BATCH_CHANNEL_CRON_HOUR_DEFAULT = 3;
+let _batchChannelPickerOrders = [];
+let _batchChannelCfg = null;
+
+function getBatchChannelConfigId() {
+    return currentUser?.uid || '';
+}
+
+function parseTikTokUsername(raw) {
+    const s = (raw || '').trim();
+    if (!s) return '';
+    if (s.startsWith('@')) return s.slice(1).split('/')[0];
+    const m = s.match(/tiktok\.com\/@([^/?#]+)/i);
+    if (m) return m[1];
+    return s.replace(/^@/, '').split('/')[0];
+}
+
+function batchChannelRunNowPending(cfg) {
+    if (!cfg?.runNowRequestedAt) return false;
+    const req = cfg.runNowRequestedAt?.toMillis?.() ?? cfg.runNowRequestedAt?.seconds * 1000 ?? 0;
+    const handled = cfg.runNowHandledAt?.toMillis?.() ?? cfg.runNowHandledAt?.seconds * 1000 ?? 0;
+    return req > handled;
+}
+
+function getBatchSourceModeFromUI() {
+    const orders = document.getElementById('batch-source-orders');
+    return orders?.checked ? 'orders' : 'tiktok';
+}
+
+function getBatchYesterdayVideoCount() {
+    const raw = parseInt(document.getElementById('batch-yesterday-count')?.value, 10);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return Math.max(0, Math.min(50, raw));
+}
+
+function syncBatchSourceModeUI(mode) {
+    const m = mode === 'orders' ? 'orders' : 'tiktok';
+    const tiktokRadio = document.getElementById('batch-source-tiktok');
+    const ordersRadio = document.getElementById('batch-source-orders');
+    const tiktokWrap = document.getElementById('batch-channel-tiktok-wrap');
+    const ordersWrap = document.getElementById('batch-channel-orders-wrap');
+    if (tiktokRadio) tiktokRadio.checked = m === 'tiktok';
+    if (ordersRadio) ordersRadio.checked = m === 'orders';
+    if (tiktokWrap) tiktokWrap.style.display = m === 'tiktok' ? 'block' : 'none';
+    if (ordersWrap) ordersWrap.style.display = m === 'orders' ? 'block' : 'none';
+    document.querySelectorAll('.batch-source-tab').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === m);
+    });
+}
+
+function getBatchSelectedOrderIds() {
+    const wrap = document.getElementById('batch-channel-orders-pick');
+    if (!wrap) return [];
+    return [...wrap.querySelectorAll('input[type="checkbox"][data-order-id]:checked')]
+        .map((el) => el.getAttribute('data-order-id'))
+        .filter(Boolean);
+}
+
+function renderBatchChannelOrderPicker(orders, selectedIds = []) {
+    const wrap = document.getElementById('batch-channel-orders-pick');
+    if (!wrap) return;
+    const selected = new Set(selectedIds || []);
+    if (!orders.length) {
+        wrap.innerHTML = `<div class="batch-empty-hint">${t('build_channel.orders_pick_empty')}</div>`;
+        return;
+    }
+    wrap.innerHTML = orders.map((o) => {
+        const id = o.id;
+        const shortId = id.slice(-6).toUpperCase();
+        const checked = selected.has(id) ? 'checked' : '';
+        return `
+        <label class="batch-order-pick-item">
+            <input type="checkbox" data-order-id="${escapeHTML(id)}" ${checked}>
+            <div class="batch-order-pick-thumb">
+                ${o.characterImageLink ? `<img src="${escapeHTML(o.characterImageLink)}" alt="">` : ''}
+            </div>
+            <div class="batch-order-pick-meta">
+                <div class="batch-order-pick-id">#${escapeHTML(shortId)}</div>
+                <div class="batch-order-pick-user">${escapeHTML(o.userName || o.userEmail || t('common.guest'))}</div>
+            </div>
+            <span class="status-badge status-${escapeHTML(o.status || 'pending')}">${escapeHTML(STATUS_MAP()[o.status] || o.status || '')}</span>
+        </label>`;
+    }).join('');
+}
+
+function isBatchDailyChecked() {
+    return !!document.getElementById('batch-daily-checkbox')?.checked;
+}
+
+function getBatchCronHour() {
+    const raw = parseInt(document.getElementById('batch-cron-hour')?.value, 10);
+    if (!Number.isFinite(raw)) return BATCH_CHANNEL_CRON_HOUR_DEFAULT;
+    return Math.max(0, Math.min(23, raw));
+}
+
+function syncBatchDailyScheduleUI(cfg) {
+    const wrap = document.getElementById('batch-cron-hour-wrap');
+    const show = isBatchDailyChecked();
+    if (wrap) wrap.style.display = show ? 'block' : 'none';
+    updateBatchChannelMainButton(cfg ?? _batchChannelCfg);
+}
+
+async function persistBatchChannelCronHourOnly() {
+    if (!currentUser || !_batchChannelCfg?.enabled) return;
+    const configId = getBatchChannelConfigId();
+    if (!configId) return;
+    const { db, doc, setDoc, serverTimestamp } = window.firebase;
+    const cronHour = getBatchCronHour();
+    try {
+        await setDoc(doc(db, 'batchChannelConfig', configId), {
+            cronHour,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+    } catch (e) {
+        console.error('[BatchChannel] cron hour:', e);
+    }
+}
+
+function updateBatchChannelMainButton(cfg) {
+    const btn = document.getElementById('batch-channel-main-btn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.classList.remove('btn-secondary');
+    btn.classList.add('btn-primary');
+    btn.style.background = '';
+    btn.style.borderColor = '';
+
+    if (batchChannelRunNowPending(cfg)) {
+        btn.disabled = true;
+        btn.textContent = t('build_channel.btn_running');
+        return;
+    }
+
+    const daily = isBatchDailyChecked();
+    if (daily && cfg?.enabled) {
+        btn.textContent = t('build_channel.btn_stop');
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-secondary');
+        btn.style.background = '#c0392b';
+        btn.style.borderColor = '#c0392b';
+        return;
+    }
+    if (daily) {
+        btn.textContent = t('build_channel.btn_schedule', { hour: getBatchCronHour() });
+        return;
+    }
+    btn.textContent = t('build_channel.btn_run_now');
+}
+
+function syncBatchDailyCheckboxFromCfg(cfg) {
+    const box = document.getElementById('batch-daily-checkbox');
+    if (!box) return;
+    box.checked = !!cfg?.enabled;
+}
+
+function batchChannelRunNowMode() {
+    return getBatchSourceModeFromUI() === 'orders' ? 'orders' : 'full';
+}
+
+function batchChannelPerVideoCost() {
+    return MODELS.vae20 ? MODELS.vae20.cost : 10;
+}
+
+async function ensureBatchChannelCoins(triggerRun) {
+    if (!triggerRun || !currentUser) return true;
+    const cost = batchChannelPerVideoCost();
+    const { db, doc, getDoc } = window.firebase;
+    let coins = Number(FB_CACHE.userProfile?.coins);
+    try {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) {
+            coins = Number(snap.data().coins);
+        }
+    } catch (e) {
+        console.warn('[BatchChannel] coin check:', e);
+    }
+    if (!Number.isFinite(coins) || coins < cost) {
+        showToast(t('build_channel.status_insufficient_coins', { cost }));
+        return false;
+    }
+    return true;
+}
+
+async function persistBatchChannelConfig({ enable, triggerRun = false }) {
+    if (!currentUser) {
+        showToast(t('common.toast_login_required'));
+        return false;
+    }
+    const configId = getBatchChannelConfigId();
+    if (!configId) return false;
+    const { db, doc, getDoc, setDoc, serverTimestamp } = window.firebase;
+    const channelUrl = document.getElementById('batch-channel-url')?.value?.trim() || '';
+    const username = parseTikTokUsername(channelUrl);
+    const sourceMode = getBatchSourceModeFromUI();
+    const selectedOrderIds = getBatchSelectedOrderIds();
+
+    if (sourceMode === 'tiktok' && !username) {
+        showToast(t('build_channel.status_need_channel'));
+        return false;
+    }
+    if (sourceMode === 'orders' && !selectedOrderIds.length) {
+        showToast(t('build_channel.status_need_orders'));
+        return false;
+    }
+    if (!(await ensureBatchChannelCoins(triggerRun))) {
+        return false;
+    }
+
+    let templateImageUrl = '';
+    let existingStartedAt = null;
+    try {
+        const existing = await getDoc(doc(db, 'batchChannelConfig', configId));
+        if (existing.exists()) {
+            const d = existing.data();
+            templateImageUrl = d.templateImageUrl || '';
+            existingStartedAt = d.startedAt || null;
+        }
+    } catch (_) { /* ignore */ }
+
+    const fileInput = document.getElementById('batch-template-input');
+    const file = fileInput?.files?.[0];
+    const needsTemplate = enable || triggerRun;
+    if (needsTemplate && file) {
+        try {
+            templateImageUrl = await uploadFile(file, 'characters');
+            const preview = document.getElementById('batch-template-preview');
+            if (preview) {
+                preview.innerHTML = `<img src="${escapeHTML(templateImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+                document.getElementById('batch-template-zone')?.classList.add('has-preview');
+            }
+        } catch (e) {
+            console.error('[BatchChannel] upload template:', e);
+            showToast(e.message || t('upload.error_network'));
+            return false;
+        }
+    }
+    if (needsTemplate && !templateImageUrl) {
+        showToast(t('build_channel.status_need_template'));
+        return false;
+    }
+
+    const payload = {
+        enabled: !!enable,
+        channelUrl,
+        channelUsername: username,
+        templateImageUrl,
+        sourceMode,
+        cronHour: getBatchCronHour(),
+        yesterdayVideoCount: getBatchYesterdayVideoCount(),
+        wardrobeReplace: 'full',
+        frameSec: 2.5,
+        selectedOrderIds,
+        createdBy: currentUser.uid,
+        createdByEmail: currentUser.email || '',
+        createdByName: currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : ''),
+        updatedAt: serverTimestamp(),
+    };
+    if (enable && !existingStartedAt) {
+        payload.startedAt = serverTimestamp();
+    }
+    if (triggerRun) {
+        payload.enabled = false;
+        payload.runNowRequestedAt = serverTimestamp();
+        payload.runNowMode = batchChannelRunNowMode();
+    }
+
+    try {
+        await setDoc(doc(db, 'batchChannelConfig', configId), payload, { merge: true });
+        if (fileInput) fileInput.value = '';
+        if (triggerRun) {
+            showToast(t('build_channel.status_run_now_queued'));
+            closeModal('batch-channel-modal');
+        } else if (enable) {
+            showToast(t('build_channel.status_schedule_on', { hour: getBatchCronHour() }));
+        } else {
+            showToast(t('build_channel.status_schedule_off'));
+        }
+        return true;
+    } catch (e) {
+        console.error('[BatchChannel] save:', e);
+        showToast(t('common.error_system', { msg: e.message || e.code || 'save' }));
+        return false;
+    }
+}
+
+window.handleBatchChannelMainAction = async () => {
+    const cfg = _batchChannelCfg;
+    if (batchChannelRunNowPending(cfg)) return;
+
+    const daily = isBatchDailyChecked();
+    if (daily && cfg?.enabled) {
+        await persistBatchChannelConfig({ enable: false });
+        return;
+    }
+    if (daily) {
+        await persistBatchChannelConfig({ enable: true });
+        return;
+    }
+    await persistBatchChannelConfig({ enable: false, triggerRun: true });
+};
+
+window.saveBatchChannelConfig = async (enable) => {
+    await persistBatchChannelConfig({ enable: !!enable });
+};
+
+function renderBatchChannelStatus(cfg) {
+    _batchChannelCfg = cfg;
+    const el = document.getElementById('batch-channel-status');
+    let html = '';
+
+    if (!cfg) {
+        html = t('build_channel.status_idle');
+    } else if (batchChannelRunNowPending(cfg)) {
+        html = t('build_channel.status_run_now_pending');
+    } else if (cfg.enabled) {
+        const hour = cfg.cronHour != null ? Number(cfg.cronHour) : BATCH_CHANNEL_CRON_HOUR_DEFAULT;
+        html = t('build_channel.status_on', { hour: Number.isFinite(hour) ? hour : BATCH_CHANNEL_CRON_HOUR_DEFAULT });
+        if (cfg.lastRunMessage) html += ` — ${escapeHTML(cfg.lastRunMessage)}`;
+    } else {
+        html = t('build_channel.status_idle');
+        if (cfg.lastRunMessage) html += ` — ${escapeHTML(cfg.lastRunMessage)}`;
+    }
+
+    if (el) el.textContent = html;
+    syncBatchDailyCheckboxFromCfg(cfg);
+    syncBatchDailyScheduleUI(cfg);
+}
+
+async function loadBatchChannelPage() {
+    if (!currentUser) return;
+    const configId = getBatchChannelConfigId();
+    if (!configId) return;
+    const { db, doc, collection, query, orderBy, limit, onSnapshot, where } = window.firebase;
+
+    if (!window.__batchSourceModeBound) {
+        window.__batchSourceModeBound = true;
+        document.getElementById('batch-source-tiktok')?.addEventListener('change', () => syncBatchSourceModeUI('tiktok'));
+        document.getElementById('batch-source-orders')?.addEventListener('change', () => syncBatchSourceModeUI('orders'));
+        document.querySelectorAll('.batch-source-tab').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const mode = btn.getAttribute('data-mode') || 'tiktok';
+                syncBatchSourceModeUI(mode);
+            });
+        });
+        const templateZone = document.getElementById('batch-template-zone');
+        const templateInput = document.getElementById('batch-template-input');
+        templateZone?.addEventListener('click', (e) => {
+            if (e.target.closest('.preview-change-btn')) return;
+            templateInput?.click();
+        });
+        templateInput?.addEventListener('change', () => {
+            const file = templateInput.files?.[0];
+            if (!file) return;
+            const preview = document.getElementById('batch-template-preview');
+            if (preview) {
+                preview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+                templateZone?.classList.add('has-preview');
+            }
+        });
+        document.getElementById('batch-daily-checkbox')?.addEventListener('change', () => {
+            syncBatchDailyScheduleUI(_batchChannelCfg);
+        });
+        document.getElementById('batch-cron-hour')?.addEventListener('change', () => {
+            updateBatchChannelMainButton(_batchChannelCfg);
+            persistBatchChannelCronHourOnly();
+        });
+    }
+
+    fbUnsub('batchChannelConfig');
+    fbSub('batchChannelConfig', onSnapshot(doc(db, 'batchChannelConfig', configId), (snap) => {
+        const cfg = snap.exists() ? snap.data() : null;
+        renderBatchChannelStatus(cfg);
+        const urlInput = document.getElementById('batch-channel-url');
+        if (urlInput && cfg?.channelUrl) {
+            urlInput.value = cfg.channelUrl;
+        }
+        const cronInput = document.getElementById('batch-cron-hour');
+        if (cronInput) {
+            cronInput.value = String(
+                cfg?.cronHour != null ? cfg.cronHour : BATCH_CHANNEL_CRON_HOUR_DEFAULT
+            );
+        }
+        const yesterdayInput = document.getElementById('batch-yesterday-count');
+        if (yesterdayInput && cfg?.yesterdayVideoCount != null) {
+            yesterdayInput.value = String(cfg.yesterdayVideoCount);
+        }
+        syncBatchSourceModeUI(cfg?.sourceMode || 'tiktok');
+        const preview = document.getElementById('batch-template-preview');
+        if (preview && cfg?.templateImageUrl) {
+            preview.innerHTML = `<img src="${escapeHTML(cfg.templateImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+            document.getElementById('batch-template-zone')?.classList.add('has-preview');
+        }
+        if (cfg?.selectedOrderIds?.length) {
+            renderBatchChannelOrderPicker(_batchChannelPickerOrders, cfg.selectedOrderIds);
+        }
+    }, (err) => console.error('[BatchChannel] config listener:', err)));
+
+    fbUnsub('batchChannelOrdersPick');
+    fbUnsub('batchChannelOrdersPickFallback');
+    const pickQ = query(
+        collection(db, 'orders'),
+        where('userId', '==', currentUser.uid),
+        orderBy('createdAt', 'desc'),
+        limit(80)
+    );
+    fbSub('batchChannelOrdersPick', onSnapshot(pickQ, (snap) => {
+        _batchChannelPickerOrders = snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((o) => (o.characterImageLink || '').trim() && (o.referenceVideoLink || '').trim());
+        renderBatchChannelOrderPicker(_batchChannelPickerOrders, getBatchSelectedOrderIds());
+    }, (err) => {
+        console.error('[BatchChannel] orders pick:', err);
+        if (err?.code === 'failed-precondition') {
+            const fallbackQ = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(120));
+            fbSub('batchChannelOrdersPickFallback', onSnapshot(fallbackQ, (snap) => {
+                _batchChannelPickerOrders = snap.docs
+                    .map((d) => ({ id: d.id, ...d.data() }))
+                    .filter((o) => o.userId === currentUser.uid)
+                    .filter((o) => (o.characterImageLink || '').trim() && (o.referenceVideoLink || '').trim());
+                renderBatchChannelOrderPicker(_batchChannelPickerOrders, getBatchSelectedOrderIds());
+            }));
+        }
+    }));
+}
+
+function updateBatchChannelNewBadge() {
+    const btn = document.getElementById('home-auto-video-btn');
+    if (!btn) return;
+    let seen = false;
+    try {
+        seen = localStorage.getItem(BATCH_CHANNEL_NEW_KEY) === '1';
+    } catch (_) { /* ignore */ }
+    btn.classList.toggle('has-new-badge', !seen);
+}
+
+window.openBatchChannelModal = () => {
+    if (!currentUser) {
+        showToast(t('common.toast_login_required'));
+        return;
+    }
+    try {
+        localStorage.setItem(BATCH_CHANNEL_NEW_KEY, '1');
+    } catch (_) { /* ignore */ }
+    updateBatchChannelNewBadge();
+    loadBatchChannelPage();
+    window.openModal('batch-channel-modal');
+};
 
