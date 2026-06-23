@@ -107,6 +107,15 @@ export async function onRequestPost(context) {
            await grantCoins(state.token, state.cfg.project_id, topup.userId, coins, topup.id);
            console.log(`Successfully granted ${coins} coins to user ${topup.userId}`);
            
+           // Tính tổng tiền nạp hôm nay
+           let todayTotal = 0;
+           try {
+               todayTotal = await fetchTodayTotalAmount(state.token, state.cfg.project_id);
+               todayTotal += amount; // Cộng thêm đơn hiện tại vì đơn hiện tại mới chuyển sang approved
+           } catch(e) {
+               console.error("Lỗi lấy tổng tiền hôm nay:", e);
+           }
+
            // Gửi thông báo Telegram
            const tidDisplay = transaction.tid || transaction.id || 'N/A';
            const message = `💰 *NẠP TIỀN THÀNH CÔNG!*\n\n` +
@@ -115,7 +124,8 @@ export async function onRequestPost(context) {
                            `💵 Số tiền: ${amount.toLocaleString()}đ\n` +
                            `🪙 Coin nhận: +${coins}\n` +
                            `📝 Nội dung: ${code}\n` +
-                           `🔑 Mã GD: \`${tidDisplay}\``;
+                           `🔑 Mã GD: \`${tidDisplay}\`\n` +
+                           `📊 Tổng hôm nay: ${todayTotal.toLocaleString()}đ`;
            await notifyTelegram(message);
 
            // Affiliate / Referral commission - isolated, must never block topup flow
@@ -269,6 +279,49 @@ async function fetchPendingTopups(token, projectId) {
         amount: parseInt(fields.amount?.integerValue || fields.amount?.doubleValue || fields.amount?.stringValue || 0)
       };
     });
+}
+
+async function fetchTodayTotalAmount(token, projectId) {
+  // Start of today in Vietnam Time (UTC+7)
+  const now = new Date();
+  const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  vnTime.setUTCHours(0, 0, 0, 0);
+  const startOfDayUtc = new Date(vnTime.getTime() - 7 * 60 * 60 * 1000).toISOString();
+
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "topups" }],
+        where: {
+          fieldFilter: { field: { fieldPath: "createdAt" }, op: "GREATER_THAN_OR_EQUAL", value: { timestampValue: startOfDayUtc } }
+        },
+        limit: 1000
+      }
+    })
+  });
+  
+  const data = await res.json();
+  if (!Array.isArray(data)) return 0;
+
+  let total = 0;
+  for (const item of data) {
+    if (item.document && item.document.fields) {
+      const fields = item.document.fields;
+      if (fields.status && fields.status.stringValue === "approved") {
+         const currency = fields.currency?.stringValue || "VND";
+         const amountStr = fields.amount?.integerValue || fields.amount?.doubleValue || fields.amount?.stringValue || "0";
+         let val = parseFloat(amountStr);
+         if (currency.toUpperCase() === "USD") {
+             val = val * 25400; // Tỉ giá ước tính
+         }
+         total += val;
+      }
+    }
+  }
+  return total;
 }
 
 async function grantCoins(token, projectId, userId, coins, topupId) {

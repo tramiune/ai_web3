@@ -248,6 +248,14 @@ export async function onWebhookRequest(context) {
         // 2) Grant coins to user.
         await grantCoins(fbToken, svc.project_id, userId, coins);
 
+        // Fetch today's total amount
+        let todayTotal = 0;
+        try {
+            todayTotal = await fetchTodayTotalAmount(fbToken, svc.project_id);
+        } catch (e) {
+            console.error("fetchTodayTotalAmount error:", e);
+        }
+
         // 3) Notify Telegram.
         const isPending = eventType === 'PAYMENT.CAPTURE.PENDING';
         const statusLabel = isPending ? '⏳ ĐANG GIỮ TIỀN (Hold)' : '✅ HOÀN TẤT';
@@ -259,7 +267,8 @@ export async function onWebhookRequest(context) {
             `💵 Số tiền: $${amountValue.toFixed(2)} ${currency}\n` +
             `🪙 Coin nhận: +${coins}\n` +
             `📦 Gói: ${escapeHtml(packageName)}\n` +
-            `🔑 Capture: <code>${captureId}</code>`;
+            `🔑 Capture: <code>${captureId}</code>\n` +
+            `📊 Tổng hôm nay: ${Math.round(todayTotal).toLocaleString()}đ (ước tính)`;
         await notifyTelegram(message);
 
         // 4) Referral commission - isolated.
@@ -491,6 +500,49 @@ async function grantCoins(token, projectId, userId, coins) {
         const txt = await res.text();
         throw new Error(`Failed to grant coins: ${res.status} ${txt}`);
     }
+}
+
+async function fetchTodayTotalAmount(token, projectId) {
+  // Start of today in Vietnam Time (UTC+7)
+  const now = new Date();
+  const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  vnTime.setUTCHours(0, 0, 0, 0);
+  const startOfDayUtc = new Date(vnTime.getTime() - 7 * 60 * 60 * 1000).toISOString();
+
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "topups" }],
+        where: {
+          fieldFilter: { field: { fieldPath: "createdAt" }, op: "GREATER_THAN_OR_EQUAL", value: { timestampValue: startOfDayUtc } }
+        },
+        limit: 1000
+      }
+    })
+  });
+  
+  const data = await res.json();
+  if (!Array.isArray(data)) return 0;
+
+  let total = 0;
+  for (const item of data) {
+    if (item.document && item.document.fields) {
+      const fields = item.document.fields;
+      if (fields.status && fields.status.stringValue === "approved") {
+         const currency = fields.currency?.stringValue || "VND";
+         const amountStr = fields.amount?.integerValue || fields.amount?.doubleValue || fields.amount?.stringValue || "0";
+         let val = parseFloat(amountStr);
+         if (currency.toUpperCase() === "USD") {
+             val = val * 25400; // Tỉ giá ước tính
+         }
+         total += val;
+      }
+    }
+  }
+  return total;
 }
 
 // --- Affiliate / Referral Commission (mirrors casso-webhook.js) --------------
