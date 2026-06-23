@@ -981,7 +981,7 @@ export async function initAppLogic() {
             }
 
             currentUser = null;
-            handleUserLoggedOut(true);
+            handleUserLoggedOut(false);
         } catch (e) {
             console.error("Auth Change Error:", e);
             showToast(t('common.error_auth', { msg: e.message || e.code || 'Auth' }));
