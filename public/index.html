@@ -1343,14 +1343,22 @@
                 data-i18n="footer.privacy">Chính sách bảo mật</a>
         </div>
     </footer>
-    <!-- Floating Telegram Button (right) -->
-    <a href="https://t.me/motionaistudio" target="_blank" class="telegram-fab" data-i18n-title="common.support_chat" title="Chat với chúng tôi ✨">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" />
-        </svg>
-    </a>
+    <!-- Floating support buttons (Zalo + Telegram) -->
+    <div class="support-fabs" aria-label="Liên hệ hỗ trợ">
+        <a href="https://zalo.me/0965951536" class="zalo-fab" id="zalo-fab" target="_blank" rel="noopener noreferrer"
+            data-i18n-title="common.support_zalo" title="Chat Zalo hỗ trợ" aria-label="Chat Zalo Kaling">
+            <img src="/assets/zalo-icon.png" alt="" class="zalo-fab__img" width="60" height="60" loading="lazy" 
+decoding="async">
+        </a>
+        <a href="https://t.me/motionaistudio" class="telegram-fab" id="telegram-fab" target="_blank" rel="noopener noreferrer"
+            data-i18n-title="common.support_chat" title="Chat với chúng tôi ✨" aria-label="Chat Telegram Kaling">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+        </a>
+    </div>
 
     <!-- SVG Gradients -->
     <svg style="width:0; height:0; position:absolute;" aria-hidden="true" focusable="false">

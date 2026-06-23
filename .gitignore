@@ -26,5 +26,6 @@ bot_chrome_profile/
 !public/icon-180.png
 !public/icon-192.png
 !public/icon-512.png
+!public/assets/zalo-icon.png
 *.jpg
 !public/favicon.ico
