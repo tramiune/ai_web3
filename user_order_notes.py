@@ -22,3 +22,18 @@ USER_NOTE_ROBONEO_TRIAL_INVALID = (
     "Ưu đãi RoboNeo 24h đã hết hạn hoặc không áp dụng cho tài khoản này. "
     "Vui lòng chọn gói khác và đặt lại. Coin đã hoàn."
 )
+USER_NOTE_VAE_FALLBACK = (
+    "Gặp sự cố kỹ thuật khi tạo video. Coin đã hoàn. Thử đặt lại sau ít phút."
+)
+
+
+def user_note_from_vae_error(err: str | None) -> str:
+    """Hiển thị đúng thông báo VAE trả về (error_message / API error)."""
+    msg = " ".join(str(err or "").split())
+    if msg.startswith("HTTP ") and ": " in msg:
+        tail = msg.split(": ", 1)[1].strip()
+        if tail and not tail.startswith("{"):
+            msg = tail
+    if not msg:
+        return USER_NOTE_VAE_FALLBACK
+    return msg[:500]

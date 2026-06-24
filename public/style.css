@@ -5208,7 +5208,7 @@ body.video-trim-active {
 }
 
 .auto-video-new-badge {
-  display: none;
+  display: inline-flex;
   position: absolute;
   top: -7px;
   right: -7px;
@@ -5224,10 +5224,6 @@ body.video-trim-active {
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 4px 12px rgba(255, 159, 28, 0.35);
   pointer-events: none;
-}
-
-.btn-auto-video.has-new-badge .auto-video-new-badge {
-  display: inline-flex;
 }
 
 .myvideo-actions {
@@ -5324,6 +5320,7 @@ body.video-trim-active {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-bottom: 0;
 }
 
 .batch-channel-modal-content .modal-header {
@@ -5331,16 +5328,73 @@ body.video-trim-active {
   padding-bottom: 0.75rem;
 }
 
+.batch-channel-modal-content .modal-header h2 {
+  margin-bottom: 0.35rem;
+}
+
+.batch-channel-modal-content .modal-header p {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.42);
+}
+
 .batch-channel-modal-body {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 0.25rem;
+  padding: 0 1.25rem 0.5rem;
+  padding-right: calc(1.25rem + 0.25rem);
   -webkit-overflow-scrolling: touch;
 }
 
 .batch-channel-modal-body .batch-channel-panel {
   max-width: none;
   margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.batch-channel-modal-footer {
+  flex-shrink: 0;
+  padding: 0.85rem 1.25rem 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(10, 8, 22, 0.72) 0%, rgba(10, 8, 22, 0.96) 100%);
+  backdrop-filter: blur(14px);
+}
+
+.batch-channel-modal-footer #batch-channel-main-btn {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.batch-advanced-section {
+  margin: 0.25rem 0 1rem;
+  padding: 1rem 0 0.25rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.batch-advanced-heading {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.batch-steps--tail {
+  margin-top: 0;
+}
+
+.batch-steps--tail .batch-daily-row {
+  margin-top: 0.55rem;
 }
 
 .batch-panel-head {

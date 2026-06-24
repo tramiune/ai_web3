@@ -55,6 +55,7 @@ VAE_COINS_720P_BY_DURATION = {10: 10, 15: 15, 20: 20, 30: 30}
 VAE_COINS_1080P_BY_DURATION = {10: 20, 20: 40, 30: 60}
 VAE_API_MODEL_WEAVY = "weavy-kling-26"
 VAE_API_MODEL_MOTION_1080P = "pixverse"
+VAE_MODELS_WITHOUT_RESOLUTION = frozenset({VAE_API_MODEL_WEAVY})
 VAE_MAX_UPLOAD_BYTES = int(get_env("VIDEOAIEASY_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 DEFAULT_VAE_RESOLUTION = "720p"
 
@@ -282,11 +283,10 @@ class VideoAiEasyClient:
             "drivingVideoUrl": driving_video_url.strip(),
             "durationSec": dur,
         }
-        # kling-2.6 / pixverse: gửi resolution. weavy-kling-26 (Pro/HD/fallback): không gửi resolution.
-        if vae_model == MODEL_KLING_26:
-            body["resolution"] = res
-        elif vae_model == VAE_API_MODEL_MOTION_1080P:
-            body["resolution"] = res
+        # kling-2.6 / pixverse: gửi resolution. weavy-* (Pro/HD/fallback): không gửi resolution.
+        if vae_model not in VAE_MODELS_WITHOUT_RESOLUTION:
+            if vae_model in (MODEL_KLING_26, VAE_API_MODEL_MOTION_1080P):
+                body["resolution"] = res
         resp = self._api(
             "POST",
             "/api/jobs",
@@ -415,7 +415,7 @@ def vae_motion_api_model(
     weavy: bool = False,
     model_id: str | None = None,
 ) -> str:
-    """weavy-kling-26 = RoboNeo fallback 10s, Pro 20s, HD 30s. kling-2.6/pixverse = gói cũ."""
+    """weavy-kling-26 = Pro 20s, HD 30s, RoboNeo fallback. kling-2.6/pixverse = gói cũ."""
     if weavy:
         return VAE_API_MODEL_WEAVY
     mid = str(model_id or "").strip()

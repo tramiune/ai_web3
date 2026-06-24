@@ -59,15 +59,14 @@ window.TRANSLATIONS = {
             complaint_error: "Không gửi được khiếu nại. Thử lại hoặc chat Telegram."
         },
         build_channel: {
-            title: "Xây kênh tự động",
-            subtitle: "Lấy video TikTok → thay nguyên bộ đồ → tạo video AI.",
+            title: "Tạo video tự động",
+            subtitle: "Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI (có thể chạy mỗi ngày).",
             setup_title: "Thiết lập nhanh",
             step1_title: "Ảnh nhân vật của bạn",
             step1_hint: "Ảnh rõ mặt + toàn thân, nền đơn giản.",
             step2_title: "Link kênh TikTok",
             step2_hint: "Hệ thống lấy video đăng hôm qua trên kênh này.",
-            step3_title: "Chạy",
-            step3_hint: "Không bật lịch thì bấm nút để tạo video ngay. Tick chạy mỗi ngày để chọn giờ và bật lịch tự động.",
+            step3_title: "Lịch tự động",
             daily_checkbox: "Chạy mỗi ngày",
             cron_hour_hint: "Mặc định 3:00 sáng — có thể đổi giờ khác.",
             btn_run_now: "Tạo video ngay",

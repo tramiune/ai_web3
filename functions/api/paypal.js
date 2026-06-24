@@ -30,7 +30,7 @@
  */
 
 // --- Static credentials (ENV vars override these in production) ---------------
-const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
+const TELEGRAM_BOT_TOKEN = '8647185235:AAEcxfblgna8BnQoAX2B7cF9HEyx3EhDBts';
 const TELEGRAM_CHAT_ID = '6067707939';
 
 // Sandbox credentials provided by store owner. Override with PAYPAL_* env vars.
@@ -248,12 +248,22 @@ export async function onWebhookRequest(context) {
         // 2) Grant coins to user.
         await grantCoins(fbToken, svc.project_id, userId, coins);
 
-        // Fetch today's total amount
-        let todayTotal = 0;
-        try {
-            todayTotal = await fetchTodayTotalAmount(fbToken, svc.project_id);
-        } catch (e) {
-            console.error("fetchTodayTotalAmount error:", e);
+        // Fetch today's total amount (KV + Firestore fallback)
+        let todayLine = '';
+        const amountVnd = currency.toUpperCase() === 'USD'
+            ? Math.round(amountValue * 25400)
+            : Math.round(amountValue);
+        const kvTotal = await trackDailyRevenueVnd(env, amountVnd, topupId, 'ALL');
+        if (kvTotal != null) {
+            todayLine = `\n📊 Tổng hôm nay: ${kvTotal.toLocaleString('vi-VN')}đ (ước tính)`;
+        } else {
+            try {
+                let todayTotal = await fetchTodayTotalAmount(fbToken, svc.project_id);
+                todayTotal += amountVnd;
+                todayLine = `\n📊 Tổng hôm nay: ${Math.round(todayTotal).toLocaleString('vi-VN')}đ (ước tính)`;
+            } catch (e) {
+                console.error("fetchTodayTotalAmount error:", e);
+            }
         }
 
         // 3) Notify Telegram.
@@ -267,8 +277,8 @@ export async function onWebhookRequest(context) {
             `💵 Số tiền: $${amountValue.toFixed(2)} ${currency}\n` +
             `🪙 Coin nhận: +${coins}\n` +
             `📦 Gói: ${escapeHtml(packageName)}\n` +
-            `🔑 Capture: <code>${captureId}</code>\n` +
-            `📊 Tổng hôm nay: ${Math.round(todayTotal).toLocaleString()}đ (ước tính)`;
+            `🔑 Capture: <code>${captureId}</code>` +
+            todayLine;
         await notifyTelegram(message);
 
         // 4) Referral commission - isolated.
@@ -683,6 +693,40 @@ function escapeHtml(s) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+}
+
+const REVENUE_KV_TTL_SEC = 14 * 24 * 60 * 60;
+const REVENUE_DEDUPE_TTL_SEC = 48 * 60 * 60;
+
+function vietnamDateKey(date = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+}
+
+async function trackDailyRevenueVnd(env, amountVnd, topupId, scope = 'ALL') {
+    const kv = env?.REVENUE_KV;
+    if (!kv || !topupId) return null;
+    const amount = Math.round(Number(amountVnd) || 0);
+    if (amount <= 0) return null;
+
+    try {
+        const dedupeKey = `rev:dedupe:${String(topupId)}`;
+        const dayKey = vietnamDateKey();
+        const totalKey = `rev:total:${scope}:${dayKey}`;
+
+        if (await kv.get(dedupeKey)) {
+            const existing = await kv.get(totalKey);
+            return existing ? parseInt(existing, 10) : 0;
+        }
+
+        const prev = parseInt(await kv.get(totalKey) || '0', 10);
+        const next = prev + amount;
+        await kv.put(totalKey, String(next), { expirationTtl: REVENUE_KV_TTL_SEC });
+        await kv.put(dedupeKey, '1', { expirationTtl: REVENUE_DEDUPE_TTL_SEC });
+        return next;
+    } catch (err) {
+        console.warn('[RevenueKV] trackDailyRevenueVnd:', err.message);
+        return null;
+    }
 }
 
 async function notifyTelegram(text) {

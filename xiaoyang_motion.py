@@ -70,6 +70,7 @@ from user_order_notes import (
     USER_NOTE_FILES_MISSING,
     USER_NOTE_ORDER_FAILED,
     USER_NOTE_SUBMIT_FAILED,
+    user_note_from_vae_error,
 )
 
 _g: dict = {}
@@ -942,7 +943,11 @@ def _defer_vae_slot_wait(order_id: str):
     )
 
 
-def _handle_vae_submit_result(order_id: str, result: str) -> bool:
+def _handle_vae_submit_result(
+    order_id: str,
+    result: str,
+    vae_err: str | None = None,
+) -> bool:
     """True = đã xử lý xong (ok hoặc chờ slot); False = cần fail đơn."""
     if result == "ok":
         return True
@@ -961,21 +966,30 @@ def _handle_vae_submit_result(order_id: str, result: str) -> bool:
         return True
     reason = {
         "credit_exhausted": "Hết nick VAE đủ coin",
-        "failed": "Không nạp được VideoAiEasy",
+        "failed": f"Không nạp được VideoAiEasy: {vae_err or ''}".strip(),
     }.get(result, "Không nạp được VideoAiEasy")
+    user_note = (
+        user_note_from_vae_error(vae_err)
+        if result == "failed"
+        else USER_NOTE_SUBMIT_FAILED
+    )
     _fail_order_processing(
         doc,
         data,
         reason,
-        USER_NOTE_SUBMIT_FAILED,
+        user_note,
         "submit videoaieasy",
     )
     return True
 
 
-def _try_submit_videoaieasy(order_id: str, *, vae_weavy_fallback: bool = False) -> str:
+def _try_submit_videoaieasy(
+    order_id: str,
+    *,
+    vae_weavy_fallback: bool = False,
+) -> tuple[str, str | None]:
     if not _use_videoaieasy():
-        return "failed"
+        return "failed", None
     excluded: set[str] = set()
     last_credit_err: str | None = None
     while True:
@@ -986,22 +1000,22 @@ def _try_submit_videoaieasy(order_id: str, *, vae_weavy_fallback: bool = False) 
                     f"❌ Hết nick VAE đủ coin cho {order_id}"
                     + (f" ({last_credit_err})" if last_credit_err else "")
                 )
-                return "credit_exhausted"
+                return "credit_exhausted", last_credit_err
             print(f"📊 VAE đầy slot — chờ xử lý xong ({order_id})")
-            return "slot_full"
+            return "slot_full", None
         account = candidates[0]
         ok, credit_fail, err_msg = submit_to_videoaieasy(
             order_id, account, vae_weavy_fallback=vae_weavy_fallback
         )
         if ok:
-            return "ok"
+            return "ok", None
         if credit_fail:
             last_credit_err = err_msg
             excluded.add(account["id"])
             email = account.get("email") or account["id"]
             print(f"→ Đổi nick VAE (đã loại {len(excluded)}): {email}")
             continue
-        return "failed"
+        return "failed", err_msg
 
 
 def submit_order(order_id: str):
@@ -1056,11 +1070,14 @@ def submit_order(order_id: str):
             print(
                 f"⏳ Pool RoboNeo đang sync credit — bỏ qua RoboNeo đơn {order_id}, dùng VAE"
             )
-            result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
+            result, vae_err = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
             if result == "ok":
                 return
             if result == "slot_full":
                 _defer_vae_slot_wait(order_id)
+                return
+            if result == "failed":
+                _handle_vae_submit_result(order_id, result, vae_err)
                 return
             doc = doc_ref.get()
             data = doc.to_dict() or {}
@@ -1088,7 +1105,7 @@ def submit_order(order_id: str):
             f"→ fallback VAE weavy-kling-26 (10s · 1 xu)"
         )
         _g.get("session_error_backoff", {}).pop(order_id, None)
-        result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
+        result, vae_err = _try_submit_videoaieasy(order_id, vae_weavy_fallback=True)
         if result == "ok":
             try:
                 short_id = order_id[-6:].upper()
@@ -1101,6 +1118,9 @@ def submit_order(order_id: str):
             return
         if result == "slot_full":
             _defer_vae_slot_wait(order_id)
+            return
+        if result == "failed":
+            _handle_vae_submit_result(order_id, result, vae_err)
             return
         doc = doc_ref.get()
         data = doc.to_dict() or {}
@@ -1119,13 +1139,13 @@ def submit_order(order_id: str):
     if weavy_economy:
         note = " (RoboNeo tắt — VAE-only)" if not _kaling_roboneo_enabled() else ""
         print(f"→ VAE weavy-kling-26 · 10s · 1 xu{note}")
-    result = _try_submit_videoaieasy(order_id, vae_weavy_fallback=weavy_economy)
+    result, vae_err = _try_submit_videoaieasy(order_id, vae_weavy_fallback=weavy_economy)
     if result == "ok":
         return
     if result == "slot_full":
         _defer_vae_slot_wait(order_id)
         return
-    _handle_vae_submit_result(order_id, result)
+    _handle_vae_submit_result(order_id, result, vae_err)
 
 
 def poll_xiaoyang_orders(orders_to_check):
@@ -1244,7 +1264,7 @@ def poll_videoaieasy_orders(orders_to_check):
             _fail_order_processing(
                 doc, order_data,
                 f"VideoAiEasy job {job_id} {status}: {err or ''}",
-                USER_NOTE_ORDER_FAILED,
+                user_note_from_vae_error(err),
                 "render videoaieasy",
             )
         else:

@@ -8,7 +8,7 @@
  * - FIREBASE_SERVICE_ACCOUNT_KL (Kaling — kaling.cloud)
  */
 
-const TELEGRAM_BOT_TOKEN = '8783657660:AAHRfxHNiohZzPJ2OaQ7TEMNKwb7AAlp2uo';
+const TELEGRAM_BOT_TOKEN = '8647185235:AAEcxfblgna8BnQoAX2B7cF9HEyx3EhDBts';
 const TELEGRAM_CHAT_ID = '6067707939';
 
 function isStarterTopup(topup) {
@@ -107,13 +107,18 @@ export async function onRequestPost(context) {
            await grantCoins(state.token, state.cfg.project_id, topup.userId, coins, topup.id);
            console.log(`Successfully granted ${coins} coins to user ${topup.userId}`);
            
-           // Tính tổng tiền nạp hôm nay
-           let todayTotal = 0;
-           try {
-               todayTotal = await fetchTodayTotalAmount(state.token, state.cfg.project_id);
-               todayTotal += amount; // Cộng thêm đơn hiện tại vì đơn hiện tại mới chuyển sang approved
-           } catch(e) {
-               console.error("Lỗi lấy tổng tiền hôm nay:", e);
+           const todayTotalVnd = await trackDailyRevenueVnd(env, amount, topup.id, prefix);
+           let todayLine = '';
+           if (todayTotalVnd != null) {
+               todayLine = `\n📊 Tổng hôm nay: ${todayTotalVnd.toLocaleString('vi-VN')}đ`;
+           } else {
+               try {
+                   let todayTotal = await fetchTodayTotalAmount(state.token, state.cfg.project_id);
+                   todayTotal += amount;
+                   todayLine = `\n📊 Tổng hôm nay: ${todayTotal.toLocaleString('vi-VN')}đ`;
+               } catch (e) {
+                   console.error("Lỗi lấy tổng tiền hôm nay:", e);
+               }
            }
 
            // Gửi thông báo Telegram
@@ -124,8 +129,8 @@ export async function onRequestPost(context) {
                            `💵 Số tiền: ${amount.toLocaleString()}đ\n` +
                            `🪙 Coin nhận: +${coins}\n` +
                            `📝 Nội dung: ${code}\n` +
-                           `🔑 Mã GD: \`${tidDisplay}\`\n` +
-                           `📊 Tổng hôm nay: ${todayTotal.toLocaleString()}đ`;
+                           `🔑 Mã GD: \`${tidDisplay}\`` +
+                           todayLine;
            await notifyTelegram(message);
 
            // Affiliate / Referral commission - isolated, must never block topup flow
@@ -346,6 +351,41 @@ async function grantCoins(token, projectId, userId, coins, topupId) {
 }
 
 function b64(str) { return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+
+const REVENUE_KV_TTL_SEC = 14 * 24 * 60 * 60;
+const REVENUE_DEDUPE_TTL_SEC = 48 * 60 * 60;
+
+function vietnamDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+}
+
+/** Cộng dồn doanh thu VND theo ngày (VN) vào KV — best-effort, không chặn nạp tiền. */
+async function trackDailyRevenueVnd(env, amountVnd, topupId, scope = 'ALL') {
+  const kv = env?.REVENUE_KV;
+  if (!kv || !topupId) return null;
+  const amount = Math.round(Number(amountVnd) || 0);
+  if (amount <= 0) return null;
+
+  try {
+    const dedupeKey = `rev:dedupe:${String(topupId)}`;
+    const dayKey = vietnamDateKey();
+    const totalKey = `rev:total:${scope}:${dayKey}`;
+
+    if (await kv.get(dedupeKey)) {
+      const existing = await kv.get(totalKey);
+      return existing ? parseInt(existing, 10) : 0;
+    }
+
+    const prev = parseInt(await kv.get(totalKey) || '0', 10);
+    const next = prev + amount;
+    await kv.put(totalKey, String(next), { expirationTtl: REVENUE_KV_TTL_SEC });
+    await kv.put(dedupeKey, '1', { expirationTtl: REVENUE_DEDUPE_TTL_SEC });
+    return next;
+  } catch (err) {
+    console.warn('[RevenueKV] trackDailyRevenueVnd:', err.message);
+    return null;
+  }
+}
 
 async function notifyTelegram(text) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;

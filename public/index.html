@@ -366,7 +366,7 @@
                         <button class="btn-topup-inline" onclick="window.openTopupModal()" type="button">
                             <span class="btn-topup-inline__label">Nạp coin</span>
                         </button>
-                        <button type="button" id="home-auto-video-btn" class="btn-auto-video has-new-badge" onclick="window.openBatchChannelModal()">
+                        <button type="button" id="home-auto-video-btn" class="btn-auto-video" onclick="window.openBatchChannelModal()">
                             <span class="btn-auto-video__icon" aria-hidden="true">✨</span>
                             <span data-i18n="dashboard.auto_video_btn">Tạo video tự động</span>
                             <span class="auto-video-new-badge" data-i18n="dashboard.auto_video_new">MỚI</span>
@@ -813,8 +813,8 @@
         <div class="modal-content batch-channel-modal-content">
             <span class="modal-close" onclick="closeModal('batch-channel-modal')" aria-label="Close">&times;</span>
             <div class="modal-header">
-                <h2 data-i18n="build_channel.title">Xây kênh tự động</h2>
-                <p data-i18n="build_channel.subtitle">Lấy video TikTok → thay nguyên bộ đồ → tạo video AI.</p>
+                <h2 data-i18n="build_channel.title">Tạo video tự động</h2>
+                <p data-i18n="build_channel.subtitle">Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI (có thể chạy mỗi ngày).</p>
             </div>
             <div class="modal-body batch-channel-modal-body">
                 <section class="batch-channel-panel glass-card">
@@ -842,28 +842,9 @@
                                 <input type="url" id="batch-channel-url" class="form-control" placeholder="https://www.tiktok.com/@username" data-i18n="build_channel.channel_placeholder">
                             </div>
                         </li>
-                        <li class="batch-step">
-                            <span class="batch-step-num">3</span>
-                            <div class="batch-step-body">
-                                <div class="batch-field-label" data-i18n="build_channel.step3_title">Chạy</div>
-                                <p class="batch-field-hint" data-i18n="build_channel.step3_hint">Không bật lịch thì bấm nút để tạo video ngay. Tick chạy mỗi ngày để chọn giờ và bật lịch tự động.</p>
-                                <label class="batch-daily-row">
-                                    <input type="checkbox" id="batch-daily-checkbox">
-                                    <span data-i18n="build_channel.daily_checkbox">Chạy mỗi ngày</span>
-                                </label>
-                                <div id="batch-cron-hour-wrap" class="batch-inline-field" style="display:none;">
-                                    <label class="batch-field-label" data-i18n="build_channel.cron_hour_label">Giờ chạy tự động (VN)</label>
-                                    <input type="number" id="batch-cron-hour" class="form-control" min="0" max="23" value="3" style="max-width:88px;">
-                                    <p class="batch-field-hint" data-i18n="build_channel.cron_hour_hint">Mặc định 3:00 sáng — có thể đổi giờ khác.</p>
-                                </div>
-                                <div class="batch-actions">
-                                    <button type="button" class="btn-primary" id="batch-channel-main-btn" onclick="window.handleBatchChannelMainAction()">Tạo video ngay</button>
-                                </div>
-                            </div>
-                        </li>
                     </ol>
-                    <details class="batch-advanced">
-                        <summary data-i18n="build_channel.advanced_toggle">Tùy chọn nâng cao</summary>
+                    <div class="batch-advanced-section">
+                        <div class="batch-advanced-heading" data-i18n="build_channel.advanced_toggle">Tùy chọn nâng cao</div>
                         <div class="batch-advanced-body">
                             <div class="batch-field">
                                 <label class="batch-field-label" data-i18n="build_channel.source_mode_label">Nguồn video</label>
@@ -876,7 +857,7 @@
                             </div>
                             <div id="batch-channel-tiktok-wrap" class="batch-inline-field">
                                 <label class="batch-field-label" data-i18n="build_channel.yesterday_count_label">Giới hạn số video</label>
-                                <input type="number" id="batch-yesterday-count" class="form-control" min="0" max="50" value="0">
+                                <input type="number" id="batch-yesterday-count" class="form-control" min="0" max="50" value="0" placeholder="0">
                                 <p class="batch-field-hint" data-i18n="build_channel.yesterday_count_hint">0 = tất cả video hôm qua.</p>
                             </div>
                             <div id="batch-channel-orders-wrap" class="batch-field" style="display:none;">
@@ -884,9 +865,29 @@
                                 <div id="batch-channel-orders-pick" class="batch-order-pick-list"></div>
                             </div>
                         </div>
-                    </details>
-                    <p id="batch-channel-status" class="batch-status-text"></p>
+                    </div>
+                    <ol class="batch-steps batch-steps--tail">
+                        <li class="batch-step">
+                            <span class="batch-step-num">3</span>
+                            <div class="batch-step-body">
+                                <div class="batch-field-label" data-i18n="build_channel.step3_title">Lịch tự động</div>
+                                <label class="batch-daily-row">
+                                    <input type="checkbox" id="batch-daily-checkbox" checked>
+                                    <span data-i18n="build_channel.daily_checkbox">Chạy mỗi ngày</span>
+                                </label>
+                                <div id="batch-cron-hour-wrap" class="batch-inline-field">
+                                    <label class="batch-field-label" data-i18n="build_channel.cron_hour_label">Giờ chạy tự động (VN)</label>
+                                    <input type="number" id="batch-cron-hour" class="form-control" min="0" max="23" value="3" style="max-width:88px;">
+                                    <p class="batch-field-hint" data-i18n="build_channel.cron_hour_hint">Mặc định 3:00 sáng — có thể đổi giờ khác.</p>
+                                </div>
+                            </div>
+                        </li>
+                    </ol>
+                    <p id="batch-channel-status" class="batch-status-text" style="display: none;"></p>
                 </section>
+            </div>
+            <div class="batch-channel-modal-footer">
+                <button type="button" class="btn-primary" id="batch-channel-main-btn" onclick="window.handleBatchChannelMainAction()">Tạo video ngay</button>
             </div>
         </div>
     </div>

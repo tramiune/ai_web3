@@ -8,5 +8,12 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "REVENUE_KV",
+      "id": "c5b4114203104be6b4ff0e9998c58cb1",
+      "preview_id": "bf65edb072934d6e8c1555fc2536a668"
+    }
+  ]
 }

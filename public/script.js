@@ -1821,6 +1821,11 @@ function handleUserLoggedOut(autoGoogleSignIn = false) {
     adminSubscribedOrderStatus = null;
     adminSubscribedTopupStatus = null;
     Object.keys(FB_CACHE).forEach(k => { delete FB_CACHE[k]; });
+    if (typeof resetBatchChannelForm === 'function') {
+        _batchChannelPickerOrders = [];
+        resetBatchChannelForm({ keepDefaults: true });
+        closeModal('batch-channel-modal');
+    }
 
     // Legacy var (giờ đã unsub trong fbUnsubAll, để null cho an toàn)
     referralEarningsUnsubscribe = null;
@@ -1836,6 +1841,7 @@ function showDashboard() {
     hideAllPages();
     document.getElementById('user-dashboard').style.display = 'block';
     window.scrollTo(0, 0);
+    if (typeof updateBatchChannelNewBadge === 'function') updateBatchChannelNewBadge();
 }
 
 function showTopupHistory() {
@@ -6646,13 +6652,76 @@ window.payReferralCommissionClient = payReferralCommissionClient;
 
 
 // --- Batch channel (modal on home) ---
-const BATCH_CHANNEL_NEW_KEY = 'kaling_batch_auto_video_seen_v1';
 const BATCH_CHANNEL_CRON_HOUR_DEFAULT = 3;
 let _batchChannelPickerOrders = [];
 let _batchChannelCfg = null;
 
 function getBatchChannelConfigId() {
     return currentUser?.uid || '';
+}
+
+function resetBatchChannelForm({ keepDefaults = true } = {}) {
+    const urlInput = document.getElementById('batch-channel-url');
+    if (urlInput) urlInput.value = '';
+
+    const templateInput = document.getElementById('batch-template-input');
+    if (templateInput) templateInput.value = '';
+
+    const preview = document.getElementById('batch-template-preview');
+    const templateZone = document.getElementById('batch-template-zone');
+    if (preview) preview.innerHTML = '';
+    templateZone?.classList.remove('has-preview');
+
+    const cronInput = document.getElementById('batch-cron-hour');
+    if (cronInput) cronInput.value = String(BATCH_CHANNEL_CRON_HOUR_DEFAULT);
+
+    const yesterdayInput = document.getElementById('batch-yesterday-count');
+    if (yesterdayInput) yesterdayInput.value = '0';
+
+    const box = document.getElementById('batch-daily-checkbox');
+    if (box) box.checked = !!keepDefaults;
+
+    syncBatchSourceModeUI('tiktok');
+    renderBatchChannelOrderPicker(_batchChannelPickerOrders, []);
+    _batchChannelCfg = null;
+    renderBatchChannelStatus(null);
+}
+
+function applyBatchChannelConfigToForm(cfg) {
+    renderBatchChannelStatus(cfg);
+
+    const urlInput = document.getElementById('batch-channel-url');
+    if (urlInput) urlInput.value = cfg?.channelUrl || '';
+
+    const cronInput = document.getElementById('batch-cron-hour');
+    if (cronInput) {
+        cronInput.value = String(
+            cfg?.cronHour != null ? cfg.cronHour : BATCH_CHANNEL_CRON_HOUR_DEFAULT
+        );
+    }
+
+    const yesterdayInput = document.getElementById('batch-yesterday-count');
+    if (yesterdayInput) {
+        yesterdayInput.value = String(
+            cfg?.yesterdayVideoCount != null ? cfg.yesterdayVideoCount : 0
+        );
+    }
+
+    syncBatchSourceModeUI(cfg?.sourceMode || 'tiktok');
+
+    const preview = document.getElementById('batch-template-preview');
+    const templateZone = document.getElementById('batch-template-zone');
+    if (preview) {
+        if (cfg?.templateImageUrl) {
+            preview.innerHTML = `<img src="${escapeHTML(cfg.templateImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+            templateZone?.classList.add('has-preview');
+        } else {
+            preview.innerHTML = '';
+            templateZone?.classList.remove('has-preview');
+        }
+    }
+
+    renderBatchChannelOrderPicker(_batchChannelPickerOrders, cfg?.selectedOrderIds || []);
 }
 
 function parseTikTokUsername(raw) {
@@ -6799,7 +6868,7 @@ function updateBatchChannelMainButton(cfg) {
 function syncBatchDailyCheckboxFromCfg(cfg) {
     const box = document.getElementById('batch-daily-checkbox');
     if (!box) return;
-    box.checked = !!cfg?.enabled;
+    box.checked = cfg != null ? !!cfg.enabled : true;
 }
 
 function batchChannelRunNowMode() {
@@ -6956,21 +7025,25 @@ function renderBatchChannelStatus(cfg) {
     _batchChannelCfg = cfg;
     const el = document.getElementById('batch-channel-status');
     let html = '';
+    let show = false;
 
-    if (!cfg) {
-        html = t('build_channel.status_idle');
-    } else if (batchChannelRunNowPending(cfg)) {
+    if (cfg && batchChannelRunNowPending(cfg)) {
         html = t('build_channel.status_run_now_pending');
-    } else if (cfg.enabled) {
+        show = true;
+    } else if (cfg?.enabled) {
         const hour = cfg.cronHour != null ? Number(cfg.cronHour) : BATCH_CHANNEL_CRON_HOUR_DEFAULT;
         html = t('build_channel.status_on', { hour: Number.isFinite(hour) ? hour : BATCH_CHANNEL_CRON_HOUR_DEFAULT });
         if (cfg.lastRunMessage) html += ` — ${escapeHTML(cfg.lastRunMessage)}`;
-    } else {
-        html = t('build_channel.status_idle');
-        if (cfg.lastRunMessage) html += ` — ${escapeHTML(cfg.lastRunMessage)}`;
+        show = true;
+    } else if (cfg?.lastRunMessage) {
+        html = escapeHTML(cfg.lastRunMessage);
+        show = true;
     }
 
-    if (el) el.textContent = html;
+    if (el) {
+        el.textContent = html;
+        el.style.display = show ? '' : 'none';
+    }
     syncBatchDailyCheckboxFromCfg(cfg);
     syncBatchDailyScheduleUI(cfg);
 }
@@ -7016,32 +7089,11 @@ async function loadBatchChannelPage() {
     }
 
     fbUnsub('batchChannelConfig');
+    resetBatchChannelForm({ keepDefaults: true });
     fbSub('batchChannelConfig', onSnapshot(doc(db, 'batchChannelConfig', configId), (snap) => {
+        if (currentUser?.uid !== configId) return;
         const cfg = snap.exists() ? snap.data() : null;
-        renderBatchChannelStatus(cfg);
-        const urlInput = document.getElementById('batch-channel-url');
-        if (urlInput && cfg?.channelUrl) {
-            urlInput.value = cfg.channelUrl;
-        }
-        const cronInput = document.getElementById('batch-cron-hour');
-        if (cronInput) {
-            cronInput.value = String(
-                cfg?.cronHour != null ? cfg.cronHour : BATCH_CHANNEL_CRON_HOUR_DEFAULT
-            );
-        }
-        const yesterdayInput = document.getElementById('batch-yesterday-count');
-        if (yesterdayInput && cfg?.yesterdayVideoCount != null) {
-            yesterdayInput.value = String(cfg.yesterdayVideoCount);
-        }
-        syncBatchSourceModeUI(cfg?.sourceMode || 'tiktok');
-        const preview = document.getElementById('batch-template-preview');
-        if (preview && cfg?.templateImageUrl) {
-            preview.innerHTML = `<img src="${escapeHTML(cfg.templateImageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
-            document.getElementById('batch-template-zone')?.classList.add('has-preview');
-        }
-        if (cfg?.selectedOrderIds?.length) {
-            renderBatchChannelOrderPicker(_batchChannelPickerOrders, cfg.selectedOrderIds);
-        }
+        applyBatchChannelConfigToForm(cfg);
     }, (err) => console.error('[BatchChannel] config listener:', err)));
 
     fbUnsub('batchChannelOrdersPick');
@@ -7073,13 +7125,7 @@ async function loadBatchChannelPage() {
 }
 
 function updateBatchChannelNewBadge() {
-    const btn = document.getElementById('home-auto-video-btn');
-    if (!btn) return;
-    let seen = false;
-    try {
-        seen = localStorage.getItem(BATCH_CHANNEL_NEW_KEY) === '1';
-    } catch (_) { /* ignore */ }
-    btn.classList.toggle('has-new-badge', !seen);
+    /* Badge MỚI luôn hiển thị — CSS .auto-video-new-badge */
 }
 
 window.openBatchChannelModal = () => {
@@ -7087,10 +7133,6 @@ window.openBatchChannelModal = () => {
         showToast(t('common.toast_login_required'));
         return;
     }
-    try {
-        localStorage.setItem(BATCH_CHANNEL_NEW_KEY, '1');
-    } catch (_) { /* ignore */ }
-    updateBatchChannelNewBadge();
     loadBatchChannelPage();
     window.openModal('batch-channel-modal');
 };
