@@ -981,7 +981,7 @@ export async function initAppLogic() {
             }
 
             currentUser = null;
-            handleUserLoggedOut(false);
+            handleUserLoggedOut(true);
         } catch (e) {
             console.error("Auth Change Error:", e);
             showToast(t('common.error_auth', { msg: e.message || e.code || 'Auth' }));
@@ -1464,6 +1464,7 @@ async function login() {
 async function logout() {
     const { auth, signOut } = window.firebase;
     try {
+        delete window.__googleSignInAutoAttempted;
         await signOut(auth);
         showToast(t('common.toast_logout_success'));
     } catch (error) {
