@@ -6,8 +6,27 @@ USER_NOTE_CLIENT_OUTDATED = (
     "Bạn đang dùng phiên bản web cũ. Nhấn F5 hoặc Ctrl+Shift+R để tải bản mới nhất rồi đặt lại đơn. Coin đã hoàn."
 )
 USER_NOTE_FILES_MISSING = (
-    "Ảnh hoặc video quý khách tải lên không tồn tại, hệ thống đã hoàn lại coin."
+    "Ảnh/video không hợp lệ hoặc link hỏng. Coin đã hoàn. Tải lại file JPG/PNG và đặt đơn mới."
 )
+USER_NOTE_FILES_INVALID = USER_NOTE_FILES_MISSING
+
+_INVALID_MEDIA_MARKERS = (
+    "cannot identify image",
+    "unidentifiedimageerror",
+    "broken data",
+    "truncated",
+    "file rỗng",
+    "0 byte",
+    "không đọc được",
+    "không tải được ảnh/video",
+    "heic",
+    "ftypheic",
+)
+
+
+def is_invalid_order_media_error(err: object) -> bool:
+    s = str(err or "").lower()
+    return any(m in s for m in _INVALID_MEDIA_MARKERS)
 USER_NOTE_SUBMIT_FAILED = (
     "Tạm thời không gửi được đơn vào hàng xử lý. Thử lại sau hoặc liên hệ hỗ trợ."
 )

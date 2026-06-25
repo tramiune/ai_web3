@@ -70,6 +70,7 @@ from user_order_notes import (
     USER_NOTE_FILES_MISSING,
     USER_NOTE_ORDER_FAILED,
     USER_NOTE_SUBMIT_FAILED,
+    is_invalid_order_media_error,
     user_note_from_vae_error,
 )
 
@@ -896,6 +897,16 @@ def submit_to_videoaieasy(
             except (requests.RequestException, VideoAiEasyAuthError, VideoAiEasyError) as e:
                 err_msg = str(e)
                 credit_fail = is_vae_credit_error(e)
+                if is_invalid_order_media_error(e):
+                    print(f"❌ Ảnh/video lỗi — fail đơn {order_id}: {e}")
+                    _fail_order_processing(
+                        doc,
+                        data,
+                        err_msg,
+                        USER_NOTE_FILES_MISSING,
+                        "invalid media",
+                    )
+                    return False, False, err_msg
                 print(f"❌ Nạp VideoAiEasy thất bại {order_id} ({nick_label}): {e}")
                 if isinstance(e, VideoAiEasyAuthError):
                     _reset_vae_web_client(account_id)
@@ -968,11 +979,13 @@ def _handle_vae_submit_result(
         "credit_exhausted": "Hết nick VAE đủ coin",
         "failed": f"Không nạp được VideoAiEasy: {vae_err or ''}".strip(),
     }.get(result, "Không nạp được VideoAiEasy")
-    user_note = (
-        user_note_from_vae_error(vae_err)
-        if result == "failed"
-        else USER_NOTE_SUBMIT_FAILED
-    )
+    if result == "failed":
+        if vae_err and is_invalid_order_media_error(vae_err):
+            user_note = USER_NOTE_FILES_MISSING
+        else:
+            user_note = user_note_from_vae_error(vae_err)
+    else:
+        user_note = USER_NOTE_SUBMIT_FAILED
     _fail_order_processing(
         doc,
         data,

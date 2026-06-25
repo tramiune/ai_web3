@@ -542,10 +542,17 @@ def prepare_character_image_for_vae(
     image_path = os.path.abspath(image_path)
     if not os.path.isfile(image_path):
         raise VideoAiEasyError(f"File không tồn tại: {image_path}")
+    if os.path.getsize(image_path) <= 0:
+        raise VideoAiEasyError("Ảnh nhân vật rỗng (0 byte) — upload lại JPG/PNG")
 
     target = _parse_vae_aspect_ratio(aspect_ratio)
-    with Image.open(image_path) as opened:
-        img = opened.convert("RGB")
+    try:
+        with Image.open(image_path) as opened:
+            img = opened.convert("RGB")
+    except Exception as e:
+        raise VideoAiEasyError(
+            f"Ảnh nhân vật không đọc được ({e}). Dùng JPG/PNG, không HEIC."
+        ) from e
     orig_w, orig_h = img.size
     current = orig_w / orig_h if orig_h else target
 

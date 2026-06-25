@@ -686,7 +686,21 @@ def _pending_order_worker():
                     submit_order(order_id)
             except Exception as e:
                 print(f"❌ Lỗi nạp đơn {order_id}: {e}")
-                _session_error_backoff[order_id] = time.time() + SESSION_ERROR_BACKOFF_SEC
+                from user_order_notes import USER_NOTE_FILES_MISSING, is_invalid_order_media_error
+                if is_invalid_order_media_error(e):
+                    doc = db.collection("orders").document(order_id).get()
+                    if doc.exists:
+                        data = doc.to_dict() or {}
+                        if data.get("status") == "pending":
+                            _fail_order_processing(
+                                doc,
+                                data,
+                                str(e),
+                                USER_NOTE_FILES_MISSING,
+                                "invalid media",
+                            )
+                else:
+                    _session_error_backoff[order_id] = time.time() + SESSION_ERROR_BACKOFF_SEC
         else:
             time.sleep(0.5)
 
