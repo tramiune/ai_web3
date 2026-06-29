@@ -981,7 +981,7 @@ export async function initAppLogic() {
             }
 
             currentUser = null;
-            handleUserLoggedOut(true);
+            handleUserLoggedOut(false);
         } catch (e) {
             console.error("Auth Change Error:", e);
             showToast(t('common.error_auth', { msg: e.message || e.code || 'Auth' }));
@@ -1036,7 +1036,7 @@ function showExternalBrowserRequiredModal() {
     applyTranslations();
 }
 
-function promptGoogleSignIn(autoPopup = false) {
+function promptGoogleSignIn() {
     if (requiresExternalBrowser()) {
         showExternalBrowserRequiredModal();
         return;
@@ -1053,10 +1053,6 @@ function promptGoogleSignIn(autoPopup = false) {
     if (inAppNote) inAppNote.style.display = 'none';
     authModal.style.display = 'flex';
     applyTranslations();
-    if (autoPopup && !window.__googleSignInAutoAttempted) {
-        window.__googleSignInAutoAttempted = true;
-        setTimeout(() => login(), 600);
-    }
 }
 
 window.copyPageLinkForExternal = async (url) => {
@@ -1464,7 +1460,6 @@ async function login() {
 async function logout() {
     const { auth, signOut } = window.firebase;
     try {
-        delete window.__googleSignInAutoAttempted;
         await signOut(auth);
         showToast(t('common.toast_logout_success'));
     } catch (error) {
@@ -1770,7 +1765,7 @@ function navigateFromURLParam() {
     }
 }
 
-function handleUserLoggedOut(autoGoogleSignIn = false) {
+function handleUserLoggedOut() {
     const v = document.getElementById('auth-banner-video');
     if (v && !v.src) {
         v.src = 'https://pub-2b53cd37b4a44642afdbb8bb470bde66.r2.dev/banner.mp4';
@@ -1781,7 +1776,7 @@ function handleUserLoggedOut(autoGoogleSignIn = false) {
         const loginBtn = document.getElementById('login-btn');
         if (loginBtn) loginBtn.style.display = 'none';
     } else {
-        promptGoogleSignIn(autoGoogleSignIn);
+        promptGoogleSignIn();
         const loginBtn = document.getElementById('login-btn');
         if (loginBtn) loginBtn.style.display = 'flex';
     }
@@ -3537,7 +3532,7 @@ async function setupEventListeners() {
             e.preventDefault();
 
             if (!currentUser) {
-                promptGoogleSignIn(false);
+                promptGoogleSignIn();
                 showToast(t('common.toast_login_required'));
                 return;
             }
