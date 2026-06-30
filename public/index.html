@@ -140,7 +140,7 @@
                             <span id="dropdown-user-email">email@gmail.com</span>
                         </div>
                         <hr class="dropdown-divider">
-                        <a href="javascript:void(0)" class="dropdown-item premium-nav-item" onclick="window.navTo('build-channel-page')">
+                        <a href="javascript:void(0)" id="nav-batch-channel-item" class="dropdown-item premium-nav-item" style="display: none;" onclick="window.navTo('build-channel-page')">
                             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                             </svg>
@@ -366,7 +366,7 @@
                         <button class="btn-topup-inline" onclick="window.openTopupModal()" type="button">
                             <span class="btn-topup-inline__label">Nạp coin</span>
                         </button>
-                        <button type="button" id="home-auto-video-btn" class="btn-auto-video" onclick="window.openBatchChannelModal()">
+                        <button type="button" id="home-auto-video-btn" class="btn-auto-video" style="display: none;" onclick="window.openBatchChannelModal()">
                             <span class="btn-auto-video__icon" aria-hidden="true">✨</span>
                             <span data-i18n="dashboard.auto_video_btn">Tạo video tự động</span>
                             <span class="auto-video-new-badge" data-i18n="dashboard.auto_video_new">MỚI</span>
@@ -724,6 +724,15 @@
 
         <!-- Tab: Bots -->
         <div id="admin-tab-bots" class="admin-tab-content">
+            <div class="admin-section" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.2);">
+                <h3 style="margin: 0 0 0.5rem 0;" data-i18n="admin.auto_video_allowlist_title">Email được phép Tạo video tự động</h3>
+                <p style="margin: 0 0 1rem 0; opacity: 0.65; font-size: 0.85rem;" data-i18n="admin.auto_video_allowlist_desc">Chỉ email trong danh sách mới thấy nút Tạo video tự động và cấu hình batch.</p>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+                    <input type="email" id="batch-channel-allowlist-input" class="form-control" placeholder="email@example.com" style="max-width:320px;">
+                    <button type="button" class="btn-primary" onclick="window.addBatchChannelAllowlistEmail()" data-i18n="admin.auto_video_allowlist_add">Thêm email</button>
+                </div>
+                <div id="batch-channel-allowlist-list" style="display:flex; flex-direction:column; gap:0.35rem;"></div>
+            </div>
             <div class="admin-section" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.2);">
                 <h3 style="margin: 0 0 0.5rem 0;" data-i18n="admin.render_provider_title">Engine render (đơn mới)</h3>
                 <p style="margin: 0 0 1rem 0; opacity: 0.65; font-size: 0.85rem;" data-i18n="admin.render_provider_desc">Đơn đang processing vẫn chạy trên engine cũ. Chỉ đơn pending mới dùng lựa chọn bên dưới.</p>

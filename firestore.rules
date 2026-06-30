@@ -28,6 +28,12 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/referralAllowlist/$(request.auth.token.email.lower()));
     }
 
+    function isBatchChannelAllowlisted() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/batchChannelAllowlist/$(request.auth.token.email.lower()));
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
 
@@ -72,10 +78,12 @@ service cloud.firestore {
       allow create: if false;
     }
 
-    // Xây kênh tự động — mọi user đăng nhập (config theo uid)
+    // Tạo video tự động — chỉ email trong batchChannelAllowlist (hoặc admin)
     match /batchChannelConfig/{docId} {
       allow read, write: if isAdmin()
-        || (request.auth != null && request.auth.uid == docId);
+        || (request.auth != null
+            && request.auth.uid == docId
+            && isBatchChannelAllowlisted());
     }
 
     // Lịch sử batch — user xem run của mình; cron/bot ghi qua service account
@@ -86,6 +94,13 @@ service cloud.firestore {
     }
 
     match /referralAllowlist/{emailId} {
+      allow read: if request.auth != null && (
+        request.auth.token.email.lower() == emailId || isAdmin()
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /batchChannelAllowlist/{emailId} {
       allow read: if request.auth != null && (
         request.auth.token.email.lower() == emailId || isAdmin()
       );

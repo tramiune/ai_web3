@@ -620,15 +620,28 @@ let initialCoinsBeforeTopup = 0; // Để theo dõi số dư trước khi nạp
 let referralEarningsUnsubscribe = null; // Cleanup handle for referralEarnings onSnapshot (legacy - giờ dùng FB_LISTENERS)
 let referralCurrentCode = null; // User's referral code, populated when opening referral page
 window.__referralAllowed = false;
+window.__batchChannelAllowed = false;
 const SUPER_ADMIN_EMAILS = ["traderfinn0312@gmail.com", "dinhhoangvan.hh@gmail.com"]; // Bootstrap super-admin (khớp Firestore rules)
 
 function normalizeReferralAllowlistEmail(email) {
     return (email || '').trim().toLowerCase();
 }
 
+function canUseBatchChannel() {
+    return !!(window.__batchChannelAllowed || window.__isAdmin);
+}
+
 function updateReferralNavVisibility(allowed) {
     const item = document.getElementById('nav-referral-item');
     if (item) item.style.display = allowed ? 'flex' : 'none';
+}
+
+function updateBatchChannelNavVisibility(allowed) {
+    const show = allowed || window.__isAdmin;
+    const navItem = document.getElementById('nav-batch-channel-item');
+    if (navItem) navItem.style.display = show ? 'flex' : 'none';
+    const homeBtn = document.getElementById('home-auto-video-btn');
+    if (homeBtn) homeBtn.style.display = show ? 'inline-flex' : 'none';
 }
 
 async function refreshReferralAllowance(user) {
@@ -649,6 +662,26 @@ async function refreshReferralAllowance(user) {
     }
     updateReferralNavVisibility(window.__referralAllowed);
     return window.__referralAllowed;
+}
+
+async function refreshBatchChannelAllowance(user) {
+    const email = user?.email || currentUser?.email || '';
+    const key = normalizeReferralAllowlistEmail(email);
+    if (!key) {
+        window.__batchChannelAllowed = false;
+        updateBatchChannelNavVisibility(false);
+        return false;
+    }
+    const { db, doc, getDoc } = window.firebase;
+    try {
+        const snap = await getDoc(doc(db, 'batchChannelAllowlist', key));
+        window.__batchChannelAllowed = snap.exists();
+    } catch (e) {
+        console.warn('[BatchChannel] allowlist check failed:', e.message);
+        window.__batchChannelAllowed = false;
+    }
+    updateBatchChannelNavVisibility(window.__batchChannelAllowed);
+    return window.__batchChannelAllowed;
 }
 
 // =====================================================================
@@ -1680,6 +1713,7 @@ async function handleUserLoggedIn(user) {
             window.__isSuperAdmin = isSuperAdmin;
 
             updateBatchChannelNewBadge();
+            updateBatchChannelNavVisibility(window.__batchChannelAllowed);
 
             if (isAdmin) {
                 const adminProfileItem = document.getElementById('admin-dropdown-item-profile');
@@ -1727,7 +1761,10 @@ async function handleUserLoggedIn(user) {
 
     loadMyOrders();
     loadMyTopups();
-    refreshReferralAllowance(user).finally(() => navigateFromURLParam());
+    Promise.all([
+        refreshReferralAllowance(user),
+        refreshBatchChannelAllowance(user),
+    ]).finally(() => navigateFromURLParam());
 }
 
 function navigateFromURLParam() {
@@ -1745,6 +1782,10 @@ function navigateFromURLParam() {
         } else if (page === 'admin-panel' && window.__isAdmin) {
             showAdminPanel();
         } else if (page === 'build-channel-page' && currentUser) {
+            if (!canUseBatchChannel()) {
+                showDashboard();
+                return;
+            }
             showDashboard();
             window.openBatchChannelModal();
         } else if (page === 'user-dashboard') {
@@ -1812,6 +1853,8 @@ function handleUserLoggedOut() {
     window.__isAdmin = false;
     window.__referralAllowed = false;
     updateReferralNavVisibility(false);
+    window.__batchChannelAllowed = false;
+    updateBatchChannelNavVisibility(false);
     window.__isSuperAdmin = false;
     window.__currentUserData = null;
     adminSubscribedOrderStatus = null;
@@ -1847,6 +1890,11 @@ function showTopupHistory() {
 }
 
 function showBuildChannel() {
+    if (!canUseBatchChannel()) {
+        showToast(t('build_channel.not_allowed'));
+        showDashboard();
+        return;
+    }
     window.openBatchChannelModal();
 }
 
@@ -1914,6 +1962,7 @@ window.navTo = (target) => {
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
         fbUnsub('adminReferralAllowlist');
+        fbUnsub('adminBatchChannelAllowlist');
         fbUnsub('adminBots');
         adminSubscribedOrderStatus = null;
         adminSubscribedTopupStatus = null;
@@ -4648,6 +4697,84 @@ window.removeReferralAllowlistEmail = async (emailId) => {
     }
 };
 
+// ----- BATCH CHANNEL ALLOWLIST (Admin bots tab) -----
+function subscribeAdminBatchChannelAllowlist() {
+    const { db, collection, onSnapshot, query, orderBy } = window.firebase;
+    if (fbHas('adminBatchChannelAllowlist')) {
+        renderAdminBatchChannelAllowlist();
+        return;
+    }
+    const q = query(collection(db, 'batchChannelAllowlist'), orderBy('addedAt', 'desc'));
+    fbSub('adminBatchChannelAllowlist', onSnapshot(q, (snapshot) => {
+        FB_CACHE.adminBatchChannelAllowlist = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAdminBatchChannelAllowlist();
+    }, (err) => {
+        console.error('Admin batch channel allowlist error:', err);
+        const list = document.getElementById('batch-channel-allowlist-list');
+        if (list) {
+            list.innerHTML = `<p style="opacity:0.6;margin:0;">${t('admin.auto_video_allowlist_rules_hint')}</p>`;
+        }
+    }));
+}
+
+function renderAdminBatchChannelAllowlist() {
+    const list = document.getElementById('batch-channel-allowlist-list');
+    if (!list) return;
+    const rows = FB_CACHE.adminBatchChannelAllowlist || [];
+    if (!rows.length) {
+        list.innerHTML = `<p style="opacity:0.6;margin:0;">${t('admin.auto_video_allowlist_empty')}</p>`;
+        return;
+    }
+    list.innerHTML = rows.map((row) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.45rem 0.6rem;border-radius:8px;background:rgba(255,255,255,0.04);">
+            <span style="font-family:monospace;">${escapeHTML(row.email || row.id)}</span>
+            <button type="button" class="btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" onclick="window.removeBatchChannelAllowlistEmail('${escapeHTML(row.id)}')">${t('admin.auto_video_allowlist_remove')}</button>
+        </div>
+    `).join('');
+}
+
+window.addBatchChannelAllowlistEmail = async () => {
+    if (!window.__isAdmin) return;
+    const input = document.getElementById('batch-channel-allowlist-input');
+    const email = normalizeReferralAllowlistEmail(input?.value || '');
+    if (!email || !email.includes('@')) {
+        return showToast(t('admin.toast_email_required'));
+    }
+    const { db, doc, setDoc, serverTimestamp } = window.firebase;
+    try {
+        await setDoc(doc(db, 'batchChannelAllowlist', email), {
+            email,
+            addedAt: serverTimestamp(),
+            addedBy: currentUser?.email || '',
+        });
+        if (input) input.value = '';
+        showToast(t('admin.auto_video_allowlist_added', { email }));
+        if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === email) {
+            window.__batchChannelAllowed = true;
+            updateBatchChannelNavVisibility(true);
+        }
+    } catch (e) {
+        console.error('[BatchChannel] add allowlist:', e);
+        showToast(t('common.error_with_msg', { msg: e.message }));
+    }
+};
+
+window.removeBatchChannelAllowlistEmail = async (emailId) => {
+    if (!window.__isAdmin) return;
+    if (!confirm(t('admin.auto_video_allowlist_confirm_remove', { email: emailId }))) return;
+    const { db, doc, deleteDoc } = window.firebase;
+    try {
+        await deleteDoc(doc(db, 'batchChannelAllowlist', emailId));
+        showToast(t('admin.auto_video_allowlist_removed'));
+        if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === emailId) {
+            window.__batchChannelAllowed = false;
+            updateBatchChannelNavVisibility(false);
+        }
+    } catch (e) {
+        showToast(t('common.error_with_msg', { msg: e.message }));
+    }
+};
+
 function subscribeAdminReferrals() {
     const { db, collection, onSnapshot, query, orderBy, limit } = window.firebase;
 
@@ -5370,6 +5497,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
         fbUnsub('adminReferralAllowlist');
+        fbUnsub('adminBatchChannelAllowlist');
         fbUnsub('adminBots');
         fbUnsub('adminRenderProvider');
         return;
@@ -5410,6 +5538,7 @@ function refreshActiveAdminSubscription() {
         fbUnsub('adminUsers');
         fbUnsub('adminReferrals');
         subscribeAdminBots();
+        subscribeAdminBatchChannelAllowlist();
     }
 }
 
@@ -7127,6 +7256,10 @@ function updateBatchChannelNewBadge() {
 window.openBatchChannelModal = () => {
     if (!currentUser) {
         showToast(t('common.toast_login_required'));
+        return;
+    }
+    if (!canUseBatchChannel()) {
+        showToast(t('build_channel.not_allowed'));
         return;
     }
     loadBatchChannelPage();

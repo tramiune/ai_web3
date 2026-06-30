@@ -44,6 +44,7 @@ ROOT = Path(__file__).resolve().parent
 CONFIG_DOC = "default"  # legacy admin doc; user configs use Firebase uid
 CONFIG_COLLECTION = "batchChannelConfig"
 RUNS_COLLECTION = "batchChannelRuns"
+ALLOWLIST_COLLECTION = "batchChannelAllowlist"
 TIKWM_USER_POSTS = "https://www.tikwm.com/api/user/posts"
 VN_TZ = "Asia/Ho_Chi_Minh"
 # Đơn batch → VAE weavy-kling-26, gói 20s (MODELS.vae20 / modelId 125, 720p)
@@ -70,6 +71,18 @@ def _vn_now() -> datetime:
     if ZoneInfo:
         return datetime.now(ZoneInfo(VN_TZ))
     return datetime.utcnow() + timedelta(hours=7)
+
+
+def _normalize_allowlist_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _is_batch_channel_allowlisted(db, email: str) -> bool:
+    key = _normalize_allowlist_email(email)
+    if not key:
+        return False
+    snap = db.collection(ALLOWLIST_COLLECTION).document(key).get()
+    return snap.exists
 
 
 def _yesterday_vn_range() -> tuple[int, int]:
@@ -514,6 +527,10 @@ def run_daily_hourly() -> int:
         if cfg.get("lastDailyCronDateVN") == y_date:
             continue
         owner = (cfg.get("createdBy") or snap.id).strip() or snap.id
+        owner_email = (cfg.get("createdByEmail") or "").strip()
+        if not _is_batch_channel_allowlisted(db, owner_email):
+            print(f"⏭️ Batch kênh [{owner}] — email không trong allowlist, bỏ qua.")
+            continue
         print(f"⏰ Cron batch kênh [{owner}] — {cron_hour}:00 VN, video {y_date}")
         one_rc = run_batch(force=False, manual=False, config_id=snap.id)
         rc = max(rc, one_rc)
@@ -557,6 +574,9 @@ def run_batch(
     admin_uid = (cfg.get("createdBy") or "").strip()
     admin_email = (cfg.get("createdByEmail") or "").strip()
     admin_name = (cfg.get("createdByName") or "Admin").strip()
+    if not _is_batch_channel_allowlisted(db, admin_email):
+        print(f"⏭️ Email {admin_email or admin_uid} không trong batchChannelAllowlist — bỏ qua.")
+        return 0
     source_mode = (source_mode or cfg.get("sourceMode") or "tiktok").strip().lower()
     if not template_url or not admin_uid:
         print("❌ Config thiếu templateImageUrl / createdBy")

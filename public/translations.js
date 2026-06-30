@@ -111,7 +111,8 @@ window.TRANSLATIONS = {
             status_insufficient_coins: "Không đủ Coin — cần {cost} Coin cho mỗi video. Vui lòng nạp thêm.",
             status_need_channel: "Vui lòng dán link kênh TikTok.",
             status_need_orders: "Vui lòng chọn ít nhất một đơn nguồn.",
-            status_login_required: "Vui lòng đăng nhập để dùng tính năng này."
+            status_login_required: "Vui lòng đăng nhập để dùng tính năng này.",
+            not_allowed: "Tính năng Tạo video tự động chưa mở cho tài khoản này."
         },
         referral: {
             title: "Giới thiệu bạn bè - Nhận 10% hoa hồng",
@@ -568,6 +569,15 @@ window.TRANSLATIONS = {
             ref_allowlist_removed: "Đã xóa email khỏi danh sách.",
             ref_allowlist_confirm_remove: "Xóa {email} khỏi danh sách được phép?",
             ref_allowlist_rules_hint: "Cần deploy Firestore rules cho collection referralAllowlist (xem firestore.rules).",
+            auto_video_allowlist_title: "Email được phép Tạo video tự động",
+            auto_video_allowlist_desc: "Chỉ email trong danh sách mới thấy nút Tạo video tự động và cấu hình batch.",
+            auto_video_allowlist_add: "Thêm email",
+            auto_video_allowlist_remove: "Xóa",
+            auto_video_allowlist_empty: "Chưa có email nào — thêm email bên trên.",
+            auto_video_allowlist_added: "Đã thêm {email}",
+            auto_video_allowlist_removed: "Đã xóa email khỏi danh sách.",
+            auto_video_allowlist_confirm_remove: "Xóa {email} khỏi danh sách được phép?",
+            auto_video_allowlist_rules_hint: "Cần deploy Firestore rules cho collection batchChannelAllowlist (xem firestore.rules).",
             ref_summary_title: "Tổng hoa hồng theo người giới thiệu",
             ref_detail_title: "Chi tiết từng giao dịch",
             ref_col_referrer: "Người giới thiệu",
@@ -901,7 +911,8 @@ window.TRANSLATIONS = {
             status_insufficient_coins: "Not enough coins — {cost} coins required per video. Please top up.",
             status_need_channel: "Please paste a TikTok channel link.",
             status_need_orders: "Please select at least one source order.",
-            status_login_required: "Please sign in to use this feature."
+            status_login_required: "Please sign in to use this feature.",
+            not_allowed: "Auto-create videos is not enabled for this account."
         },
         referral: {
             title: "Refer Friends - Earn 10% Commission",
@@ -1358,6 +1369,15 @@ window.TRANSLATIONS = {
             ref_allowlist_removed: "Email removed from allowlist.",
             ref_allowlist_confirm_remove: "Remove {email} from allowlist?",
             ref_allowlist_rules_hint: "Deploy Firestore rules for referralAllowlist (see firestore.rules).",
+            auto_video_allowlist_title: "Auto-create video allowlist",
+            auto_video_allowlist_desc: "Only listed emails can see Auto-create videos and configure batch runs.",
+            auto_video_allowlist_add: "Add email",
+            auto_video_allowlist_remove: "Remove",
+            auto_video_allowlist_empty: "No emails yet — add one above.",
+            auto_video_allowlist_added: "Added {email}",
+            auto_video_allowlist_removed: "Email removed from allowlist.",
+            auto_video_allowlist_confirm_remove: "Remove {email} from allowlist?",
+            auto_video_allowlist_rules_hint: "Deploy Firestore rules for batchChannelAllowlist (see firestore.rules).",
             ref_summary_title: "Commission totals by referrer",
             ref_detail_title: "Transaction details",
             ref_col_referrer: "Referrer",
