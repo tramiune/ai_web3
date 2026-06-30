@@ -395,15 +395,41 @@ function formatRoboneoTrialRemaining(userData) {
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
     const key = checked ? checked.value : 'vae20';
+    if (usesBatchChannelModelPricing() && key !== 'vae10' && key !== 'vae20') {
+        return 'vae10';
+    }
     if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
         return 'vae20';
     }
     return key;
 }
 
+function usesBatchChannelModelPricing() {
+    return canUseBatchChannel();
+}
+
+function getModelPreset(modelKey) {
+    const key = modelKey || getSelectedModelKey();
+    const base = MODELS[key] || MODELS.vae10;
+    const batch = BATCH_CHANNEL_MODELS[key];
+    if (usesBatchChannelModelPricing() && batch) {
+        return {
+            ...base,
+            cost: batch.cost,
+            modelId: batch.modelId,
+            renderProvider: batch.renderProvider,
+            maxVideoSec: batch.maxVideoSec,
+            vaeDurationSec: batch.vaeDurationSec,
+            vaeResolution: batch.vaeResolution,
+            serviceLabel: batch.serviceLabel,
+            batchChannelPricing: true,
+        };
+    }
+    return base;
+}
+
 function getMaxVideoSecForModel(modelKey) {
-    const m = MODELS[modelKey] || MODELS.vae10;
-    return m.maxVideoSec;
+    return getModelPreset(modelKey).maxVideoSec;
 }
 
 function getMaxVideoSecForSelectedModel() {
@@ -411,15 +437,49 @@ function getMaxVideoSecForSelectedModel() {
 }
 
 function modelCoinCost(modelKey) {
-    const m = MODELS[modelKey || getSelectedModelKey()] || MODELS.vae10;
-    return m.cost;
+    return getModelPreset(modelKey).cost;
 }
 
 function syncModelPriceLabels() {
-    Object.entries(MODELS).forEach(([key, m]) => {
+    Object.keys(MODELS).forEach((key) => {
         const el = document.getElementById(`model-${key}-cost`);
-        if (el) el.textContent = String(m.cost);
+        if (el) el.textContent = String(getModelPreset(key).cost);
     });
+}
+
+function syncOrderModelCardCopy() {
+    const batch = usesBatchChannelModelPricing();
+    const cards = [
+        { key: 'vae10', titleKey: 'build_channel.model_10s', descKey: 'build_channel.model_10s_desc', defaultTitle: 'modals.model_vae10', defaultDesc: 'modals.model_vae10_desc' },
+        { key: 'vae20', titleKey: 'build_channel.model_20s', descKey: 'build_channel.model_20s_desc', defaultTitle: 'modals.model_vae20', defaultDesc: 'modals.model_vae20_desc' },
+    ];
+    cards.forEach(({ key, titleKey, descKey, defaultTitle, defaultDesc }) => {
+        const label = document.querySelector(`input[name="model-type"][value="${key}"]`)?.closest('label');
+        if (!label) return;
+        const titleEl = label.querySelector('.model-card-title');
+        const descEl = label.querySelector('.model-card-desc');
+        if (titleEl) titleEl.textContent = t(batch ? titleKey : defaultTitle);
+        if (descEl) descEl.textContent = t(batch ? descKey : defaultDesc);
+    });
+}
+
+function updateOrderModelSelectionUI() {
+    const batchOnly = usesBatchChannelModelPricing();
+    const trialWrap = document.getElementById('model-rbtrial-wrap');
+    if (trialWrap) {
+        trialWrap.style.display = batchOnly ? 'none' : (isRoboneoTrialEligible(window.__currentUserData) ? '' : 'none');
+    }
+    const vae1080Label = document.querySelector('input[name="model-type"][value="vae1080_30"]')?.closest('label');
+    if (vae1080Label) vae1080Label.style.display = batchOnly ? 'none' : '';
+
+    const checked = document.querySelector('input[name="model-type"]:checked');
+    if (batchOnly && checked && checked.value !== 'vae10' && checked.value !== 'vae20') {
+        const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
+        if (fallback) fallback.checked = true;
+    }
+
+    syncOrderModelCardCopy();
+    syncModelPriceLabels();
 }
 
 function normalizeOrderCost(model) {
@@ -586,11 +646,16 @@ const MODELS = {
 
 function localizedModel(key) {
     const modelKey = key || getSelectedModelKey();
-    const m = MODELS[modelKey] || MODELS.vae10;
+    const m = getModelPreset(modelKey);
+    const batch = usesBatchChannelModelPricing() && BATCH_CHANNEL_MODELS[modelKey];
     return {
         ...m,
-        name: t(m.nameKey),
-        time: t(m.timeKey),
+        name: batch
+            ? t(modelKey === 'vae10' ? 'build_channel.model_10s' : 'build_channel.model_20s')
+            : t(m.nameKey),
+        time: batch
+            ? t(modelKey === 'vae10' ? 'build_channel.model_10s_desc' : 'build_channel.model_20s_desc')
+            : t(m.timeKey),
         cost: m.cost,
         renderProvider: m.renderProvider,
     };
@@ -690,6 +755,8 @@ async function refreshBatchChannelAllowance(user) {
     if (!key) {
         window.__batchChannelAllowed = false;
         updateBatchChannelNavVisibility(false);
+        updateOrderModelSelectionUI();
+        updateFirstOrderUI();
         return false;
     }
     const { db, doc, getDoc } = window.firebase;
@@ -701,6 +768,8 @@ async function refreshBatchChannelAllowance(user) {
         window.__batchChannelAllowed = false;
     }
     updateBatchChannelNavVisibility(window.__batchChannelAllowed);
+    updateOrderModelSelectionUI();
+    updateFirstOrderUI();
     return window.__batchChannelAllowed;
 }
 
@@ -2549,7 +2618,11 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
 window.openOrderModal = () => {
     updateRoboneoTrialUI(window.__currentUserData);
-    if (isRoboneoTrialEligible(window.__currentUserData)) {
+    updateOrderModelSelectionUI();
+    if (usesBatchChannelModelPricing()) {
+        const vae10 = document.querySelector('input[name="model-type"][value="vae10"]');
+        if (vae10) vae10.checked = true;
+    } else if (isRoboneoTrialEligible(window.__currentUserData)) {
         const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
         if (trialRadio) trialRadio.checked = true;
     }
@@ -2604,6 +2677,7 @@ function updateRoboneoTrialUI(userData = window.__currentUserData) {
 
 function updateFirstOrderUI() {
     updateRoboneoTrialUI(window.__currentUserData);
+    updateOrderModelSelectionUI();
     const costEl = document.getElementById('submit-cost');
     const offerBanner = document.getElementById('first-order-offer-banner');
     const guestOfferBar = document.getElementById('guest-offer-bar');
@@ -4771,6 +4845,8 @@ window.addBatchChannelAllowlistEmail = async () => {
         if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === email) {
             window.__batchChannelAllowed = true;
             updateBatchChannelNavVisibility(true);
+            updateOrderModelSelectionUI();
+            updateFirstOrderUI();
         }
     } catch (e) {
         console.error('[BatchChannel] add allowlist:', e);
@@ -4788,6 +4864,8 @@ window.removeBatchChannelAllowlistEmail = async (emailId) => {
         if (currentUser?.email && normalizeReferralAllowlistEmail(currentUser.email) === emailId) {
             window.__batchChannelAllowed = false;
             updateBatchChannelNavVisibility(false);
+            updateOrderModelSelectionUI();
+            updateFirstOrderUI();
         }
     } catch (e) {
         showToast(t('common.error_with_msg', { msg: e.message }));
