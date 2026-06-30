@@ -47,13 +47,34 @@ RUNS_COLLECTION = "batchChannelRuns"
 ALLOWLIST_COLLECTION = "batchChannelAllowlist"
 TIKWM_USER_POSTS = "https://www.tikwm.com/api/user/posts"
 VN_TZ = "Asia/Ho_Chi_Minh"
-# Đơn batch → VAE weavy-kling-26, gói 20s (MODELS.vae20 / modelId 125, 720p)
+# Batch model presets (auto-create video popup)
+BATCH_MODEL_PRESETS = {
+    "vae10": {
+        "modelId": "124",
+        "renderProvider": "roboneo",
+        "vaeDurationSec": 10,
+        "vaeResolution": "720p",
+        "maxVideoSec": 10,
+        "costCoins": 3.1,
+        "serviceLabel": "Kling 2.6 (10s)",
+    },
+    "vae20": {
+        "modelId": "125",
+        "renderProvider": "videoaieasy",
+        "vaeDurationSec": 20,
+        "vaeResolution": "720p",
+        "maxVideoSec": 20,
+        "costCoins": 6.1,
+        "serviceLabel": "Kling 2.6 Pro (20s)",
+    },
+}
+# Legacy defaults (vae20)
 BATCH_RENDER_PROVIDER = "videoaieasy"
 BATCH_MODEL_ID = "125"
 BATCH_VAE_DURATION_SEC = 20
 BATCH_VAE_RESOLUTION = "720p"
 BATCH_MAX_VIDEO_SEC = 20
-BATCH_ORDER_COST_COINS = 10  # Gói Kling 2.6 Pro (model 125)
+BATCH_ORDER_COST_COINS = 6.1
 STALE_RUNNING_RUN_HOURS = 3
 
 
@@ -255,6 +276,30 @@ def run_wardrobe_vae(
     return out_url
 
 
+def _batch_model_preset(cfg: dict) -> dict:
+    key = (cfg.get("batchModelKey") or "vae10").strip().lower()
+    preset = dict(BATCH_MODEL_PRESETS.get(key) or BATCH_MODEL_PRESETS["vae10"])
+    if cfg.get("modelId"):
+        preset["modelId"] = str(cfg.get("modelId"))
+    if cfg.get("renderProvider"):
+        preset["renderProvider"] = str(cfg.get("renderProvider"))
+    if cfg.get("vaeDurationSec") is not None:
+        preset["vaeDurationSec"] = int(cfg.get("vaeDurationSec"))
+    if cfg.get("vaeResolution"):
+        preset["vaeResolution"] = str(cfg.get("vaeResolution"))
+    if cfg.get("maxVideoSec") is not None:
+        preset["maxVideoSec"] = int(cfg.get("maxVideoSec"))
+    if cfg.get("costCoins") is not None:
+        preset["costCoins"] = float(cfg.get("costCoins"))
+    if cfg.get("serviceLabel"):
+        preset["serviceLabel"] = str(cfg.get("serviceLabel"))
+    return preset
+
+
+def _batch_cost_coins(cfg: dict) -> float:
+    return float(_batch_model_preset(cfg).get("costCoins") or BATCH_ORDER_COST_COINS)
+
+
 def create_batch_order(
     db,
     *,
@@ -266,22 +311,25 @@ def create_batch_order(
     batch_run_id: str,
     source_video_id: str = "",
     source_order_id: str = "",
+    model_preset: dict | None = None,
 ) -> str:
+    model = dict(model_preset or BATCH_MODEL_PRESETS["vae10"])
+    cost = float(model.get("costCoins") or BATCH_ORDER_COST_COINS)
     ref = db.collection("orders").document()
     payload = {
         "userId": admin_uid,
         "userEmail": admin_email or "",
         "userName": admin_name or "Admin",
         "packageName": "Xây kênh tự động",
-        "modelId": BATCH_MODEL_ID,
-        "renderProvider": BATCH_RENDER_PROVIDER,
-        "vaeDurationSec": BATCH_VAE_DURATION_SEC,
-        "vaeResolution": BATCH_VAE_RESOLUTION,
-        "maxVideoSec": BATCH_MAX_VIDEO_SEC,
+        "modelId": str(model.get("modelId") or BATCH_MODEL_ID),
+        "renderProvider": model.get("renderProvider") or BATCH_RENDER_PROVIDER,
+        "vaeDurationSec": int(model.get("vaeDurationSec") or BATCH_VAE_DURATION_SEC),
+        "vaeResolution": model.get("vaeResolution") or BATCH_VAE_RESOLUTION,
+        "maxVideoSec": int(model.get("maxVideoSec") or BATCH_MAX_VIDEO_SEC),
         "clientVersion": APP_CLIENT_VERSION,
         "serviceType": "motion-to-char",
-        "serviceLabel": "Kling 2.6 Pro (20s)",
-        "costCoins": BATCH_ORDER_COST_COINS,
+        "serviceLabel": model.get("serviceLabel") or "Kling 2.6 Pro (20s)",
+        "costCoins": cost,
         "characterImageLink": char_url,
         "referenceVideoLink": video_url,
         "aspectRatio": "9:16",
@@ -301,7 +349,8 @@ def create_batch_order(
     return ref.id
 
 
-def _deduct_user_coins(db, user_id: str, amount: int) -> None:
+def _deduct_user_coins(db, user_id: str, amount: float) -> None:
+    amount = round(float(amount), 1)
     if amount <= 0:
         return
     if not user_id:
@@ -311,16 +360,17 @@ def _deduct_user_coins(db, user_id: str, amount: int) -> None:
     @firestore.transactional
     def _deduct_tx(transaction):
         snap = user_ref.get(transaction=transaction)
-        current = int((snap.to_dict() or {}).get("coins") or 0) if snap.exists else 0
-        if current < amount:
+        current = float((snap.to_dict() or {}).get("coins") or 0) if snap.exists else 0.0
+        if current + 1e-9 < amount:
             raise InsufficientCoinsError(f"Không đủ coin: cần {amount}, có {current}")
-        transaction.update(user_ref, {"coins": current - amount})
+        transaction.update(user_ref, {"coins": round(current - amount, 1)})
 
     _deduct_tx(db.transaction())
     print(f"💳 Trừ {amount} coin — user {user_id}")
 
 
-def _refund_user_coins(db, user_id: str, amount: int) -> None:
+def _refund_user_coins(db, user_id: str, amount: float) -> None:
+    amount = round(float(amount), 1)
     if amount <= 0 or not user_id:
         return
     db.collection("users").document(user_id).update({"coins": firestore.Increment(amount)})
@@ -352,9 +402,11 @@ def _process_video_item(
         print(f"▶️ Nguồn {item_key}...")
         download_file(video_url, video_local, referer=referer)
         frame_local = _extract_outfit_frame(video_local, tmp, item_key, cfg)
+        model_preset = _batch_model_preset(cfg)
+        cost_coins = _batch_cost_coins(cfg)
         coins_deducted = False
         try:
-            _deduct_user_coins(db, admin_uid, BATCH_ORDER_COST_COINS)
+            _deduct_user_coins(db, admin_uid, cost_coins)
             coins_deducted = True
             char_url = run_wardrobe_vae(
                 vae_client, template_url, frame_local, tmp=tmp, wardrobe_replace=wardrobe_mode,
@@ -370,10 +422,11 @@ def _process_video_item(
                 batch_run_id=run_ref.id,
                 source_video_id=source_video_id,
                 source_order_id=source_order_id,
+                model_preset=model_preset,
             )
         except Exception:
             if coins_deducted:
-                _refund_user_coins(db, admin_uid, BATCH_ORDER_COST_COINS)
+                _refund_user_coins(db, admin_uid, cost_coins)
             raise
         item["status"] = "order_created"
         item["orderId"] = order_id

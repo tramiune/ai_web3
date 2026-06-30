@@ -851,30 +851,37 @@
                                 <input type="url" id="batch-channel-url" class="form-control" placeholder="https://www.tiktok.com/@username" data-i18n="build_channel.channel_placeholder">
                             </div>
                         </li>
-                    </ol>
-                    <div class="batch-advanced-section">
-                        <div class="batch-advanced-heading" data-i18n="build_channel.advanced_toggle">Tùy chọn nâng cao</div>
-                        <div class="batch-advanced-body">
-                            <div class="batch-field">
-                                <label class="batch-field-label" data-i18n="build_channel.source_mode_label">Nguồn video</label>
-                                <div class="batch-source-tabs">
-                                    <button type="button" class="batch-source-tab active" data-mode="tiktok" data-i18n="build_channel.source_tiktok">TikTok hôm qua</button>
-                                    <button type="button" class="batch-source-tab" data-mode="orders" data-i18n="build_channel.source_orders">Video đơn cũ</button>
+                        <li class="batch-step">
+                            <span class="batch-step-num">3</span>
+                            <div class="batch-step-body">
+                                <div class="batch-field-label" data-i18n="build_channel.model_label">Chọn gói</div>
+                                <div class="model-selection-grid batch-model-grid">
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                        <input type="radio" name="batch-model-type" value="vae10" checked>
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                            <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_10s">10 giây</div>
+                                            <div style="font-size: 0.7rem; color: var(--text-muted);" data-i18n="build_channel.model_10s_desc">720p · Kling 2.6</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                                <span>3.1</span>
+                                                <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                        <input type="radio" name="batch-model-type" value="vae20">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                            <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_20s">20 giây</div>
+                                            <div style="font-size: 0.7rem; color: var(--text-muted);" data-i18n="build_channel.model_20s_desc">720p · Kling 2.6 Pro</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                                <span>6.1</span>
+                                                <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
-                                <input type="radio" name="batch-source-mode" id="batch-source-tiktok" value="tiktok" checked hidden>
-                                <input type="radio" name="batch-source-mode" id="batch-source-orders" value="orders" hidden>
                             </div>
-                            <div id="batch-channel-tiktok-wrap" class="batch-inline-field">
-                                <label class="batch-field-label" data-i18n="build_channel.yesterday_count_label">Giới hạn số video</label>
-                                <input type="number" id="batch-yesterday-count" class="form-control" min="0" max="50" value="0" placeholder="0">
-                                <p class="batch-field-hint" data-i18n="build_channel.yesterday_count_hint">0 = tất cả video hôm qua.</p>
-                            </div>
-                            <div id="batch-channel-orders-wrap" class="batch-field" style="display:none;">
-                                <label class="batch-field-label" data-i18n="build_channel.orders_pick_label">Chọn đơn nguồn</label>
-                                <div id="batch-channel-orders-pick" class="batch-order-pick-list"></div>
-                            </div>
-                        </div>
-                    </div>
+                        </li>
+                    </ol>
                     <p id="batch-channel-status" class="batch-status-text" style="display: none;"></p>
                 </section>
             </div>

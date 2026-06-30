@@ -117,6 +117,26 @@ window.reportTopupComplaint = async () => {
 
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
+const BATCH_CHANNEL_MODELS = {
+    vae10: {
+        cost: 3.1,
+        modelId: '124',
+        renderProvider: 'roboneo',
+        maxVideoSec: 10,
+        vaeDurationSec: 10,
+        vaeResolution: '720p',
+        serviceLabel: 'Kling 2.6 (10s)',
+    },
+    vae20: {
+        cost: 6.1,
+        modelId: '125',
+        renderProvider: 'videoaieasy',
+        maxVideoSec: 20,
+        vaeDurationSec: 20,
+        vaeResolution: '720p',
+        serviceLabel: 'Kling 2.6 Pro (20s)',
+    },
+};
 const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {
@@ -1861,7 +1881,6 @@ function handleUserLoggedOut() {
     adminSubscribedTopupStatus = null;
     Object.keys(FB_CACHE).forEach(k => { delete FB_CACHE[k]; });
     if (typeof resetBatchChannelForm === 'function') {
-        _batchChannelPickerOrders = [];
         resetBatchChannelForm({ keepDefaults: true });
         closeModal('batch-channel-modal');
     }
@@ -6778,8 +6797,23 @@ window.payReferralCommissionClient = payReferralCommissionClient;
 
 // --- Batch channel (modal on home) ---
 const BATCH_CHANNEL_CRON_HOUR_DEFAULT = 3;
-let _batchChannelPickerOrders = [];
 let _batchChannelCfg = null;
+
+function getBatchModelKey() {
+    const checked = document.querySelector('input[name="batch-model-type"]:checked');
+    const key = checked?.value || 'vae10';
+    return BATCH_CHANNEL_MODELS[key] ? key : 'vae10';
+}
+
+function getBatchModel() {
+    return BATCH_CHANNEL_MODELS[getBatchModelKey()] || BATCH_CHANNEL_MODELS.vae10;
+}
+
+function setBatchModelKey(modelKey) {
+    const key = BATCH_CHANNEL_MODELS[modelKey] ? modelKey : 'vae10';
+    const input = document.querySelector(`input[name="batch-model-type"][value="${key}"]`);
+    if (input) input.checked = true;
+}
 
 function getBatchChannelConfigId() {
     return currentUser?.uid || '';
@@ -6797,11 +6831,7 @@ function resetBatchChannelForm({ keepDefaults = true } = {}) {
     if (preview) preview.innerHTML = '';
     templateZone?.classList.remove('has-preview');
 
-    const yesterdayInput = document.getElementById('batch-yesterday-count');
-    if (yesterdayInput) yesterdayInput.value = '0';
-
-    syncBatchSourceModeUI('tiktok');
-    renderBatchChannelOrderPicker(_batchChannelPickerOrders, []);
+    setBatchModelKey('vae10');
     _batchChannelCfg = null;
     renderBatchChannelStatus(null);
 }
@@ -6812,14 +6842,7 @@ function applyBatchChannelConfigToForm(cfg) {
     const urlInput = document.getElementById('batch-channel-url');
     if (urlInput) urlInput.value = cfg?.channelUrl || '';
 
-    const yesterdayInput = document.getElementById('batch-yesterday-count');
-    if (yesterdayInput) {
-        yesterdayInput.value = String(
-            cfg?.yesterdayVideoCount != null ? cfg.yesterdayVideoCount : 0
-        );
-    }
-
-    syncBatchSourceModeUI(cfg?.sourceMode || 'tiktok');
+    setBatchModelKey(cfg?.batchModelKey || 'vae10');
 
     const preview = document.getElementById('batch-template-preview');
     const templateZone = document.getElementById('batch-template-zone');
@@ -6832,8 +6855,6 @@ function applyBatchChannelConfigToForm(cfg) {
             templateZone?.classList.remove('has-preview');
         }
     }
-
-    renderBatchChannelOrderPicker(_batchChannelPickerOrders, cfg?.selectedOrderIds || []);
 }
 
 function parseTikTokUsername(raw) {
@@ -6850,67 +6871,6 @@ function batchChannelRunNowPending(cfg) {
     const req = cfg.runNowRequestedAt?.toMillis?.() ?? cfg.runNowRequestedAt?.seconds * 1000 ?? 0;
     const handled = cfg.runNowHandledAt?.toMillis?.() ?? cfg.runNowHandledAt?.seconds * 1000 ?? 0;
     return req > handled;
-}
-
-function getBatchSourceModeFromUI() {
-    const orders = document.getElementById('batch-source-orders');
-    return orders?.checked ? 'orders' : 'tiktok';
-}
-
-function getBatchYesterdayVideoCount() {
-    const raw = parseInt(document.getElementById('batch-yesterday-count')?.value, 10);
-    if (!Number.isFinite(raw) || raw <= 0) return 0;
-    return Math.max(0, Math.min(50, raw));
-}
-
-function syncBatchSourceModeUI(mode) {
-    const m = mode === 'orders' ? 'orders' : 'tiktok';
-    const tiktokRadio = document.getElementById('batch-source-tiktok');
-    const ordersRadio = document.getElementById('batch-source-orders');
-    const tiktokWrap = document.getElementById('batch-channel-tiktok-wrap');
-    const ordersWrap = document.getElementById('batch-channel-orders-wrap');
-    if (tiktokRadio) tiktokRadio.checked = m === 'tiktok';
-    if (ordersRadio) ordersRadio.checked = m === 'orders';
-    if (tiktokWrap) tiktokWrap.style.display = m === 'tiktok' ? 'block' : 'none';
-    if (ordersWrap) ordersWrap.style.display = m === 'orders' ? 'block' : 'none';
-    document.querySelectorAll('.batch-source-tab').forEach((btn) => {
-        btn.classList.toggle('active', btn.getAttribute('data-mode') === m);
-    });
-}
-
-function getBatchSelectedOrderIds() {
-    const wrap = document.getElementById('batch-channel-orders-pick');
-    if (!wrap) return [];
-    return [...wrap.querySelectorAll('input[type="checkbox"][data-order-id]:checked')]
-        .map((el) => el.getAttribute('data-order-id'))
-        .filter(Boolean);
-}
-
-function renderBatchChannelOrderPicker(orders, selectedIds = []) {
-    const wrap = document.getElementById('batch-channel-orders-pick');
-    if (!wrap) return;
-    const selected = new Set(selectedIds || []);
-    if (!orders.length) {
-        wrap.innerHTML = `<div class="batch-empty-hint">${t('build_channel.orders_pick_empty')}</div>`;
-        return;
-    }
-    wrap.innerHTML = orders.map((o) => {
-        const id = o.id;
-        const shortId = id.slice(-6).toUpperCase();
-        const checked = selected.has(id) ? 'checked' : '';
-        return `
-        <label class="batch-order-pick-item">
-            <input type="checkbox" data-order-id="${escapeHTML(id)}" ${checked}>
-            <div class="batch-order-pick-thumb">
-                ${o.characterImageLink ? `<img src="${escapeHTML(o.characterImageLink)}" alt="">` : ''}
-            </div>
-            <div class="batch-order-pick-meta">
-                <div class="batch-order-pick-id">#${escapeHTML(shortId)}</div>
-                <div class="batch-order-pick-user">${escapeHTML(o.userName || o.userEmail || t('common.guest'))}</div>
-            </div>
-            <span class="status-badge status-${escapeHTML(o.status || 'pending')}">${escapeHTML(STATUS_MAP()[o.status] || o.status || '')}</span>
-        </label>`;
-    }).join('');
 }
 
 function getBatchCronHour() {
@@ -6935,11 +6895,11 @@ function updateBatchChannelMainButton(cfg) {
 }
 
 function batchChannelRunNowMode() {
-    return getBatchSourceModeFromUI() === 'orders' ? 'orders' : 'full';
+    return 'full';
 }
 
 function batchChannelPerVideoCost() {
-    return MODELS.vae20 ? MODELS.vae20.cost : 10;
+    return getBatchModel().cost;
 }
 
 async function ensureBatchChannelCoins(triggerRun) {
@@ -6972,15 +6932,11 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
     const { db, doc, getDoc, setDoc, serverTimestamp } = window.firebase;
     const channelUrl = document.getElementById('batch-channel-url')?.value?.trim() || '';
     const username = parseTikTokUsername(channelUrl);
-    const sourceMode = getBatchSourceModeFromUI();
-    const selectedOrderIds = getBatchSelectedOrderIds();
+    const batchModel = getBatchModel();
+    const batchModelKey = getBatchModelKey();
 
-    if (sourceMode === 'tiktok' && !username) {
+    if (!username) {
         showToast(t('build_channel.status_need_channel'));
-        return false;
-    }
-    if (sourceMode === 'orders' && !selectedOrderIds.length) {
-        showToast(t('build_channel.status_need_orders'));
         return false;
     }
     if (!(await ensureBatchChannelCoins(triggerRun))) {
@@ -7022,12 +6978,20 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
         channelUrl,
         channelUsername: username,
         templateImageUrl,
-        sourceMode,
+        sourceMode: 'tiktok',
+        batchModelKey,
+        modelId: batchModel.modelId,
+        renderProvider: batchModel.renderProvider,
+        vaeDurationSec: batchModel.vaeDurationSec,
+        vaeResolution: batchModel.vaeResolution,
+        maxVideoSec: batchModel.maxVideoSec,
+        costCoins: batchModel.cost,
+        serviceLabel: batchModel.serviceLabel,
         cronHour: getBatchCronHour(),
-        yesterdayVideoCount: getBatchYesterdayVideoCount(),
+        yesterdayVideoCount: 0,
         wardrobeReplace: 'full',
         frameSec: 2.5,
-        selectedOrderIds,
+        selectedOrderIds: [],
         createdBy: currentUser.uid,
         createdByEmail: currentUser.email || '',
         createdByName: currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : ''),
@@ -7088,18 +7052,10 @@ async function loadBatchChannelPage() {
     if (!currentUser) return;
     const configId = getBatchChannelConfigId();
     if (!configId) return;
-    const { db, doc, collection, query, orderBy, limit, onSnapshot, where } = window.firebase;
+    const { db, doc, onSnapshot } = window.firebase;
 
-    if (!window.__batchSourceModeBound) {
-        window.__batchSourceModeBound = true;
-        document.getElementById('batch-source-tiktok')?.addEventListener('change', () => syncBatchSourceModeUI('tiktok'));
-        document.getElementById('batch-source-orders')?.addEventListener('change', () => syncBatchSourceModeUI('orders'));
-        document.querySelectorAll('.batch-source-tab').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const mode = btn.getAttribute('data-mode') || 'tiktok';
-                syncBatchSourceModeUI(mode);
-            });
-        });
+    if (!window.__batchChannelModalBound) {
+        window.__batchChannelModalBound = true;
         const templateZone = document.getElementById('batch-template-zone');
         const templateInput = document.getElementById('batch-template-input');
         templateZone?.addEventListener('click', (e) => {
@@ -7124,33 +7080,6 @@ async function loadBatchChannelPage() {
         const cfg = snap.exists() ? snap.data() : null;
         applyBatchChannelConfigToForm(cfg);
     }, (err) => console.error('[BatchChannel] config listener:', err)));
-
-    fbUnsub('batchChannelOrdersPick');
-    fbUnsub('batchChannelOrdersPickFallback');
-    const pickQ = query(
-        collection(db, 'orders'),
-        where('userId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc'),
-        limit(80)
-    );
-    fbSub('batchChannelOrdersPick', onSnapshot(pickQ, (snap) => {
-        _batchChannelPickerOrders = snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((o) => (o.characterImageLink || '').trim() && (o.referenceVideoLink || '').trim());
-        renderBatchChannelOrderPicker(_batchChannelPickerOrders, getBatchSelectedOrderIds());
-    }, (err) => {
-        console.error('[BatchChannel] orders pick:', err);
-        if (err?.code === 'failed-precondition') {
-            const fallbackQ = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(120));
-            fbSub('batchChannelOrdersPickFallback', onSnapshot(fallbackQ, (snap) => {
-                _batchChannelPickerOrders = snap.docs
-                    .map((d) => ({ id: d.id, ...d.data() }))
-                    .filter((o) => o.userId === currentUser.uid)
-                    .filter((o) => (o.characterImageLink || '').trim() && (o.referenceVideoLink || '').trim());
-                renderBatchChannelOrderPicker(_batchChannelPickerOrders, getBatchSelectedOrderIds());
-            }));
-        }
-    }));
 }
 
 function updateBatchChannelNewBadge() {
