@@ -61,7 +61,7 @@ window.TRANSLATIONS = {
         },
         build_channel: {
             title: "Tạo video tự động",
-            subtitle: "Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI (có thể chạy mỗi ngày).",
+            subtitle: "Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI.",
             setup_title: "Thiết lập nhanh",
             step1_title: "Ảnh nhân vật của bạn",
             step1_hint: "Ảnh rõ mặt + toàn thân, nền đơn giản.",

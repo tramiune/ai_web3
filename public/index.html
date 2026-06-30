@@ -823,7 +823,7 @@
             <span class="modal-close" onclick="closeModal('batch-channel-modal')" aria-label="Close">&times;</span>
             <div class="modal-header">
                 <h2 data-i18n="build_channel.title">Tạo video tự động</h2>
-                <p data-i18n="build_channel.subtitle">Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI (có thể chạy mỗi ngày).</p>
+                <p data-i18n="build_channel.subtitle">Gắn ảnh nhân vật và link TikTok — hệ thống tự lấy video, thay outfit và render AI.</p>
             </div>
             <div class="modal-body batch-channel-modal-body">
                 <section class="batch-channel-panel glass-card">
@@ -875,23 +875,6 @@
                             </div>
                         </div>
                     </div>
-                    <ol class="batch-steps batch-steps--tail">
-                        <li class="batch-step">
-                            <span class="batch-step-num">3</span>
-                            <div class="batch-step-body">
-                                <div class="batch-field-label" data-i18n="build_channel.step3_title">Lịch tự động</div>
-                                <label class="batch-daily-row">
-                                    <input type="checkbox" id="batch-daily-checkbox" checked>
-                                    <span data-i18n="build_channel.daily_checkbox">Chạy mỗi ngày</span>
-                                </label>
-                                <div id="batch-cron-hour-wrap" class="batch-inline-field">
-                                    <label class="batch-field-label" data-i18n="build_channel.cron_hour_label">Giờ chạy tự động (VN)</label>
-                                    <input type="number" id="batch-cron-hour" class="form-control" min="0" max="23" value="3" style="max-width:88px;">
-                                    <p class="batch-field-hint" data-i18n="build_channel.cron_hour_hint">Mặc định 3:00 sáng — có thể đổi giờ khác.</p>
-                                </div>
-                            </div>
-                        </li>
-                    </ol>
                     <p id="batch-channel-status" class="batch-status-text" style="display: none;"></p>
                 </section>
             </div>

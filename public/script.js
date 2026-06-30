@@ -6797,14 +6797,8 @@ function resetBatchChannelForm({ keepDefaults = true } = {}) {
     if (preview) preview.innerHTML = '';
     templateZone?.classList.remove('has-preview');
 
-    const cronInput = document.getElementById('batch-cron-hour');
-    if (cronInput) cronInput.value = String(BATCH_CHANNEL_CRON_HOUR_DEFAULT);
-
     const yesterdayInput = document.getElementById('batch-yesterday-count');
     if (yesterdayInput) yesterdayInput.value = '0';
-
-    const box = document.getElementById('batch-daily-checkbox');
-    if (box) box.checked = !!keepDefaults;
 
     syncBatchSourceModeUI('tiktok');
     renderBatchChannelOrderPicker(_batchChannelPickerOrders, []);
@@ -6817,13 +6811,6 @@ function applyBatchChannelConfigToForm(cfg) {
 
     const urlInput = document.getElementById('batch-channel-url');
     if (urlInput) urlInput.value = cfg?.channelUrl || '';
-
-    const cronInput = document.getElementById('batch-cron-hour');
-    if (cronInput) {
-        cronInput.value = String(
-            cfg?.cronHour != null ? cfg.cronHour : BATCH_CHANNEL_CRON_HOUR_DEFAULT
-        );
-    }
 
     const yesterdayInput = document.getElementById('batch-yesterday-count');
     if (yesterdayInput) {
@@ -6926,37 +6913,8 @@ function renderBatchChannelOrderPicker(orders, selectedIds = []) {
     }).join('');
 }
 
-function isBatchDailyChecked() {
-    return !!document.getElementById('batch-daily-checkbox')?.checked;
-}
-
 function getBatchCronHour() {
-    const raw = parseInt(document.getElementById('batch-cron-hour')?.value, 10);
-    if (!Number.isFinite(raw)) return BATCH_CHANNEL_CRON_HOUR_DEFAULT;
-    return Math.max(0, Math.min(23, raw));
-}
-
-function syncBatchDailyScheduleUI(cfg) {
-    const wrap = document.getElementById('batch-cron-hour-wrap');
-    const show = isBatchDailyChecked();
-    if (wrap) wrap.style.display = show ? 'block' : 'none';
-    updateBatchChannelMainButton(cfg ?? _batchChannelCfg);
-}
-
-async function persistBatchChannelCronHourOnly() {
-    if (!currentUser || !_batchChannelCfg?.enabled) return;
-    const configId = getBatchChannelConfigId();
-    if (!configId) return;
-    const { db, doc, setDoc, serverTimestamp } = window.firebase;
-    const cronHour = getBatchCronHour();
-    try {
-        await setDoc(doc(db, 'batchChannelConfig', configId), {
-            cronHour,
-            updatedAt: serverTimestamp(),
-        }, { merge: true });
-    } catch (e) {
-        console.error('[BatchChannel] cron hour:', e);
-    }
+    return BATCH_CHANNEL_CRON_HOUR_DEFAULT;
 }
 
 function updateBatchChannelMainButton(cfg) {
@@ -6973,27 +6931,7 @@ function updateBatchChannelMainButton(cfg) {
         btn.textContent = t('build_channel.btn_running');
         return;
     }
-
-    const daily = isBatchDailyChecked();
-    if (daily && cfg?.enabled) {
-        btn.textContent = t('build_channel.btn_stop');
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-secondary');
-        btn.style.background = '#c0392b';
-        btn.style.borderColor = '#c0392b';
-        return;
-    }
-    if (daily) {
-        btn.textContent = t('build_channel.btn_schedule', { hour: getBatchCronHour() });
-        return;
-    }
     btn.textContent = t('build_channel.btn_run_now');
-}
-
-function syncBatchDailyCheckboxFromCfg(cfg) {
-    const box = document.getElementById('batch-daily-checkbox');
-    if (!box) return;
-    box.checked = cfg != null ? !!cfg.enabled : true;
 }
 
 function batchChannelRunNowMode() {
@@ -7024,7 +6962,7 @@ async function ensureBatchChannelCoins(triggerRun) {
     return true;
 }
 
-async function persistBatchChannelConfig({ enable, triggerRun = false }) {
+async function persistBatchChannelConfig({ triggerRun = true } = {}) {
     if (!currentUser) {
         showToast(t('common.toast_login_required'));
         return false;
@@ -7050,19 +6988,16 @@ async function persistBatchChannelConfig({ enable, triggerRun = false }) {
     }
 
     let templateImageUrl = '';
-    let existingStartedAt = null;
     try {
         const existing = await getDoc(doc(db, 'batchChannelConfig', configId));
         if (existing.exists()) {
-            const d = existing.data();
-            templateImageUrl = d.templateImageUrl || '';
-            existingStartedAt = d.startedAt || null;
+            templateImageUrl = existing.data().templateImageUrl || '';
         }
     } catch (_) { /* ignore */ }
 
     const fileInput = document.getElementById('batch-template-input');
     const file = fileInput?.files?.[0];
-    const needsTemplate = enable || triggerRun;
+    const needsTemplate = triggerRun;
     if (needsTemplate && file) {
         try {
             templateImageUrl = await uploadFile(file, 'characters');
@@ -7083,7 +7018,7 @@ async function persistBatchChannelConfig({ enable, triggerRun = false }) {
     }
 
     const payload = {
-        enabled: !!enable,
+        enabled: false,
         channelUrl,
         channelUsername: username,
         templateImageUrl,
@@ -7098,11 +7033,7 @@ async function persistBatchChannelConfig({ enable, triggerRun = false }) {
         createdByName: currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : ''),
         updatedAt: serverTimestamp(),
     };
-    if (enable && !existingStartedAt) {
-        payload.startedAt = serverTimestamp();
-    }
     if (triggerRun) {
-        payload.enabled = false;
         payload.runNowRequestedAt = serverTimestamp();
         payload.runNowMode = batchChannelRunNowMode();
     }
@@ -7113,10 +7044,6 @@ async function persistBatchChannelConfig({ enable, triggerRun = false }) {
         if (triggerRun) {
             showToast(t('build_channel.status_run_now_queued'));
             closeModal('batch-channel-modal');
-        } else if (enable) {
-            showToast(t('build_channel.status_schedule_on', { hour: getBatchCronHour() }));
-        } else {
-            showToast(t('build_channel.status_schedule_off'));
         }
         return true;
     } catch (e) {
@@ -7129,21 +7056,11 @@ async function persistBatchChannelConfig({ enable, triggerRun = false }) {
 window.handleBatchChannelMainAction = async () => {
     const cfg = _batchChannelCfg;
     if (batchChannelRunNowPending(cfg)) return;
-
-    const daily = isBatchDailyChecked();
-    if (daily && cfg?.enabled) {
-        await persistBatchChannelConfig({ enable: false });
-        return;
-    }
-    if (daily) {
-        await persistBatchChannelConfig({ enable: true });
-        return;
-    }
-    await persistBatchChannelConfig({ enable: false, triggerRun: true });
+    await persistBatchChannelConfig({ triggerRun: true });
 };
 
-window.saveBatchChannelConfig = async (enable) => {
-    await persistBatchChannelConfig({ enable: !!enable });
+window.saveBatchChannelConfig = async () => {
+    await persistBatchChannelConfig({ triggerRun: true });
 };
 
 function renderBatchChannelStatus(cfg) {
@@ -7155,11 +7072,6 @@ function renderBatchChannelStatus(cfg) {
     if (cfg && batchChannelRunNowPending(cfg)) {
         html = t('build_channel.status_run_now_pending');
         show = true;
-    } else if (cfg?.enabled) {
-        const hour = cfg.cronHour != null ? Number(cfg.cronHour) : BATCH_CHANNEL_CRON_HOUR_DEFAULT;
-        html = t('build_channel.status_on', { hour: Number.isFinite(hour) ? hour : BATCH_CHANNEL_CRON_HOUR_DEFAULT });
-        if (cfg.lastRunMessage) html += ` — ${escapeHTML(cfg.lastRunMessage)}`;
-        show = true;
     } else if (cfg?.lastRunMessage) {
         html = escapeHTML(cfg.lastRunMessage);
         show = true;
@@ -7169,8 +7081,7 @@ function renderBatchChannelStatus(cfg) {
         el.textContent = html;
         el.style.display = show ? '' : 'none';
     }
-    syncBatchDailyCheckboxFromCfg(cfg);
-    syncBatchDailyScheduleUI(cfg);
+    updateBatchChannelMainButton(cfg);
 }
 
 async function loadBatchChannelPage() {
@@ -7203,13 +7114,6 @@ async function loadBatchChannelPage() {
                 preview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
                 templateZone?.classList.add('has-preview');
             }
-        });
-        document.getElementById('batch-daily-checkbox')?.addEventListener('change', () => {
-            syncBatchDailyScheduleUI(_batchChannelCfg);
-        });
-        document.getElementById('batch-cron-hour')?.addEventListener('change', () => {
-            updateBatchChannelMainButton(_batchChannelCfg);
-            persistBatchChannelCronHourOnly();
         });
     }
 
