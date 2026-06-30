@@ -5502,12 +5502,94 @@ body.video-trim-active {
   font-weight: 600;
 }
 
-.batch-field-hint,
+.batch-field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  line-height: 1.45;
+}
+
 .batch-status-text {
   margin: 0.35rem 0 0;
   font-size: 0.78rem;
   opacity: 0.65;
   line-height: 1.45;
+}
+
+.batch-estimate-text {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.batch-run-panel {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.batch-run-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.batch-run-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.batch-run-stat {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.batch-run-stat strong {
+  color: var(--accent);
+}
+
+.batch-run-phase {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.batch-run-errors {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #ff8a8a;
+}
+
+.batch-status-chip--queued {
+  background: rgba(100, 181, 246, 0.16);
+  color: #90caf9;
+  border: 1px solid rgba(100, 181, 246, 0.35);
+}
+
+.batch-status-chip--done {
+  background: rgba(39, 174, 96, 0.18);
+  color: #6ee7a8;
+  border: 1px solid rgba(39, 174, 96, 0.35);
+}
+
+.batch-status-chip--fail {
+  background: rgba(244, 67, 54, 0.16);
+  color: #ff8a8a;
+  border: 1px solid rgba(244, 67, 54, 0.35);
 }
 
 .batch-inline-field {

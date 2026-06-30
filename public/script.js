@@ -6866,6 +6866,7 @@ function applyBatchChannelConfigToForm(cfg) {
             templateZone?.classList.remove('has-preview');
         }
     }
+    updateBatchChannelEstimate();
 }
 
 function parseTikTokUsername(raw) {
@@ -6903,7 +6904,7 @@ function updateBatchChannelMainButton(cfg) {
     btn.style.background = '';
     btn.style.borderColor = '';
 
-    if (batchChannelRunNowPending(cfg)) {
+    if (isBatchRunActive(cfg)) {
         btn.disabled = true;
         btn.textContent = t('build_channel.btn_running');
         return;
@@ -7017,6 +7018,11 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
     if (triggerRun) {
         payload.runNowRequestedAt = serverTimestamp();
         payload.runNowMode = batchChannelRunNowMode();
+        payload.activeRunStatus = 'queued';
+        payload.activeRunPhase = t('build_channel.status_run_now_queued');
+        payload.activeRunVideosFound = 0;
+        payload.activeRunOrdersCreated = 0;
+        payload.activeRunErrors = [];
     }
 
     try {
@@ -7024,7 +7030,6 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
         if (fileInput) fileInput.value = '';
         if (triggerRun) {
             showToast(t('build_channel.status_run_now_queued'));
-            closeModal('batch-channel-modal');
         }
         return true;
     } catch (e) {
@@ -7036,7 +7041,7 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
 
 window.handleBatchChannelMainAction = async () => {
     const cfg = _batchChannelCfg;
-    if (batchChannelRunNowPending(cfg)) return;
+    if (isBatchRunActive(cfg)) return;
     await persistBatchChannelConfig({ triggerRun: true });
 };
 
@@ -7044,25 +7049,114 @@ window.saveBatchChannelConfig = async () => {
     await persistBatchChannelConfig({ triggerRun: true });
 };
 
+function getBatchRunState(cfg) {
+    if (!cfg) return 'idle';
+    const active = String(cfg.activeRunStatus || '').toLowerCase();
+    if (active === 'queued' || active === 'running') return active;
+    if (active === 'completed') return 'completed';
+    if (active === 'failed') return 'failed';
+    if (batchChannelRunNowPending(cfg)) return 'queued';
+    const last = String(cfg.lastRunStatus || '').toLowerCase();
+    if (last === 'completed' || last === 'failed') return last;
+    return 'idle';
+}
+
+function isBatchRunActive(cfg) {
+    const s = getBatchRunState(cfg);
+    return s === 'queued' || s === 'running';
+}
+
+function updateBatchChannelEstimate() {
+    const el = document.getElementById('batch-channel-estimate');
+    if (!el) return;
+    const username = parseTikTokUsername(document.getElementById('batch-channel-url')?.value || '');
+    const limit = getBatchYesterdayVideoCount();
+    const cost = batchChannelPerVideoCost();
+    if (!username) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    const key = limit > 0 ? 'build_channel.status_estimate_limit' : 'build_channel.status_estimate_all';
+    el.innerHTML = t(key, { limit, cost });
+    el.style.display = '';
+}
+
 function renderBatchChannelStatus(cfg) {
     _batchChannelCfg = cfg;
-    const el = document.getElementById('batch-channel-status');
-    let html = '';
-    let show = false;
+    const legacyEl = document.getElementById('batch-channel-status');
+    const panel = document.getElementById('batch-channel-run-panel');
+    const chip = document.getElementById('batch-run-chip');
+    const statsEl = document.getElementById('batch-run-stats');
+    const phaseEl = document.getElementById('batch-run-phase');
+    const errorsEl = document.getElementById('batch-run-errors');
 
-    if (cfg && batchChannelRunNowPending(cfg)) {
-        html = t('build_channel.status_run_now_pending');
-        show = true;
-    } else if (cfg?.lastRunMessage) {
-        html = escapeHTML(cfg.lastRunMessage);
-        show = true;
+    const state = getBatchRunState(cfg);
+    const videosFound = Number(cfg?.activeRunVideosFound ?? 0);
+    const ordersCreated = Number(cfg?.activeRunOrdersCreated ?? 0);
+    const errors = Array.isArray(cfg?.activeRunErrors) ? cfg.activeRunErrors : [];
+    const phase = (cfg?.activeRunPhase || '').trim();
+    const lastMsg = (cfg?.lastRunMessage || '').trim();
+    const showPanel = state !== 'idle' || !!lastMsg;
+
+    if (legacyEl) {
+        legacyEl.style.display = 'none';
+        legacyEl.textContent = '';
     }
 
-    if (el) {
-        el.textContent = html;
-        el.style.display = show ? '' : 'none';
+    if (!showPanel || !panel) {
+        panel?.style && (panel.style.display = 'none');
+        updateBatchChannelMainButton(cfg);
+        updateBatchChannelEstimate();
+        return;
     }
+
+    panel.style.display = '';
+
+    const chipMap = {
+        queued: { cls: 'batch-status-chip--queued', label: t('build_channel.status_run_queued') },
+        running: { cls: 'batch-status-chip--running', label: t('build_channel.status_run_running') },
+        completed: { cls: 'batch-status-chip--done', label: t('build_channel.status_run_done') },
+        failed: { cls: 'batch-status-chip--fail', label: t('build_channel.status_run_failed') },
+    };
+    const chipInfo = chipMap[state] || chipMap.completed;
+    if (chip) {
+        chip.className = `batch-status-chip ${chipInfo.cls}`;
+        chip.textContent = chipInfo.label;
+    }
+
+    if (statsEl) {
+        const parts = [];
+        if (state === 'running' || state === 'completed' || state === 'failed' || videosFound > 0) {
+            parts.push(`<span class="batch-run-stat">${t('build_channel.status_run_videos', { count: videosFound })}</span>`);
+        }
+        if (ordersCreated > 0 || state === 'running' || state === 'completed') {
+            parts.push(`<span class="batch-run-stat">${t('build_channel.status_run_orders', { count: ordersCreated })}</span>`);
+        }
+        if (errors.length > 0) {
+            parts.push(`<span class="batch-run-stat" style="color:#ff8a8a;">${t('build_channel.status_run_errors', { count: errors.length })}</span>`);
+        }
+        statsEl.innerHTML = parts.join('');
+    }
+
+    if (phaseEl) {
+        const phaseText = phase || (state === 'queued' ? t('build_channel.status_run_now_queued') : lastMsg);
+        phaseEl.textContent = phaseText || '';
+        phaseEl.style.display = phaseText ? '' : 'none';
+    }
+
+    if (errorsEl) {
+        if (errors.length > 0) {
+            errorsEl.innerHTML = errors.map((err) => `<li>${escapeHTML(String(err))}</li>`).join('');
+            errorsEl.style.display = '';
+        } else {
+            errorsEl.innerHTML = '';
+            errorsEl.style.display = 'none';
+        }
+    }
+
     updateBatchChannelMainButton(cfg);
+    updateBatchChannelEstimate();
 }
 
 async function loadBatchChannelPage() {
@@ -7087,6 +7181,11 @@ async function loadBatchChannelPage() {
                 preview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
                 templateZone?.classList.add('has-preview');
             }
+        });
+        document.getElementById('batch-channel-url')?.addEventListener('input', updateBatchChannelEstimate);
+        document.getElementById('batch-yesterday-count')?.addEventListener('input', updateBatchChannelEstimate);
+        document.querySelectorAll('input[name="batch-model-type"]').forEach((el) => {
+            el.addEventListener('change', updateBatchChannelEstimate);
         });
     }
 

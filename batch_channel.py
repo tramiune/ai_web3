@@ -377,6 +377,58 @@ def _refund_user_coins(db, user_id: str, amount: float) -> None:
     print(f"💰 Hoàn {amount} coin cho user {user_id}")
 
 
+def _sync_config_run_progress(
+    cfg_ref,
+    *,
+    state: str,
+    phase: str = "",
+    videos_found: int | None = None,
+    orders_created: int | None = None,
+    errors: list[str] | None = None,
+    run_id: str = "",
+    last_message: str = "",
+    last_status: str = "",
+) -> None:
+    upd: dict = {
+        "activeRunStatus": state,
+        "activeRunPhase": phase,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    if run_id:
+        upd["activeRunId"] = run_id
+    if videos_found is not None:
+        upd["activeRunVideosFound"] = int(videos_found)
+    if orders_created is not None:
+        upd["activeRunOrdersCreated"] = int(orders_created)
+    if errors is not None:
+        upd["activeRunErrors"] = list(errors)[-10:]
+    if last_message:
+        upd["lastRunMessage"] = last_message
+    if last_status:
+        upd["lastRunStatus"] = last_status
+    if state in ("completed", "failed", "idle"):
+        upd["activeRunPhase"] = phase
+    cfg_ref.update(upd)
+
+
+def _format_batch_summary(*, videos_found: int, orders_created: int, errors: list[str]) -> str:
+    if orders_created <= 0 and errors:
+        detail = errors[0]
+        if len(errors) > 1:
+            detail += f" (+{len(errors) - 1} lỗi khác)"
+        return f"Thất bại — không tạo được đơn nào. {detail}"
+    msg = f"Hoàn tất: đã tạo {orders_created} đơn hàng"
+    if videos_found > 0:
+        msg += f" từ {videos_found} video TikTok hôm qua"
+    msg += ". Mỗi đơn sẽ render AI — xem tiến độ ở danh sách Video của tôi."
+    if errors:
+        msg += f" ({len(errors)} video lỗi: {'; '.join(errors[:2])}"
+        if len(errors) > 2:
+            msg += f" … +{len(errors) - 2}"
+        msg += ")"
+    return msg
+
+
 def _process_video_item(
     vae_client: VideoAiEasyClient,
     db,
@@ -392,11 +444,19 @@ def _process_video_item(
     source_video_id: str = "",
     source_order_id: str = "",
     referer: str = "https://www.tiktok.com/",
+    cfg_ref=None,
+    progress_label: str = "",
 ) -> dict:
     wardrobe_mode = _wardrobe_replace_mode(cfg)
     item = {"videoId": item_key, "status": "pending", "orderId": ""}
     if source_order_id:
         item["sourceOrderId"] = source_order_id
+    if cfg_ref is not None and progress_label:
+        _sync_config_run_progress(
+            cfg_ref,
+            state="running",
+            phase=f"{progress_label}: đang tải video & cắt khung hình…",
+        )
     with tempfile.TemporaryDirectory(prefix="batch_ch_") as tmp:
         video_local = os.path.join(tmp, f"{item_key}.mp4")
         print(f"▶️ Nguồn {item_key}...")
@@ -405,6 +465,12 @@ def _process_video_item(
         model_preset = _batch_model_preset(cfg)
         cost_coins = _batch_cost_coins(cfg)
         coins_deducted = False
+        if cfg_ref is not None and progress_label:
+            _sync_config_run_progress(
+                cfg_ref,
+                state="running",
+                phase=f"{progress_label}: đang thay đồ AI (VAE)…",
+            )
         try:
             _deduct_user_coins(db, admin_uid, cost_coins)
             coins_deducted = True
@@ -491,7 +557,14 @@ def _trigger_config_run(db, config_id: str, cfg: dict) -> int:
     ):
         print("🧪 BATCH_RUN_NOW_USE_TEST=1 — run now dùng 1 video mới nhất (local dev)")
         mode = "test"
-    db.collection(CONFIG_COLLECTION).document(config_id).update({"runNowHandledAt": cfg.get("runNowRequestedAt")})
+    db.collection(CONFIG_COLLECTION).document(config_id).update({
+        "runNowHandledAt": cfg.get("runNowRequestedAt"),
+        "activeRunStatus": "running",
+        "activeRunPhase": "Đang khởi động — lấy video TikTok…",
+        "activeRunVideosFound": 0,
+        "activeRunOrdersCreated": 0,
+        "activeRunErrors": [],
+    })
     order_ids = [str(x).strip() for x in (cfg.get("selectedOrderIds") or []) if str(x).strip()]
     owner = (cfg.get("createdBy") or config_id).strip() or config_id
     if mode == "orders":
@@ -678,6 +751,16 @@ def run_batch(
     items: list[dict] = []
     orders_created = 0
 
+    _sync_config_run_progress(
+        cfg_ref,
+        state="running",
+        phase="Đang lấy danh sách video TikTok hôm qua…",
+        videos_found=0,
+        orders_created=0,
+        errors=[],
+        run_id=run_ref.id,
+    )
+
     try:
         if source_mode == "orders":
             ids = order_ids if order_ids is not None else [
@@ -748,13 +831,31 @@ def run_batch(
                 else:
                     print(f"   Tìm thấy {len(videos)} video hôm qua (trong {len(all_videos)} gần nhất).")
             run_ref.update({"videosFound": len(videos)})
+            _sync_config_run_progress(
+                cfg_ref,
+                state="running",
+                phase=f"Đã tìm {len(videos)} video — bắt đầu thay đồ & tạo đơn (mỗi video = 1 đơn)…",
+                videos_found=len(videos),
+                orders_created=0,
+                errors=errors,
+                run_id=run_ref.id,
+            )
+            if len(videos) == 0:
+                errors.append("Không có video TikTok nào đăng hôm qua trên kênh này.")
 
-            for v in videos:
+            for idx, v in enumerate(videos, start=1):
                 vid = str(v.get("video_id") or "")
                 play = v.get("hdplay") or v.get("play") or ""
                 if not vid or not play:
-                    errors.append(f"{vid or '?'}: no_play_url")
+                    err = f"Video {vid or '?'}: không có link tải"
+                    errors.append(err)
+                    _sync_config_run_progress(
+                        cfg_ref, state="running", videos_found=len(videos),
+                        orders_created=orders_created, errors=errors,
+                        phase=f"Video {idx}/{len(videos)}: bỏ qua (lỗi link)",
+                    )
                     continue
+                progress = f"Video {idx}/{len(videos)}"
                 try:
                     item = _process_video_item(
                         vae_client, db,
@@ -767,41 +868,88 @@ def run_batch(
                         video_url=play,
                         item_key=vid,
                         source_video_id=vid,
+                        cfg_ref=cfg_ref,
+                        progress_label=progress,
                     )
                     orders_created += 1
+                    _sync_config_run_progress(
+                        cfg_ref, state="running", videos_found=len(videos),
+                        orders_created=orders_created, errors=errors,
+                        phase=f"{progress}: đã tạo đơn #{orders_created}",
+                    )
                 except Exception as e:
-                    msg = f"{vid}: {e}"
+                    msg = f"{progress}: {e}"
                     print(f"   ❌ {msg}")
                     errors.append(msg)
                     item = {"videoId": vid, "status": "error", "error": str(e), "orderId": ""}
+                    _sync_config_run_progress(
+                        cfg_ref, state="running", videos_found=len(videos),
+                        orders_created=orders_created, errors=errors,
+                        phase=f"{progress}: lỗi — {e}",
+                    )
                 items.append(item)
                 run_ref.update({"items": items, "ordersCreated": orders_created, "errors": errors})
 
+        run_snap = run_ref.get()
+        vf = int((run_snap.to_dict() or {}).get("videosFound") or 0) if run_snap.exists else 0
+        summary = _format_batch_summary(videos_found=vf, orders_created=orders_created, errors=errors)
+        final_status = "failed" if orders_created <= 0 and errors else "completed"
+
         run_ref.update({
-            "status": "completed",
+            "status": final_status,
             "finishedAt": firestore.SERVER_TIMESTAMP,
             "ordersCreated": orders_created,
             "errors": errors,
             "items": items,
         })
+        _sync_config_run_progress(
+            cfg_ref,
+            state=final_status,
+            phase=summary,
+            videos_found=vf,
+            orders_created=orders_created,
+            errors=errors,
+            last_message=summary,
+            last_status=final_status,
+        )
         cfg_ref.update({
             "lastRunAt": firestore.SERVER_TIMESTAMP,
-            "lastRunStatus": "completed",
-            "lastRunMessage": f"{orders_created} đơn, {len(errors)} lỗi",
+            "lastRunStatus": final_status,
+            "lastRunMessage": summary,
         })
-        print(f"✅ Batch xong: {orders_created} đơn pending, {len(errors)} lỗi.")
-        return 0
+        if final_status == "failed":
+            print(f"❌ Batch thất bại: {summary}")
+        else:
+            print(f"✅ Batch xong: {summary}")
+        return 0 if final_status == "completed" else 1
     except Exception as e:
         print(f"❌ Batch thất bại: {e}")
+        err_msg = str(e)
+        all_errors = errors + [err_msg]
+        run_snap = run_ref.get()
+        vf = int((run_snap.to_dict() or {}).get("videosFound") or 0) if run_snap.exists else 0
+        summary = _format_batch_summary(videos_found=vf, orders_created=orders_created, errors=all_errors)
         run_ref.update({
             "status": "failed",
             "finishedAt": firestore.SERVER_TIMESTAMP,
-            "errors": errors + [str(e)],
+            "errors": all_errors,
+            "ordersCreated": orders_created,
+            "items": items,
         })
+        _sync_config_run_progress(
+            cfg_ref,
+            state="failed",
+            phase=summary,
+            videos_found=vf,
+            orders_created=orders_created,
+            errors=all_errors,
+            last_message=summary,
+            last_status="failed",
+        )
         cfg_ref.update({
             "lastRunAt": firestore.SERVER_TIMESTAMP,
             "lastRunStatus": "failed",
-            "lastRunMessage": str(e),
+            "lastRunMessage": summary,
         })
         return 1
 
