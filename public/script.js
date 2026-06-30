@@ -6832,6 +6832,10 @@ function resetBatchChannelForm({ keepDefaults = true } = {}) {
     templateZone?.classList.remove('has-preview');
 
     setBatchModelKey('vae10');
+
+    const yesterdayInput = document.getElementById('batch-yesterday-count');
+    if (yesterdayInput) yesterdayInput.value = '0';
+
     _batchChannelCfg = null;
     renderBatchChannelStatus(null);
 }
@@ -6843,6 +6847,13 @@ function applyBatchChannelConfigToForm(cfg) {
     if (urlInput) urlInput.value = cfg?.channelUrl || '';
 
     setBatchModelKey(cfg?.batchModelKey || 'vae10');
+
+    const yesterdayInput = document.getElementById('batch-yesterday-count');
+    if (yesterdayInput) {
+        yesterdayInput.value = String(
+            cfg?.yesterdayVideoCount != null ? cfg.yesterdayVideoCount : 0
+        );
+    }
 
     const preview = document.getElementById('batch-template-preview');
     const templateZone = document.getElementById('batch-template-zone');
@@ -6871,6 +6882,12 @@ function batchChannelRunNowPending(cfg) {
     const req = cfg.runNowRequestedAt?.toMillis?.() ?? cfg.runNowRequestedAt?.seconds * 1000 ?? 0;
     const handled = cfg.runNowHandledAt?.toMillis?.() ?? cfg.runNowHandledAt?.seconds * 1000 ?? 0;
     return req > handled;
+}
+
+function getBatchYesterdayVideoCount() {
+    const raw = parseInt(document.getElementById('batch-yesterday-count')?.value, 10);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return Math.max(0, Math.min(50, raw));
 }
 
 function getBatchCronHour() {
@@ -6988,7 +7005,7 @@ async function persistBatchChannelConfig({ triggerRun = true } = {}) {
         costCoins: batchModel.cost,
         serviceLabel: batchModel.serviceLabel,
         cronHour: getBatchCronHour(),
-        yesterdayVideoCount: 0,
+        yesterdayVideoCount: getBatchYesterdayVideoCount(),
         wardrobeReplace: 'full',
         frameSec: 2.5,
         selectedOrderIds: [],

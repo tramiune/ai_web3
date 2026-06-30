@@ -849,6 +849,11 @@
                                 <div class="batch-field-label" data-i18n="build_channel.step2_title">Link kênh TikTok</div>
                                 <p class="batch-field-hint" data-i18n="build_channel.step2_hint">Hệ thống lấy video đăng hôm qua trên kênh này.</p>
                                 <input type="url" id="batch-channel-url" class="form-control" placeholder="https://www.tiktok.com/@username" data-i18n="build_channel.channel_placeholder">
+                                <div class="batch-inline-field" style="margin-top: 0.75rem;">
+                                    <label class="batch-field-label" data-i18n="build_channel.yesterday_count_label">Giới hạn số video</label>
+                                    <input type="number" id="batch-yesterday-count" class="form-control" min="0" max="50" value="0" placeholder="0" style="max-width: 120px;">
+                                    <p class="batch-field-hint" data-i18n="build_channel.yesterday_count_hint">0 = tất cả video hôm qua.</p>
+                                </div>
                             </div>
                         </li>
                         <li class="batch-step">
