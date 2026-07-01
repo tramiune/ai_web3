@@ -394,12 +394,12 @@ function formatRoboneoTrialRemaining(userData) {
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    const key = checked ? checked.value : 'vae20';
+    const key = checked ? checked.value : 'vae10';
     if (usesBatchChannelModelPricing() && key !== 'vae10' && key !== 'vae20') {
         return 'vae10';
     }
     if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
-        return 'vae20';
+        return 'vae10';
     }
     return key;
 }
@@ -2669,7 +2669,7 @@ function updateRoboneoTrialUI(userData = window.__currentUserData) {
     if (!eligible) {
         const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
         if (trialRadio?.checked) {
-            const fallback = document.querySelector('input[name="model-type"][value="vae20"]');
+            const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
             if (fallback) fallback.checked = true;
         }
     }
