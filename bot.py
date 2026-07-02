@@ -2135,6 +2135,12 @@ def start_bot():
                 rb_motion.log_pool_on_startup()
             except Exception as e:
                 print(f"⚠️ RoboNeo pool: {e}")
+            try:
+                from roboneo_relay_http import start_relay_http_server
+
+                start_relay_http_server(download_file=download_file)
+            except Exception as e:
+                print(f"⚠️ RoboNeo relay HTTP: {e}")
         else:
             try:
                 _get_http_client()
