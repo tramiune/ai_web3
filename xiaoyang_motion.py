@@ -63,7 +63,7 @@ XIAOYANG_MODAL_STANDARD = "motion_v26"
 XIAOYANG_MODAL_TURBO = "motion_v30"
 XIAOYANG_MAX_CONCURRENT_PER_ACCOUNT = int(get_env("XIAOYANG_MAX_CONCURRENT", "4"))
 VAE_DURATION_KALING_SEC = 10
-KALING_VAE_MODEL_IDS = frozenset({"124", "125", "126", "128", "129", "130"})
+KALING_VAE_MODEL_IDS = frozenset({"124", "125", "126", "128", "129", "130", "131"})
 
 from user_order_notes import (
     USER_NOTE_CLIENT_OUTDATED,
@@ -230,7 +230,7 @@ def _kaling_roboneo_enabled() -> bool:
 
 
 def _kaling_uses_roboneo(order_data: dict) -> bool:
-    """720p gói RoboNeo (124, 130) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói."""
+    """720p gói RoboNeo (124, 131, 130) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói."""
     if not _kaling_roboneo_enabled():
         return False
     from roboneo_trial import KALING_ROBONEO_MODEL_IDS, is_roboneo_trial_order

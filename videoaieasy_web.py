@@ -35,6 +35,7 @@ MODEL_KLING_30 = "kling-3.0"
 QUALITY_MODEL_IDS = frozenset({"127"})
 KALING_TURBO_MODEL_IDS = frozenset({"117"})
 KALING_VAE_10_MODEL_IDS = frozenset({"124"})
+KALING_VAE_15_MODEL_IDS = frozenset({"131"})
 KALING_VAE_20_MODEL_IDS = frozenset({"125"})
 KALING_VAE_1080_10_MODEL_IDS = frozenset({"126"})
 KALING_VAE_1080_20_MODEL_IDS = frozenset({"128"})
@@ -496,6 +497,8 @@ def duration_for_order(order_data: dict | None) -> int:
         return VAE_PACKAGE_30_DURATION_SEC
     if model_id in KALING_VAE_20_MODEL_IDS:
         return VAE_PACKAGE_20_DURATION_SEC
+    if model_id in KALING_VAE_15_MODEL_IDS:
+        return VAE_PACKAGE_15_DURATION_SEC
     if model_id in KALING_VAE_1080_20_MODEL_IDS:
         return VAE_PACKAGE_20_DURATION_SEC
     if model_id in KALING_VAE_1080_10_MODEL_IDS or model_id in KALING_VAE_10_MODEL_IDS:

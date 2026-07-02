@@ -116,6 +116,7 @@ window.reportTopupComplaint = async () => {
 };
 
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
+const KALING_VAE_15 = { cost: 8, maxVideoSec: 15, vaeDurationSec: 15, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
 const BATCH_CHANNEL_MODELS = {
     vae10: {
@@ -621,6 +622,16 @@ const MODELS = {
         maxVideoSec: KALING_VAE_10.maxVideoSec,
         vaeDurationSec: KALING_VAE_10.vaeDurationSec,
         vaeResolution: KALING_VAE_10.vaeResolution,
+    },
+    vae15: {
+        nameKey: "modals.model_vae15",
+        cost: KALING_VAE_15.cost,
+        timeKey: "modals.model_vae15_desc",
+        modelId: "131",
+        renderProvider: "roboneo",
+        maxVideoSec: KALING_VAE_15.maxVideoSec,
+        vaeDurationSec: KALING_VAE_15.vaeDurationSec,
+        vaeResolution: KALING_VAE_15.vaeResolution,
     },
     vae20: {
         nameKey: "modals.model_vae20",

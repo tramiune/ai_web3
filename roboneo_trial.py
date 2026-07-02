@@ -19,7 +19,7 @@ TRIAL_WINDOW = timedelta(hours=24)
 TRIAL_MODEL_ID = "130"
 TRIAL_COST = 3
 TRIAL_MAX_SEC = 12
-KALING_ROBONEO_MODEL_IDS = frozenset({"124", TRIAL_MODEL_ID})
+KALING_ROBONEO_MODEL_IDS = frozenset({"124", "131", TRIAL_MODEL_ID})
 
 
 def _parse_created_at(user_data: dict | None) -> datetime | None:

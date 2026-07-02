@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 import requests
 
@@ -307,6 +309,22 @@ def submit_to_roboneo(order_id: str) -> bool:
                 vid_path = trim_reference_video_for_order(vid_path, data)
             except Exception as trim_err:
                 print(f"⚠️ Server trim thất bại {order_id}: {trim_err}")
+
+            ref_plan = None
+            try:
+                from roboneo_reference import prepare_roboneo_reference
+
+                prep_dir = Path(
+                    tempfile.mkdtemp(prefix=f"rbprep_{order_id}_")
+                )
+                vid_path, ref_plan = prepare_roboneo_reference(
+                    Path(vid_path), prep_dir
+                )
+                vid_path = str(vid_path)
+                if doc_ref is not None and ref_plan is not None:
+                    doc_ref.update({"roboneoRefPlan": ref_plan.to_dict()})
+            except Exception as prep_err:
+                print(f"⚠️ RoboNeo speed/trim {order_id}: {prep_err}")
 
             duration = video_duration_sec(vid_path)
 
@@ -624,6 +642,20 @@ def poll_roboneo_orders(orders_to_check):
                 r.raise_for_status()
                 with open(local_path, "wb") as f:
                     f.write(r.content)
+                try:
+                    from roboneo_reference import plan_from_dict, restore_roboneo_output
+
+                    plan = plan_from_dict(order_data.get("roboneoRefPlan"))
+                    if plan and plan.branch == "speed_up":
+                        restore_dir = Path(
+                            tempfile.mkdtemp(prefix=f"rbrestore_{doc.id}_")
+                        )
+                        restored = restore_roboneo_output(
+                            Path(local_path), plan, restore_dir
+                        )
+                        local_path = str(restored)
+                except Exception as restore_err:
+                    print(f"⚠️ RoboNeo restore speed {doc.id}: {restore_err}")
                 refresh_account_credits(client, email, surface=surface)
                 complete(doc, local_path)
             except Exception as e:
