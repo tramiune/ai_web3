@@ -139,6 +139,8 @@ const BATCH_CHANNEL_MODELS = {
     },
 };
 const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
+/** Tạm ẩn trên UI — backend vẫn xử lý đơn cũ */
+const HIDDEN_MODEL_KEYS = new Set(['vae20', 'vae1080_30']);
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {
     startMs: new Date('2026-06-19T00:00:00+07:00').getTime(),
@@ -402,6 +404,9 @@ function getSelectedModelKey() {
     if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
         return 'vae10';
     }
+    if (HIDDEN_MODEL_KEYS.has(key)) {
+        return 'vae10';
+    }
     return key;
 }
 
@@ -473,7 +478,18 @@ function updateOrderModelSelectionUI() {
     const vae1080Label = document.querySelector('input[name="model-type"][value="vae1080_30"]')?.closest('label');
     if (vae1080Label) vae1080Label.style.display = batchOnly ? 'none' : '';
 
+    HIDDEN_MODEL_KEYS.forEach((modelKey) => {
+        const label = document.querySelector(`input[name="model-type"][value="${modelKey}"]`)?.closest('label');
+        if (label) label.style.display = 'none';
+        const batchLabel = document.querySelector(`input[name="batch-model-type"][value="${modelKey}"]`)?.closest('label');
+        if (batchLabel) batchLabel.style.display = 'none';
+    });
+
     const checked = document.querySelector('input[name="model-type"]:checked');
+    if (checked && HIDDEN_MODEL_KEYS.has(checked.value)) {
+        const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
+        if (fallback) fallback.checked = true;
+    }
     if (batchOnly && checked && checked.value !== 'vae10' && checked.value !== 'vae20') {
         const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
         if (fallback) fallback.checked = true;
@@ -6891,6 +6907,7 @@ let _batchChannelCfg = null;
 function getBatchModelKey() {
     const checked = document.querySelector('input[name="batch-model-type"]:checked');
     const key = checked?.value || 'vae10';
+    if (HIDDEN_MODEL_KEYS.has(key)) return 'vae10';
     return BATCH_CHANNEL_MODELS[key] ? key : 'vae10';
 }
 
