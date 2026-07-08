@@ -119,35 +119,35 @@ const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolut
 const KALING_VAE_15 = { cost: 9, maxVideoSec: 15, vaeDurationSec: 15, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
 const BATCH_CHANNEL_MODELS = {
-    vae10: {
+    ad10: {
         cost: 3.1,
-        modelId: '124',
-        renderProvider: 'roboneo',
+        modelId: '159',
+        renderProvider: 'aidancing',
         maxVideoSec: 10,
+        serviceLabel: 'Nhanh (10s)',
         vaeDurationSec: 10,
         vaeResolution: '720p',
-        serviceLabel: 'Kling 2.6 (10s)',
     },
-    vae20: {
+    ad20: {
         cost: 6.1,
-        modelId: '125',
-        renderProvider: 'videoaieasy',
+        modelId: '160',
+        renderProvider: 'aidancing',
         maxVideoSec: 20,
+        serviceLabel: 'Nhanh (20s)',
         vaeDurationSec: 20,
         vaeResolution: '720p',
-        serviceLabel: 'Kling 2.6 Pro (20s)',
     },
 };
 const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
 /** Tạm ẩn trên UI — backend vẫn xử lý đơn cũ */
-const HIDDEN_MODEL_KEYS = new Set(['vae20', 'vae1080_30']);
+const HIDDEN_MODEL_KEYS = new Set(['vae20', 'vae1080_30', 'vae10', 'vae15']);
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {
     startMs: new Date('2026-06-19T00:00:00+07:00').getTime(),
     windowMs: 24 * 60 * 60 * 1000,
     modelKey: 'rbTrial',
     cost: 3,
-    maxVideoSec: 12,
+    maxVideoSec: 10,
 };
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
@@ -397,15 +397,15 @@ function formatRoboneoTrialRemaining(userData) {
 
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    const key = checked ? checked.value : 'vae10';
-    if (usesBatchChannelModelPricing() && key !== 'vae10' && key !== 'vae20') {
-        return 'vae10';
+    let key = checked ? checked.value : 'ad20';
+    if (usesBatchChannelModelPricing() && key !== 'ad10' && key !== 'ad20') {
+        return 'ad10';
     }
     if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
-        return 'vae10';
+        return 'ad10';
     }
     if (HIDDEN_MODEL_KEYS.has(key)) {
-        return 'vae10';
+        return 'ad10';
     }
     return key;
 }
@@ -456,8 +456,8 @@ function syncModelPriceLabels() {
 function syncOrderModelCardCopy() {
     const batch = usesBatchChannelModelPricing();
     const cards = [
-        { key: 'vae10', titleKey: 'build_channel.model_10s', descKey: 'build_channel.model_10s_desc', defaultTitle: 'modals.model_vae10', defaultDesc: 'modals.model_vae10_desc' },
-        { key: 'vae20', titleKey: 'build_channel.model_20s', descKey: 'build_channel.model_20s_desc', defaultTitle: 'modals.model_vae20', defaultDesc: 'modals.model_vae20_desc' },
+        { key: 'ad10', titleKey: 'build_channel.model_10s', descKey: 'build_channel.model_10s_desc', defaultTitle: 'modals.model_ad10', defaultDesc: 'modals.model_ad10_desc' },
+        { key: 'ad20', titleKey: 'build_channel.model_20s', descKey: 'build_channel.model_20s_desc', defaultTitle: 'modals.model_ad20', defaultDesc: 'modals.model_ad20_desc' },
     ];
     cards.forEach(({ key, titleKey, descKey, defaultTitle, defaultDesc }) => {
         const label = document.querySelector(`input[name="model-type"][value="${key}"]`)?.closest('label');
@@ -487,11 +487,11 @@ function updateOrderModelSelectionUI() {
 
     const checked = document.querySelector('input[name="model-type"]:checked');
     if (checked && HIDDEN_MODEL_KEYS.has(checked.value)) {
-        const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
+        const fallback = document.querySelector('input[name="model-type"][value="ad20"]');
         if (fallback) fallback.checked = true;
     }
-    if (batchOnly && checked && checked.value !== 'vae10' && checked.value !== 'vae20') {
-        const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
+    if (batchOnly && checked && checked.value !== 'ad10' && checked.value !== 'ad20') {
+        const fallback = document.querySelector('input[name="model-type"][value="ad20"]');
         if (fallback) fallback.checked = true;
     }
 
@@ -511,7 +511,8 @@ const COIN_PACKAGES = [
     { id: 'starter_v2', name: 'Starter',    coins: 10,  price: '10.000đ',  usdPrice: '$0.49', amount: 10000,  hasBonus: false, oneTime: true },
     { id: 'creator',    name: 'Creator',    coins: 100, price: '100.000đ', usdPrice: '$5.99', amount: 100000, featured: false, hasBonus: false },
     { id: 'studio',     name: 'Studio',     coins: 525,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
-    { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true }
+    { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true },
+    { id: 'hocvien_package', name: 'Gói Học Viên', coins: 10, price: '699.000đ', usdPrice: '$29.99', amount: 699000, featured: true, hasBonus: false }
 ];
 
 function topupMatchesPackage(topup, pkg) {
@@ -623,8 +624,8 @@ const MODELS = {
         nameKey: "modals.model_rbTrial",
         cost: ROBONEO_TRIAL.cost,
         timeKey: "modals.model_rbTrial_desc",
-        modelId: "130",
-        renderProvider: "roboneo",
+        modelId: "159",
+        renderProvider: "aidancing",
         maxVideoSec: ROBONEO_TRIAL.maxVideoSec,
         vaeResolution: "720p",
         roboneoTrial: true,
@@ -638,6 +639,26 @@ const MODELS = {
         maxVideoSec: KALING_VAE_10.maxVideoSec,
         vaeDurationSec: KALING_VAE_10.vaeDurationSec,
         vaeResolution: KALING_VAE_10.vaeResolution,
+    },
+    ad10: {
+        nameKey: "modals.model_ad10",
+        cost: 6,
+        timeKey: "modals.model_ad10_desc",
+        modelId: "159",
+        renderProvider: "aidancing",
+        maxVideoSec: 10,
+        vaeDurationSec: 10,
+        vaeResolution: "720p",
+    },
+    ad20: {
+        nameKey: "modals.model_ad20",
+        cost: 12,
+        timeKey: "modals.model_ad20_desc",
+        modelId: "160",
+        renderProvider: "aidancing",
+        maxVideoSec: 20,
+        vaeDurationSec: 20,
+        vaeResolution: "720p",
     },
     vae15: {
         nameKey: "modals.model_vae15",
@@ -678,10 +699,10 @@ function localizedModel(key) {
     return {
         ...m,
         name: batch
-            ? t(modelKey === 'vae10' ? 'build_channel.model_10s' : 'build_channel.model_20s')
+            ? t(modelKey === 'ad10' ? 'build_channel.model_10s' : 'build_channel.model_20s')
             : t(m.nameKey),
         time: batch
-            ? t(modelKey === 'vae10' ? 'build_channel.model_10s_desc' : 'build_channel.model_20s_desc')
+            ? t(modelKey === 'ad10' ? 'build_channel.model_10s_desc' : 'build_channel.model_20s_desc')
             : t(m.timeKey),
         cost: m.cost,
         renderProvider: m.renderProvider,
@@ -2200,6 +2221,51 @@ function renderPricing() {
     const buildCoinCard = (pkg, { showFeatures = false } = {}) => {
         const noteText = t(`pricing.notes.${pkg.id}`);
         const showNote = noteText && !noteText.startsWith('pricing.notes.');
+
+        // Custom render for Gói Học Viên (Student Course Package)
+        if (pkg.id === 'hocvien_package') {
+            const courseTitle = t('pricing.packages.hocvien_package') || 'Gói Học Viên';
+            const featuresList = `
+                <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span><strong>Giảm giá 50%</strong> còn 699k</span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Học <strong>1 kèm 1</strong> thực chiến</span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video giá học viên siêu rẻ <strong>3k/video</strong></span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm video tự động</strong> (Trị giá 299k)</span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng ngay <strong>10 coin</strong> để trải nghiệm làm video</span></li>
+                </ul>
+            `;
+            return `
+            <div class="price-card price-card--coin featured price-card--coin-featured" style="
+                background: linear-gradient(135deg, rgba(28, 22, 16, 0.9) 0%, rgba(18, 14, 10, 0.96) 100%) !important;
+                border: 2px solid #eab308 !important;
+                box-shadow: 0 0 25px rgba(234, 179, 8, 0.25) !important;
+                position: relative;
+                transform: scale(1.02);
+            ">
+                <div class="featured-badge" style="background: #eab308; color: #000; font-weight: 800;">🔥 ${courseTitle.toUpperCase()}</div>
+                <div class="price-card-note" style="color: #fbbf24; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">${showNote ? noteText : 'ƯU ĐÃI KHÓA HỌC'}</div>
+                
+                <div style="margin: 15px 0 10px 0; text-align: center;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); text-decoration: line-through; display: block; margin-bottom: 2px;">Gốc 1.500.000đ</span>
+                    <span style="font-size: 1.8rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #fef08a 0%, #eab308 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">699.000đ</span>
+                </div>
+
+                ${featuresList}
+
+                <div class="pricing-pay-actions" style="display: flex; gap: 8px; width: 100%; margin-top: 10px;">
+                    <button type="button" class="pricing-pay-btn pricing-pay-btn--vietqr" onclick="window.selectTopup('${pkg.id}', 'vietqr')" style="flex: 1.3; padding: 10px 8px; font-size: 0.78rem; border-radius: 8px; height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        ${vietqrPayIcon}
+                        <span class="pricing-pay-label" style="font-size: 0.75rem; white-space: nowrap;">${t('pricing.pay_vietqr')}</span>
+                    </button>
+                    <a href="https://zalo.me/0965951536" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="flex: 0.7; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; font-size: 0.78rem; text-decoration: none; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: 600; height: 38px; box-sizing: border-box; line-height: 1; margin: 0;">
+                        <img src="/assets/zalo-icon.png" style="width: 14px; height: 14px; object-fit: contain;" />
+                        <span>Tư vấn</span>
+                    </a>
+                </div>
+            </div>
+            `;
+        }
+
         const featuresHtml = showFeatures ? `
             <ul class="pkg-features">
                 <li><span class="check-icon">✓</span> ${t('pricing.instant_credit')}</li>
@@ -2647,8 +2713,8 @@ window.openOrderModal = () => {
     updateRoboneoTrialUI(window.__currentUserData);
     updateOrderModelSelectionUI();
     if (usesBatchChannelModelPricing()) {
-        const vae10 = document.querySelector('input[name="model-type"][value="vae10"]');
-        if (vae10) vae10.checked = true;
+        const defaultModel = document.querySelector('input[name="model-type"][value="ad20"]');
+        if (defaultModel) defaultModel.checked = true;
     } else if (isRoboneoTrialEligible(window.__currentUserData)) {
         const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
         if (trialRadio) trialRadio.checked = true;
@@ -2696,7 +2762,7 @@ function updateRoboneoTrialUI(userData = window.__currentUserData) {
     if (!eligible) {
         const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
         if (trialRadio?.checked) {
-            const fallback = document.querySelector('input[name="model-type"][value="vae10"]');
+            const fallback = document.querySelector('input[name="model-type"][value="ad20"]');
             if (fallback) fallback.checked = true;
         }
     }
@@ -3725,7 +3791,7 @@ async function setupEventListeners() {
                 let videoFile = document.getElementById('file-video')?.files?.[0];
                 const templateUrl = document.getElementById('selected-template-url')?.value || '';
                 const tiktokUrl = document.getElementById('tiktok-video-url')?.value?.trim() || '';
-                const modelKeySelected = getSelectedModelKey();
+                let modelKeySelected = getSelectedModelKey();
                 let modelIdOverride = null;
 
                 if (!charFile) {
@@ -3777,7 +3843,7 @@ async function setupEventListeners() {
                 }
 
                 let kalingDurationSec = kalingSelectedDurationSec;
-                const maxSec = getMaxVideoSecForModel(modelKeySelected);
+                let maxSec = getMaxVideoSecForModel(modelKeySelected);
                 const useLibrary = window.currentVideoSource === 'library' && !!templateUrl;
                 if (videoFile) {
                     kalingDurationSec = await getVideoDurationSeconds(videoFile);
@@ -3786,6 +3852,13 @@ async function setupEventListeners() {
                 }
                 if (kalingDurationSec == null || !Number.isFinite(kalingDurationSec)) {
                     return showToast(t('modals.video_upload_required'));
+                }
+
+                // Tự động chuyển model 20s xuống 10s nếu video tải lên ngắn hơn hoặc bằng 10s
+                if (modelKeySelected === 'ad20' && kalingDurationSec <= 10.15) {
+                    modelKeySelected = 'ad10';
+                    maxSec = getMaxVideoSecForModel(modelKeySelected);
+                    console.log('🔄 Auto downgraded ad20 -> ad10 due to video <= 10s');
                 }
 
                 const longVideo = kalingDurationSec > maxSec + 0.15;
@@ -3909,6 +3982,7 @@ async function setupEventListeners() {
                         packageName: model.name,
                         modelId: model.modelId,
                         renderProvider: model.renderProvider || "videoaieasy",
+                        maxVideoSec: model.maxVideoSec || 15,
                         ...(model.vaeDurationSec ? { vaeDurationSec: model.vaeDurationSec } : {}),
                         ...(model.vaeResolution ? { vaeResolution: model.vaeResolution } : {}),
                         serviceType: serviceType,
@@ -4468,7 +4542,7 @@ function scheduleRenderAdminBots() {
     }, 400);
 }
 
-const RENDER_PROVIDER_BOT_ID = 'kaling_vps_bot';
+const RENDER_PROVIDER_BOT_ID = 'mac_kaling_bot';
 
 let adminActiveRenderProvider = 'xiaoyang';
 
@@ -6906,17 +6980,17 @@ let _batchChannelCfg = null;
 
 function getBatchModelKey() {
     const checked = document.querySelector('input[name="batch-model-type"]:checked');
-    const key = checked?.value || 'vae10';
-    if (HIDDEN_MODEL_KEYS.has(key)) return 'vae10';
-    return BATCH_CHANNEL_MODELS[key] ? key : 'vae10';
+    const key = checked?.value || 'ad20';
+    if (HIDDEN_MODEL_KEYS.has(key)) return 'ad20';
+    return BATCH_CHANNEL_MODELS[key] ? key : 'ad10';
 }
 
 function getBatchModel() {
-    return BATCH_CHANNEL_MODELS[getBatchModelKey()] || BATCH_CHANNEL_MODELS.vae10;
+    return BATCH_CHANNEL_MODELS[getBatchModelKey()] || BATCH_CHANNEL_MODELS.ad10;
 }
 
 function setBatchModelKey(modelKey) {
-    const key = BATCH_CHANNEL_MODELS[modelKey] ? modelKey : 'vae10';
+    const key = BATCH_CHANNEL_MODELS[modelKey] ? modelKey : 'ad10';
     const input = document.querySelector(`input[name="batch-model-type"][value="${key}"]`);
     if (input) input.checked = true;
 }
@@ -6937,7 +7011,7 @@ function resetBatchChannelForm({ keepDefaults = true } = {}) {
     if (preview) preview.innerHTML = '';
     templateZone?.classList.remove('has-preview');
 
-    setBatchModelKey('vae10');
+    setBatchModelKey('ad10');
 
     const yesterdayInput = document.getElementById('batch-yesterday-count');
     if (yesterdayInput) yesterdayInput.value = '0';
@@ -6952,7 +7026,7 @@ function applyBatchChannelConfigToForm(cfg) {
     const urlInput = document.getElementById('batch-channel-url');
     if (urlInput) urlInput.value = cfg?.channelUrl || '';
 
-    setBatchModelKey(cfg?.batchModelKey || 'vae10');
+    setBatchModelKey(cfg?.batchModelKey || 'ad10');
 
     const yesterdayInput = document.getElementById('batch-yesterday-count');
     if (yesterdayInput) {

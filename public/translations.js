@@ -267,13 +267,15 @@ window.TRANSLATIONS = {
                 starter_v2: "Gói giới hạn",
                 creator: "Gói phổ biến",
                 studio: "Tặng 25 Coin · Tổng 525 Coin",
-                "pro-studio": "Cộng 100 Coin · Tổng 1100 Coin"
+                "pro-studio": "Cộng 100 Coin · Tổng 1100 Coin",
+                hocvien_package: "Ưu đãi khóa học lớn nhất"
             },
             packages: {
                 starter_v2: "Starter",
                 creator: "Creator",
                 studio: "Studio",
-                "pro-studio": "Enterprise"
+                "pro-studio": "Enterprise",
+                hocvien_package: "Gói Học Viên"
             },
             service_packages: {
                 plus: "Plus",
@@ -379,10 +381,14 @@ window.TRANSLATIONS = {
             kaling_package_name: "Motion AI",
             model_vae10: "Kling 2.6",
             model_vae10_desc: "720p · tối đa 10s",
+            model_ad10: "Nhanh 10s",
+            model_ad10_desc: "720p · tối đa 10s",
+            model_ad20: "Nhanh 20s",
+            model_ad20_desc: "720p · tối đa 20s",
             model_vae15: "Kling 2.6 Plus",
             model_vae15_desc: "720p · tối đa 15s",
             model_rbTrial: "Ưu đãi nick mới",
-            model_rbTrial_desc: "1080p · 12s · 24h",
+            model_rbTrial_desc: "720p · 10s · 24h",
             roboneo_trial_remaining: "Còn {h}h {m}p",
             roboneo_trial_expired: "Ưu đãi 24h đã hết. Chọn gói khác.",
             trial_submit_cta: "Tạo video · ưu đãi 24h",
@@ -471,7 +477,7 @@ window.TRANSLATIONS = {
             auth_title: "Đăng nhập để tạo video trending",
             auth_desc_default: "Vào nhanh một xíu thôi nha — đăng nhập để <strong>lưu Coin</strong> và <strong>video của bạn</strong>.",
             auth_promo_rate: "Nick mới · 3 coin",
-            auth_promo_motion: "1080p · 12s",
+            auth_promo_motion: "720p · 10s",
             auth_promo_max: "24h đầu",
             auth_desc_register: "Đăng ký để bắt đầu tạo video AI — dùng <b>Email/Mật khẩu</b> nếu trình duyệt chặn Google.",
             auth_google_btn: "Đăng nhập với Google",
@@ -1083,13 +1089,15 @@ window.TRANSLATIONS = {
                 starter_v2: "Limited package",
                 creator: "Popular package",
                 studio: "Bonus 25 Coins · 525 total",
-                "pro-studio": "Extra 100 Coins · 1100 total"
+                "pro-studio": "Extra 100 Coins · 1100 total",
+                hocvien_package: "Best Course Promo"
             },
             packages: {
                 starter_v2: "Starter",
                 creator: "Creator",
                 studio: "Studio",
-                "pro-studio": "Enterprise"
+                "pro-studio": "Enterprise",
+                hocvien_package: "Student Course"
             },
             service_packages: {
                 plus: "Plus",
@@ -1195,10 +1203,14 @@ window.TRANSLATIONS = {
             kaling_package_name: "Motion AI",
             model_vae10: "Kling 2.6",
             model_vae10_desc: "720p · max 10s",
+            model_ad10: "Fast 10s",
+            model_ad10_desc: "720p · max 10s",
+            model_ad20: "Fast 20s",
+            model_ad20_desc: "720p · max 20s",
             model_vae15: "Kling 2.6 Plus",
             model_vae15_desc: "720p · max 15s",
             model_rbTrial: "New user offer",
-            model_rbTrial_desc: "1080p · 12s · 24h",
+            model_rbTrial_desc: "720p · 10s · 24h",
             roboneo_trial_remaining: "{h}h {m}m left",
             roboneo_trial_expired: "24h offer expired. Choose another model.",
             trial_submit_cta: "Create video · 24h offer",
@@ -1287,7 +1299,7 @@ window.TRANSLATIONS = {
             auth_title: "Sign in to create trending videos",
             auth_desc_default: "Quick sign-in to <strong>save your Coins</strong> and <strong>your videos</strong>.",
             auth_promo_rate: "New users · 3 coins",
-            auth_promo_motion: "1080p · 12s",
+            auth_promo_motion: "720p · 10s",
             auth_promo_max: "First 24h",
             auth_desc_register: "Register to start creating AI videos — use <b>Email/Password</b> if Google sign-in is blocked.",
             auth_google_btn: "Sign in with Google",
