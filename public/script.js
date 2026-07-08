@@ -531,8 +531,15 @@ function hasCompletedOneTimeTopup(pkg) {
 }
 
 function getVisibleCoinPackages() {
-    if (!currentUser) return COIN_PACKAGES;
-    return COIN_PACKAGES.filter((pkg) => !hasCompletedOneTimeTopup(pkg));
+    let list = COIN_PACKAGES.filter(p => p.id !== 'hocvien_package');
+    if (currentUser) {
+        list = list.filter((pkg) => !hasCompletedOneTimeTopup(pkg));
+    }
+    const hocvien = COIN_PACKAGES.find(p => p.id === 'hocvien_package');
+    if (hocvien) {
+        list.splice(1, 0, hocvien);
+    }
+    return list;
 }
 
 const AI_MODELS = [
@@ -2227,9 +2234,9 @@ function renderPricing() {
             const courseTitle = t('pricing.packages.hocvien_package') || 'Gói Học Viên';
             const featuresList = `
                 <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video giá học viên siêu rẻ <strong>3k/video</strong></span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span><strong>Giảm giá 50%</strong> còn 699k</span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Học <strong>1 kèm 1</strong> thực chiến</span></li>
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video giá học viên siêu rẻ <strong>3k/video</strong></span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm video tự động</strong> (Trị giá 299k)</span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng ngay <strong>10 coin</strong> để trải nghiệm làm video</span></li>
                 </ul>
