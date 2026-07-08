@@ -512,7 +512,7 @@ const COIN_PACKAGES = [
     { id: 'creator',    name: 'Creator',    coins: 100, price: '100.000đ', usdPrice: '$5.99', amount: 100000, featured: false, hasBonus: false },
     { id: 'studio',     name: 'Studio',     coins: 525,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true },
-    { id: 'hocvien_package', name: 'Gói Học Viên', coins: 10, price: '699.000đ', usdPrice: '$29.99', amount: 699000, featured: true, hasBonus: false }
+    { id: 'hocvien_package', name: 'Gói Học Viên', coins: 0, price: '699.000đ', usdPrice: '$29.99', amount: 699000, featured: true, hasBonus: false }
 ];
 
 function topupMatchesPackage(topup, pkg) {
@@ -2235,10 +2235,7 @@ function renderPricing() {
             const featuresList = `
                 <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video giá học viên siêu rẻ <strong>3k/video</strong></span></li>
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span><strong>Giảm giá 50%</strong> còn 699k</span></li>
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Học <strong>1 kèm 1</strong> thực chiến</span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm video tự động</strong> (Trị giá 299k)</span></li>
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng ngay <strong>10 coin</strong> để trải nghiệm làm video</span></li>
                 </ul>
             `;
             return `
