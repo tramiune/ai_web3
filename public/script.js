@@ -512,7 +512,7 @@ const COIN_PACKAGES = [
     { id: 'creator',    name: 'Creator',    coins: 100, price: '100.000đ', usdPrice: '$5.99', amount: 100000, featured: false, hasBonus: false },
     { id: 'studio',     name: 'Studio',     coins: 525,  price: '500.000đ',  usdPrice: '$24.99', amount: 500000,  featured: true, hasBonus: true },
     { id: 'pro-studio', name: 'Enterprise', coins: 1100, price: '1.000.000đ', usdPrice: '$49.99', amount: 1000000, hasBonus: true },
-    { id: 'hocvien_package', name: 'Gói Học Viên', coins: 10000, price: '5.000.000đ', usdPrice: '$199.99', amount: 5000000, featured: true, hasBonus: false }
+    { id: 'hocvien_package', name: 'Gói Học Viên', coins: 6500, price: '5.000.000đ', usdPrice: '$199.99', amount: 5000000, featured: true, hasBonus: false }
 ];
 
 function topupMatchesPackage(topup, pkg) {
@@ -2251,9 +2251,9 @@ function renderPricing() {
                 <div class="price-card-note" style="color: #fbbf24; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">${showNote ? noteText : 'ƯU ĐÃI KHÓA HỌC'}</div>
                 
                 <div style="margin: 15px 0 10px 0; text-align: center;">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); text-decoration: line-through; display: block; margin-bottom: 2px;">Gốc 10.000.000đ (Giảm 50%)</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); text-decoration: line-through; display: block; margin-bottom: 2px;">Gốc 7.150.000đ (Giảm 30%)</span>
                     <span style="font-size: 1.8rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #fef08a 0%, #eab308 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">5.000.000đ</span>
-                    <div style="font-size: 0.92rem; font-weight: 800; color: #fbbf24; margin-top: 5px; text-shadow: 0 0 8px rgba(251,191,36,0.3);">+ 10.000 COIN</div>
+                    <div style="font-size: 0.92rem; font-weight: 800; color: #fbbf24; margin-top: 5px; text-shadow: 0 0 8px rgba(251,191,36,0.3);">+ 6.500 COIN</div>
                 </div>
 
                 ${featuresList}
