@@ -2234,8 +2234,6 @@ function renderPricing() {
             const courseTitle = t('pricing.packages.hocvien_package') || 'Gói Học Viên';
             const featuresList = `
                 <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Giá học viên: <strong>3k/video</strong></span></li>
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Học <strong>1 kèm 1</strong> thực chiến</span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm video</strong> (299k)</span></li>
                 </ul>
             `;
@@ -2258,15 +2256,11 @@ function renderPricing() {
 
                 ${featuresList}
 
-                <div class="pricing-pay-actions" style="display: flex; gap: 8px; width: 100%; margin-top: 10px;">
-                    <button type="button" class="pricing-pay-btn pricing-pay-btn--vietqr" onclick="window.selectTopup('${pkg.id}', 'vietqr')" style="flex: 1.3; padding: 10px 8px; font-size: 0.78rem; border-radius: 8px; height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <div class="pricing-pay-actions pricing-pay-actions--single" style="width: 100%; margin-top: 10px;">
+                    <button type="button" class="pricing-pay-btn pricing-pay-btn--vietqr pricing-pay-btn--full" onclick="window.selectTopup('${pkg.id}', 'vietqr')" style="width: 100%; padding: 10px 8px; font-size: 0.78rem; border-radius: 8px; height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
                         ${vietqrPayIcon}
-                        <span class="pricing-pay-label" style="font-size: 0.75rem; white-space: nowrap;">${t('pricing.pay_vietqr')}</span>
+                        <span class="pricing-pay-label pricing-pay-label--single" style="font-size: 0.75rem; white-space: nowrap;">${t('pricing.pay_vietqr')}</span>
                     </button>
-                    <a href="https://zalo.me/0965951536" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="flex: 0.7; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; font-size: 0.78rem; text-decoration: none; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: 600; height: 38px; box-sizing: border-box; line-height: 1; margin: 0;">
-                        <img src="/assets/zalo-icon.png" style="width: 14px; height: 14px; object-fit: contain;" />
-                        <span>Tư vấn</span>
-                    </a>
                 </div>
             </div>
             `;
