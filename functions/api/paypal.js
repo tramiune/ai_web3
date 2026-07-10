@@ -47,7 +47,8 @@ const PACKAGES = {
     'starter_v2':  { coins: 10,   priceUsd: 0.49,  name: 'Starter (International)' },
     'creator':     { coins: 100,  priceUsd: 5.99,  name: 'Creator (International)' },
     'studio':      { coins: 525,  priceUsd: 24.99, name: 'Studio (International)' },
-    'pro-studio':  { coins: 1100, priceUsd: 49.99, name: 'Enterprise (International)' }
+    'pro-studio':  { coins: 1100, priceUsd: 49.99, name: 'Enterprise (International)' },
+    'hocvien_package': { coins: 10000, priceUsd: 99.99, name: 'Student Course (International)' }
 };
 
 // Shared with Casso webhook. Real key MUST come from FIREBASE_SERVICE_ACCOUNT env var.
