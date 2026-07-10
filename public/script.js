@@ -2246,7 +2246,7 @@ function renderPricing() {
                 transform: scale(1.02);
             ">
                 <div class="featured-badge" style="background: #eab308; color: #000; font-weight: 800;">🔥 ${courseTitle.toUpperCase()}</div>
-                <div class="price-card-note" style="color: #fbbf24; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">${showNote ? noteText : 'ƯU ĐÃI KHÓA HỌC'}</div>
+                <div class="price-card-note" style="color: #fbbf24; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">${showNote ? noteText : 'ƯU ĐÃI LỚN NHẤT NĂM'}</div>
                 
                 <div style="margin: 15px 0 10px 0; text-align: center;">
                     <span style="font-size: 0.85rem; color: var(--text-muted); text-decoration: line-through; display: block; margin-bottom: 2px;">Gốc 7.150.000đ (Giảm 30%)</span>
