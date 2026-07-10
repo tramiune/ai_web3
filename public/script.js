@@ -2234,7 +2234,7 @@ function renderPricing() {
             const courseTitle = t('pricing.packages.hocvien_package') || 'Gói Học Viên';
             const featuresList = `
                 <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm video</strong> (299k)</span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool làm ảnh chuyên nghiệp</strong> (799k)</span></li>
                 </ul>
             `;
             return `
