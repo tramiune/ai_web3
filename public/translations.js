@@ -268,7 +268,7 @@ window.TRANSLATIONS = {
                 creator: "Gói phổ biến",
                 studio: "Tặng 25 Coin · Tổng 525 Coin",
                 "pro-studio": "Cộng 100 Coin · Tổng 1100 Coin",
-                hocvien_package: "Ưu đãi lớn nhất năm"
+                hocvien_package: "Ưu đãi khóa học lớn nhất"
             },
             packages: {
                 starter_v2: "Starter",
@@ -1090,7 +1090,7 @@ window.TRANSLATIONS = {
                 creator: "Popular package",
                 studio: "Bonus 25 Coins · 525 total",
                 "pro-studio": "Extra 100 Coins · 1100 total",
-                hocvien_package: "Biggest Deal of the Year"
+                hocvien_package: "Best Course Promo"
             },
             packages: {
                 starter_v2: "Starter",
