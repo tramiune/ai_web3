@@ -1659,6 +1659,8 @@ async function handleUserLoggedIn(user) {
     document.getElementById('user-profile-menu').style.display = 'block';
     const navbarCoin = document.getElementById('navbar-coin-widget');
     if (navbarCoin) navbarCoin.style.display = 'flex';
+    const navbarApi = document.getElementById('navbar-api-btn');
+    if (navbarApi) navbarApi.style.display = 'flex';
     document.getElementById('dropdown-user-name').innerText = user.displayName || user.email.split('@')[0];
     document.getElementById('dropdown-user-email').innerText = user.email;
 
@@ -1969,6 +1971,8 @@ function handleUserLoggedOut() {
     document.getElementById('user-profile-menu').style.display = 'none';
     const navbarCoin = document.getElementById('navbar-coin-widget');
     if (navbarCoin) navbarCoin.style.display = 'none';
+    const navbarApi = document.getElementById('navbar-api-btn');
+    if (navbarApi) navbarApi.style.display = 'none';
 
     // Toggle Dashboard sub-elements
     const dashIn = document.getElementById('dashboard-logged-in');
@@ -7399,4 +7403,101 @@ window.openBatchChannelModal = () => {
     loadBatchChannelPage();
     window.openModal('batch-channel-modal');
 };
+
+/* API Portal Logic */
+window.openApiModal = () => {
+    if (!currentUser) {
+        showToast(t('common.toast_login_required'));
+        return;
+    }
+    const modal = document.getElementById('api-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        updateApiModalUI();
+    }
+};
+
+window.closeApiModal = () => {
+    const modal = document.getElementById('api-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+function updateApiModalUI() {
+    const data = window.__currentUserData || {};
+    const apiKey = data.apiKey || '';
+    const keyInput = document.getElementById('api-key-input');
+    const copyBtn = document.getElementById('btn-copy-api-key');
+    const actionBtn = document.getElementById('btn-api-action');
+
+    if (apiKey) {
+        if (keyInput) keyInput.value = apiKey;
+        if (copyBtn) copyBtn.style.display = 'block';
+        if (actionBtn) actionBtn.innerText = 'Đổi Key Mới';
+    } else {
+        if (keyInput) keyInput.value = 'Chưa tạo key API';
+        if (copyBtn) copyBtn.style.display = 'none';
+        if (actionBtn) actionBtn.innerText = 'Tạo Key API';
+    }
+}
+
+window.generateApiKey = async () => {
+    if (!currentUser) return;
+    const isRegenerate = !!(window.__currentUserData && window.__currentUserData.apiKey);
+    if (isRegenerate) {
+        if (!confirm('Bạn có chắc chắn muốn đổi API Key mới? Key cũ sẽ bị vô hiệu hóa ngay lập tức.')) {
+            return;
+        }
+    }
+
+    const actionBtn = document.getElementById('btn-api-action');
+    const oldText = actionBtn ? actionBtn.innerText : '';
+    if (actionBtn) {
+        actionBtn.innerText = 'Đang tạo...';
+        actionBtn.disabled = true;
+    }
+
+    try {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let rand = '';
+        for (let i = 0; i < 24; i++) {
+            rand += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const newKey = 'kl_live_' + rand;
+
+        const { db, doc, updateDoc } = window.firebase;
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+            apiKey: newKey,
+            updatedAt: window.firebase.serverTimestamp()
+        });
+
+        showToast('Tạo API Key thành công!');
+        updateApiModalUI();
+    } catch (e) {
+        console.error('[API Portal] generate error:', e);
+        showToast('Có lỗi xảy ra, vui lòng thử lại.');
+        if (actionBtn) actionBtn.innerText = oldText;
+    } finally {
+        if (actionBtn) actionBtn.disabled = false;
+    }
+};
+
+window.copyApiKey = () => {
+    const keyInput = document.getElementById('api-key-input');
+    if (!keyInput || keyInput.value === 'Chưa tạo key API') return;
+    
+    keyInput.select();
+    keyInput.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(keyInput.value)
+        .then(() => {
+            showToast('Đã sao chép API Key!');
+        })
+        .catch((err) => {
+            console.error('[API Portal] copy error:', err);
+            showToast('Lỗi khi sao chép key.');
+        });
+};
+
 

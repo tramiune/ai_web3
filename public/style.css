@@ -5779,3 +5779,32 @@ body.video-trim-active {
   }
 }
 
+/* API Portal styles */
+.navbar-api-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.navbar-api-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.nav-icon-api {
+  width: 16px;
+  height: 16px;
+}
+
+
