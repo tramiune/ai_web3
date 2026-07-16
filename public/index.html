@@ -111,10 +111,6 @@
             <div id="auth-section">
                 <!-- Nút API trên Top Bar -->
                 <button type="button" id="navbar-api-btn" class="navbar-api-btn" style="display: none; align-items: center; justify-content: center; margin-right: 0.5rem;" onclick="window.openApiModal()">
-                    <svg class="nav-icon-api" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="16 18 22 12 16 6"></polyline>
-                        <polyline points="8 6 2 12 8 18"></polyline>
-                    </svg>
                     <span>API</span>
                     <span class="api-badge" style="background: #ef4444; color: #fff; font-size: 0.55rem; padding: 1px 3.5px; border-radius: 4px; font-weight: 800; line-height: 1; text-transform: uppercase; margin-left: 2px;">NEW</span>
                 </button>
@@ -1598,7 +1594,7 @@ decoding="async">
                         <p style="margin-bottom: 8px;"><strong>1. Cổng kết nối (Endpoint):</strong></p>
                         <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">POST http://136.119.193.255:8080/v1/videos</pre>
                         
-                        <p style="margin-bottom: 8px;"><strong>2. Mẫu gửi yêu cầu (POST Request):</strong></p>
+                        <p style="margin-bottom: 8px;"><strong>2. Mẫu gửi yêu cầu tạo video (POST Request):</strong></p>
                         <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 12px;">curl -X POST http://136.119.193.255:8080/v1/videos \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;" \
   -H "Content-Type: application/json" \
@@ -1607,8 +1603,12 @@ decoding="async">
     "character_image_url": "https://example.com/character.png",
     "reference_video_url": "https://example.com/motion.mp4"
   }'</pre>
+
+                        <p style="margin-bottom: 8px;"><strong>3. Lấy trạng thái / kết quả video (GET Request):</strong></p>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 12px;">curl -X GET http://136.119.193.255:8080/v1/videos/&lt;order_id&gt; \
+  -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;"</pre>
                         
-                        <p style="margin-bottom: 8px;"><strong>3. Bảng giá gọi API (trừ trực tiếp từ Coin của bạn):</strong></p>
+                        <p style="margin-bottom: 8px;"><strong>4. Bảng giá gọi API (trừ trực tiếp từ Coin của bạn):</strong></p>
                         <ul style="padding-left: 18px; margin-bottom: 0; display: flex; flex-direction: column; gap: 4px;">
                             <li>Gói 10 giây (model 159): <strong>6 Coin / video</strong></li>
                             <li>Gói 20 giây (model 160): <strong>12 Coin / video</strong></li>
