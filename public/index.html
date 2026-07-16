@@ -1606,10 +1606,24 @@ decoding="async">
     "character_image_url": "https://example.com/character.png",
     "reference_video_url": "https://example.com/motion.mp4"
   }'</pre>
+                        <p style="margin-bottom: 4px; font-size: 0.75rem; color: var(--text-muted);">Phản hồi mẫu (Response JSON):</p>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.05); color: #4ade80; margin-bottom: 12px;">{
+  "success": true,
+  "order_id": "kl_ord_abcdef123456",
+  "status": "pending",
+  "cost_credits": 6.0
+}</pre>
 
                         <p style="margin-bottom: 8px;"><strong>3. Lấy trạng thái / kết quả video (GET Request):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 12px;">curl -X GET http://136.119.193.255:8080/v1/videos/&lt;order_id&gt; \
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X GET http://136.119.193.255:8080/v1/videos/&lt;order_id&gt; \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;"</pre>
+                        <p style="margin-bottom: 4px; font-size: 0.75rem; color: var(--text-muted);">Phản hồi mẫu (Response JSON):</p>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.05); color: #4ade80; margin-bottom: 12px;">{
+  "order_id": "kl_ord_abcdef123456",
+  "status": "completed", // pending, processing, completed, failed
+  "result_url": "https://pub-4496e76c4ba34c28980998855e485fbd.r2.dev/res_abcdef.mp4",
+  "error_message": null
+}</pre>
                         
                         <p style="margin-bottom: 8px;"><strong>4. Bảng giá gọi API (trừ trực tiếp từ Coin của bạn):</strong></p>
                         <ul style="padding-left: 18px; margin-bottom: 0; display: flex; flex-direction: column; gap: 4px;">
