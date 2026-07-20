@@ -1,5 +1,6 @@
 import { onRequestPost as onCassoRequestPost } from './functions/api/casso-webhook.js';
 import { onRequestPost as onTikTokVideoPost } from './functions/api/tiktok-video.js';
+import { onRequestGet as onTikTokChannelGet } from './functions/api/tiktok-channel.js';
 
 function isAllowedMediaUrl(rawUrl) {
   try {
@@ -24,6 +25,11 @@ export default {
     // --- Casso (VietQR) webhook ----------------------------------------------
     if (url.pathname === '/api/casso-webhook' && method === 'POST') {
       return onCassoRequestPost({ request, env, context });
+    }
+
+    // TikTok channel videos bridge
+    if (url.pathname === '/api/tiktok-channel' && method === 'GET') {
+      return onTikTokChannelGet({ request, env, context });
     }
 
     // Geo hint for auto language: tier mapping via lang-config.js on frontend.
