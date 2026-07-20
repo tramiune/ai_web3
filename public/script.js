@@ -3585,10 +3585,14 @@ function renderVideoFilePreview(containerId, file, options = {}) {
         if (duration > maxDurationSec + 0.15) {
             const badge = document.createElement('div');
             badge.className = 'video-trim-hint-badge';
-            badge.textContent = prefersServerSideTrim()
-                ? t('modals.video_server_trim_mobile', { sec: maxDurationSec })
-                : t('modals.video_will_trim_on_submit', { sec: maxDurationSec });
+            badge.style.cssText = 'background:rgba(220,38,38,0.15);color:#ef4444;border:1px solid rgba(220,38,38,0.4);';
+            badge.textContent = t('modals.video_too_long', { sec: maxDurationSec });
             container.appendChild(badge);
+            const sb = document.getElementById('submit-btn');
+            if (sb) sb.disabled = true;
+        } else {
+            const sb = document.getElementById('submit-btn');
+            if (sb) sb.disabled = false;
         }
 
         if (options.onChange) {
@@ -3871,40 +3875,10 @@ async function setupEventListeners() {
                 }
 
                 const longVideo = kalingDurationSec > maxSec + 0.15;
-                if (longVideo && prefersServerSideTrim() && useLibrary) {
-                    kalingDurationSec = maxSec;
-                } else if (longVideo && (videoFile || useLibrary)) {
-                    submitBtn.disabled = true;
-                    const trimMsgKey = prefersServerSideTrim()
-                        ? 'modals.video_server_trim_pending'
-                        : 'modals.video_trim_title';
-                    showVideoTrimOverlay(trimMsgKey, { sec: maxSec });
-                    try {
-                        const prepared = await prepareReferenceVideoForSubmit({
-                            videoFile,
-                            templateUrl,
-                            useLibrary,
-                            maxSec,
-                            onProgress: buildTrimProgressHandler(maxSec)
-                        });
-                        videoFile = prepared.file;
-                        kalingDurationSec = prepared.durationSec;
-                        kalingSelectedDurationSec = prepared.durationSec;
-                        setVideoFileInput(videoFile);
-                        if (prepared.fromLibrary || useLibrary) {
-                            window.currentVideoSource = 'upload';
-                            const templateInput = document.getElementById('selected-template-url');
-                            if (templateInput) templateInput.value = '';
-                        }
-                        if (prepared.serverTrimPending) {
-                            showToast(t('modals.video_server_trim_mobile', { sec: maxSec }));
-                        }
-                    } catch (trimErr) {
-                        console.error('[VideoTrim] submit failed:', trimErr);
-                        resetOrderSubmitUi(submitBtn, progressDiv);
-                        showToast(trimErr.code ? tiktokErrorMessage(trimErr.code) : (trimErr.message || t('modals.tiktok_trim_failed')));
-                        return;
-                    }
+                if (longVideo) {
+                    alert(t('modals.video_too_long', { sec: maxSec }));
+                    resetOrderSubmitUi(submitBtn, progressDiv);
+                    return;
                 }
 
                 kalingSelectedDurationSec = kalingDurationSec;
