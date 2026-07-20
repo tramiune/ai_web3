@@ -3,7 +3,7 @@
 Batch kênh TikTok (Kaling) — chạy cron 3:00 Asia/Ho_Chi_Minh.
 
 Pipeline mỗi video đăng ngày hôm qua (VN):
-  tải video → cắt frame → VAE thay đồ full bộ → tạo đơn motion pending (Kling 2.6 Pro 10 coin).
+  tải video → cắt frame → Meo3 thay đồ full bộ → tạo đơn motion pending (Kling 2.6 Pro 10 coin).
 
 Cần .env: VIDEOAIEASY_ACCOUNTS + R2_* + serviceAccountKey.json
 """
@@ -45,7 +45,7 @@ CONFIG_DOC = "default"  # legacy admin doc; user configs use Firebase uid
 CONFIG_COLLECTION = "batchChannelConfig"
 RUNS_COLLECTION = "batchChannelRuns"
 ALLOWLIST_COLLECTION = "batchChannelAllowlist"
-TIKWM_USER_POSTS = "https://www.tikwm.com/api/user/posts"
+TIKWM_USER_POSTS = "https://kaling.vn/api/tiktok-channel"
 VN_TZ = "Asia/Ho_Chi_Minh"
 # Batch model presets (auto-create video popup)
 BATCH_MODEL_PRESETS = {
@@ -276,6 +276,69 @@ def run_wardrobe_vae(
     return out_url
 
 
+# ── MEO3 Wardrobe (api.meo3.cloud) ─────────────────────────────────────────
+MEO3_API_BASE = "https://api.meo3.cloud"
+
+
+def run_wardrobe_meo3(
+    template_url: str,
+    clothes_path: str,
+    *,
+    tmp: str,
+    aspect_ratio: str = "1:1",
+    poll_interval: float = 3.0,
+    timeout_sec: float = 180.0,
+) -> str:
+    """Thay đồ qua API meo3.cloud — POST /api/try-on, rồi poll GET /api/tasks/{id}."""
+    # 1. Tải ảnh người mẫu (template) về local
+    template_path = os.path.join(tmp, "meo3_person.jpg")
+    download_file(template_url, template_path, referer="https://kaling.cloud/")
+    print(f"👗 Thay đồ Meo3 (aspect={aspect_ratio})...")
+
+    # 2. Gửi yêu cầu thay đồ
+    with open(template_path, "rb") as fp_person, open(clothes_path, "rb") as fp_clothes:
+        resp = requests.post(
+            f"{MEO3_API_BASE}/api/try-on",
+            files={
+                "personImage": ("person.jpg", fp_person, "image/jpeg"),
+                "garmentImage": ("garment.jpg", fp_clothes, "image/jpeg"),
+            },
+            data={
+                "preserve": "true",
+                "aspectRatio": aspect_ratio,
+                "model": "nano_banana_pro",
+            },
+            timeout=30,
+        )
+    if not resp.ok:
+        raise RuntimeError(f"Meo3 try-on request failed: {resp.status_code} {resp.text[:200]}")
+    task_id = resp.json().get("taskId")
+    if not task_id:
+        raise RuntimeError(f"Meo3 no taskId in response: {resp.text[:200]}")
+    print(f"   Meo3 task: {task_id}")
+
+    # 3. Poll trạng thái
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        time.sleep(poll_interval)
+        status_resp = requests.get(f"{MEO3_API_BASE}/api/tasks/{task_id}", timeout=15)
+        if not status_resp.ok:
+            continue
+        status_data = status_resp.json()
+        status = status_data.get("status", "")
+        print(f"   Meo3 status: {status}")
+        if status == "completed":
+            media_url = status_data.get("mediaUrl")
+            if not media_url:
+                raise RuntimeError("Meo3 completed but no mediaUrl")
+            return media_url
+        if status == "failed":
+            raise RuntimeError(f"Meo3 task failed: {status_data.get('error', 'unknown')}")
+
+    raise RuntimeError(f"Meo3 timeout sau {timeout_sec}s (task={task_id})")
+
+
+
 def _batch_model_preset(cfg: dict) -> dict:
     key = (cfg.get("batchModelKey") or "vae10").strip().lower()
     preset = dict(BATCH_MODEL_PRESETS.get(key) or BATCH_MODEL_PRESETS["vae10"])
@@ -474,8 +537,8 @@ def _process_video_item(
         try:
             _deduct_user_coins(db, admin_uid, cost_coins)
             coins_deducted = True
-            char_url = run_wardrobe_vae(
-                vae_client, template_url, frame_local, tmp=tmp, wardrobe_replace=wardrobe_mode,
+            char_url = run_wardrobe_meo3(
+                template_url, frame_local, tmp=tmp,
             )
             motion_url = upload_motion_video(video_local)
             order_id = create_batch_order(
