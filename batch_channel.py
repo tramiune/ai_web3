@@ -45,7 +45,7 @@ CONFIG_DOC = "default"  # legacy admin doc; user configs use Firebase uid
 CONFIG_COLLECTION = "batchChannelConfig"
 RUNS_COLLECTION = "batchChannelRuns"
 ALLOWLIST_COLLECTION = "batchChannelAllowlist"
-TIKWM_USER_POSTS = "https://kaling.vn/api/tiktok-channel"
+TIKWM_USER_POSTS = "https://kaling.cloud/api/tiktok-channel"
 VN_TZ = "Asia/Ho_Chi_Minh"
 # Batch model presets (auto-create video popup)
 BATCH_MODEL_PRESETS = {
