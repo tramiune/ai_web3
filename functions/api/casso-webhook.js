@@ -334,8 +334,14 @@ async function grantCoins(token, projectId, userId, coins, topupId) {
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   
   const userRes = await fetch(`${baseUrl}/users/${userId}`, { headers: { "Authorization": `Bearer ${token}` } });
-  const userData = await userRes.json();
-  const current = parseInt(userData.fields.coins?.integerValue || 0);
+  let current = 0;
+  if (userRes.ok) {
+    const userData = await userRes.json();
+    current = parseInt(userData?.fields?.coins?.integerValue || 0);
+  } else if (userRes.status !== 404) {
+    const errText = await userRes.text();
+    throw new Error(`Read user ${userId} failed (${userRes.status}): ${errText}`);
+  }
 
   await fetch(`${baseUrl}/users/${userId}?updateMask.fieldPaths=coins`, {
     method: "PATCH",

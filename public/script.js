@@ -535,9 +535,18 @@ function getVisibleCoinPackages() {
     if (currentUser) {
         list = list.filter((pkg) => !hasCompletedOneTimeTopup(pkg));
     }
-    const hocvien = COIN_PACKAGES.find(p => p.id === 'hocvien_package');
-    if (hocvien) {
-        list.splice(1, 0, hocvien);
+    const uData = (window.__currentUserData || (typeof FB_CACHE !== 'undefined' && FB_CACHE.userProfile)) || null;
+    const isHocVien = (window.__batchChannelAllowed === true) || (uData && (
+        uData.role === 'hocvien' ||
+        uData.role === 'student' ||
+        uData.isHocVien === true ||
+        uData.isStudent === true
+    ));
+    if (!isHocVien) {
+        const hocvien = COIN_PACKAGES.find(p => p.id === 'hocvien_package');
+        if (hocvien) {
+            list.splice(1, 0, hocvien);
+        }
     }
     return list;
 }
@@ -782,6 +791,9 @@ function updateBatchChannelNavVisibility(allowed) {
     if (navItem) navItem.style.display = show ? 'flex' : 'none';
     const homeBtn = document.getElementById('home-auto-video-btn');
     if (homeBtn) homeBtn.style.display = show ? 'inline-flex' : 'none';
+    
+    // Toggle promo button visibility based on allowlist status
+    updateCoursePromoBtnVisibility();
 }
 
 async function refreshReferralAllowance(user) {
@@ -825,6 +837,7 @@ async function refreshBatchChannelAllowance(user) {
     updateBatchChannelNavVisibility(window.__batchChannelAllowed);
     updateOrderModelSelectionUI();
     updateFirstOrderUI();
+    renderPricing();
     return window.__batchChannelAllowed;
 }
 
@@ -1495,6 +1508,11 @@ function getShowcaseTotalPages(totalVideos) {
 let _showcasePage = 1;
 let _showcaseShuffled = [];
 
+window.loadMoreShowcase = () => {
+    _showcasePage++;
+    window.renderShowcase();
+};
+
 window.renderShowcase = async (page) => {
     const gallery = document.getElementById('showcase-gallery');
     if (!gallery) return;
@@ -1507,14 +1525,10 @@ window.renderShowcase = async (page) => {
     }
 
     if (page) _showcasePage = page;
-    const totalPages = getShowcaseTotalPages(_showcaseShuffled.length);
-    if (_showcasePage < 1) _showcasePage = 1;
-    if (_showcasePage > totalPages) _showcasePage = totalPages;
+    const visibleCount = _showcasePage * 8;
+    const items = _showcaseShuffled.slice(0, visibleCount);
 
-    const { start, count } = getShowcaseRange(_showcasePage);
-    const items = _showcaseShuffled.slice(start, start + count);
-
-    const uploadCard = _showcasePage === 1 ? `
+    const uploadCard = `
         <div class="showcase-card showcase-upload" onclick="window.pickVideoThenOpenModal()">
             <div class="showcase-upload-inner">
                 <div class="showcase-upload-icon-wrap">
@@ -1529,7 +1543,7 @@ window.renderShowcase = async (page) => {
                     <small class="showcase-upload-hint">${t('showcase.upload_hint')}</small>
                 </div>
             </div>
-        </div>` : '';
+        </div>`;
 
     gallery.innerHTML = uploadCard + items.map(v => `
         <div class="showcase-card showcase-webp"
@@ -1544,7 +1558,7 @@ window.renderShowcase = async (page) => {
         </div>
     `).join('');
 
-    // Pagination controls
+    // Pagination / Load More
     let pagerEl = document.getElementById('showcase-pager');
     if (!pagerEl) {
         pagerEl = document.createElement('div');
@@ -1552,13 +1566,11 @@ window.renderShowcase = async (page) => {
         pagerEl.className = 'pager';
         gallery.parentNode.appendChild(pagerEl);
     }
-    let pagerHtml = '';
-    if (_showcasePage > 1) pagerHtml += `<button class="pager-btn" onclick="window.renderShowcase(${_showcasePage - 1})">‹</button>`;
-    for (let i = 1; i <= totalPages; i++) {
-        pagerHtml += `<button class="pager-btn${i === _showcasePage ? ' active' : ''}" onclick="window.renderShowcase(${i})">${i}</button>`;
+    if (visibleCount < _showcaseShuffled.length) {
+        pagerEl.innerHTML = `<button class="use-trend-btn" style="padding: 0.75rem 2.5rem; font-size: 1rem; border-radius: 24px; cursor: pointer;" onclick="window.loadMoreShowcase()">${t('showcase.load_more')} (${visibleCount}/${_showcaseShuffled.length})</button>`;
+    } else {
+        pagerEl.innerHTML = '';
     }
-    if (_showcasePage < totalPages) pagerHtml += `<button class="pager-btn" onclick="window.renderShowcase(${_showcasePage + 1})">›</button>`;
-    pagerEl.innerHTML = pagerHtml;
 
     // Lazy load images
     gallery.querySelectorAll('img[data-src]').forEach(el => {
@@ -1569,7 +1581,6 @@ window.renderShowcase = async (page) => {
     });
 
     initPremiumEffects();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 // Lazy loading handled by IntersectionObserver in renderShowcase
@@ -1783,6 +1794,8 @@ async function handleUserLoggedIn(user) {
         if (snapshot.exists()) {
             const data = snapshot.data();
             window.__currentUserData = data;
+            renderPricing();
+            updateCoursePromoBtnVisibility();
             const currentCoins = data.coins || 0;
             if (FB_CACHE.myOrders) {
                 syncPromo1CoinState(FB_CACHE.myOrders, data);
@@ -2238,9 +2251,10 @@ function renderPricing() {
             const courseTitle = t('pricing.packages.hocvien_package') || 'Gói Học Viên';
             const featuresList = `
                 <ul class="pkg-features" style="text-align: left; margin: 12px 0; padding-left: 0; list-style: none; font-size: 0.82rem; line-height: 1.6; color: #ececf1; display: flex; flex-direction: column; gap: 8px;">
-                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video với giá <strong>3k/video</strong></span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Làm video với giá <strong>3k/video</strong> (Giảm 50% trọn đời sau khi học)</span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Học <strong>1 kèm 1</strong></span></li>
                     <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>10 coin</strong></span></li>
+                    <li style="display: flex; gap: 8px; align-items: flex-start;"><span style="color: #fbbf24;">🌱</span> <span>Tặng <strong>tool thay đồ, làm ảnh</strong> (199k)</span></li>
                 </ul>
             `;
             return `
@@ -2777,6 +2791,20 @@ function updateRoboneoTrialUI(userData = window.__currentUserData) {
     }
 }
 
+window.updateCoursePromoBtnVisibility = () => {
+    const promoBtn = document.getElementById('home-course-promo-btn');
+    if (promoBtn) {
+        const uData = (window.__currentUserData || (typeof FB_CACHE !== 'undefined' && FB_CACHE.userProfile)) || null;
+        const isHocVien = (window.__batchChannelAllowed === true) || (uData && (
+            uData.role === 'hocvien' ||
+            uData.role === 'student' ||
+            uData.isHocVien === true ||
+            uData.isStudent === true
+        ));
+        promoBtn.style.display = isHocVien ? 'none' : 'inline-flex';
+    }
+};
+
 function updateFirstOrderUI() {
     updateRoboneoTrialUI(window.__currentUserData);
     updateOrderModelSelectionUI();
@@ -2939,7 +2967,7 @@ function isMobileLikeClient() {
 }
 
 function prefersServerSideTrim() {
-    return isMobileLikeClient();
+    return true;
 }
 
 function withTrimTimeout(promise, ms, label = 'trim') {
@@ -3043,9 +3071,8 @@ async function downloadTikTokBlobViaWorker(pageUrl) {
 
 async function downloadTikTokBlobDirect(pageUrl) {
     const meta = await resolveTikTokViaTikwm(pageUrl);
-    const videoRes = await fetch(meta.videoUrl, {
-        headers: { Referer: 'https://www.tiktok.com/' }
-    });
+    const proxyUrl = `/api/media-download?url=${encodeURIComponent(meta.videoUrl)}`;
+    const videoRes = await fetch(proxyUrl);
     if (!videoRes.ok) {
         throw Object.assign(new Error('video_download'), { code: 'video_download' });
     }
@@ -3056,12 +3083,7 @@ async function downloadTikTokVideoBlob(pageUrl) {
     if (!isTikTokPageUrl(pageUrl)) {
         throw Object.assign(new Error('invalid_url'), { code: 'invalid_url' });
     }
-    try {
-        return await downloadTikTokBlobViaWorker(pageUrl);
-    } catch (workerErr) {
-        console.warn('[TikTok] API proxy unavailable, trying direct:', workerErr?.code || workerErr);
-        return await downloadTikTokBlobDirect(pageUrl);
-    }
+    return await downloadTikTokBlobDirect(pageUrl);
 }
 
 async function getBlobVideoDurationSec(blob) {
@@ -3582,14 +3604,22 @@ function renderVideoFilePreview(containerId, file, options = {}) {
 
         container.appendChild(previewVideo);
 
-        if (duration > maxDurationSec + 0.15) {
+        if (duration > 30.15) {
             const badge = document.createElement('div');
             badge.className = 'video-trim-hint-badge';
             badge.style.cssText = 'background:rgba(220,38,38,0.15);color:#ef4444;border:1px solid rgba(220,38,38,0.4);';
-            badge.textContent = t('modals.video_too_long', { sec: maxDurationSec });
+            badge.textContent = t('modals.video_too_long', { sec: 30 });
             container.appendChild(badge);
             const sb = document.getElementById('submit-btn');
             if (sb) sb.disabled = true;
+        } else if (duration > maxDurationSec + 0.15) {
+            const badge = document.createElement('div');
+            badge.className = 'video-trim-hint-badge';
+            badge.style.cssText = 'background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);';
+            badge.textContent = t('modals.video_auto_trim_hint', { dur: Math.round(duration), sec: maxDurationSec });
+            container.appendChild(badge);
+            const sb = document.getElementById('submit-btn');
+            if (sb) sb.disabled = false;
         } else {
             const sb = document.getElementById('submit-btn');
             if (sb) sb.disabled = false;
@@ -3874,9 +3904,9 @@ async function setupEventListeners() {
                     console.log('🔄 Auto downgraded ad20 -> ad10 due to video <= 10s');
                 }
 
-                const longVideo = kalingDurationSec > maxSec + 0.15;
+                const longVideo = kalingDurationSec > 30.15;
                 if (longVideo) {
-                    alert(t('modals.video_too_long', { sec: maxSec }));
+                    alert(t('modals.video_too_long', { sec: 30 }));
                     resetOrderSubmitUi(submitBtn, progressDiv);
                     return;
                 }
@@ -4137,6 +4167,13 @@ function userFacingOrderNote(order) {
         .replace(/\bxiaoyang\.online\b/gi, 'hệ thống');
 }
 
+let _myOrdersLimit = 8;
+
+window.loadMoreMyOrders = () => {
+    _myOrdersLimit += 8;
+    renderMyOrders();
+};
+
 function renderMyOrders() {
     const grid = document.getElementById('my-orders-grid');
     const countText = document.getElementById('orders-count-text');
@@ -4150,6 +4187,8 @@ function renderMyOrders() {
             <div>${t('status.no_orders')}</div>
         </div>`;
         if (countText) countText.innerText = '';
+        let btnContainer = document.getElementById('my-orders-load-more');
+        if (btnContainer) btnContainer.innerHTML = '';
         return;
     }
 
@@ -4161,7 +4200,9 @@ function renderMyOrders() {
 
     if (countText) countText.innerText = `${sortedDocs.length} Videos`;
 
-    grid.innerHTML = sortedDocs.map(d => {
+    const visibleDocs = sortedDocs.slice(0, _myOrdersLimit);
+
+    grid.innerHTML = visibleDocs.map(d => {
             const orderId = d.id.substring(d.id.length - 6).toUpperCase();
             const createdDateObj = safeToDate(d.createdAt);
             const date = createdDateObj ? createdDateObj.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '...';
@@ -4218,6 +4259,23 @@ function renderMyOrders() {
                 </div>
             `;
         }).join('');
+
+    // Load More Button
+    let btnContainer = document.getElementById('my-orders-load-more');
+    if (!btnContainer) {
+        btnContainer = document.createElement('div');
+        btnContainer.id = 'my-orders-load-more';
+        btnContainer.style.cssText = 'grid-column: 1 / -1; text-align: center; margin-top: 1.5rem;';
+        grid.parentNode.appendChild(btnContainer);
+    }
+
+    if (sortedDocs.length > _myOrdersLimit) {
+        btnContainer.innerHTML = `<button class="use-trend-btn" style="padding: 0.75rem 2.5rem; font-size: 0.95rem; border-radius: 24px; cursor: pointer;" onclick="window.loadMoreMyOrders()">${t('dashboard.load_more_orders')} (${visibleDocs.length}/${sortedDocs.length})</button>`;
+    } else if (sortedDocs.length > 8) {
+        btnContainer.innerHTML = `<div style="opacity: 0.5; font-size: 0.85rem; padding: 0.5rem;">${t('dashboard.all_orders_loaded')} (${sortedDocs.length})</div>`;
+    } else {
+        btnContainer.innerHTML = '';
+    }
 }
 
 

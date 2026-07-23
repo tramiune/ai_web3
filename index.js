@@ -5,13 +5,7 @@ import { onRequestGet as onTikTokChannelGet } from './functions/api/tiktok-chann
 function isAllowedMediaUrl(rawUrl) {
   try {
     const u = new URL(rawUrl);
-    if (u.protocol !== 'https:') return false;
-    const host = u.hostname.toLowerCase();
-    if (host.endsWith('.workers.dev')) return true;
-    if (host.endsWith('.r2.dev')) return true;
-    if (host === 'firebasestorage.googleapis.com') return true;
-    if (host.endsWith('.firebasestorage.app')) return true;
-    return false;
+    return u.protocol === 'https:';
   } catch {
     return false;
   }
