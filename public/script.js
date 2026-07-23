@@ -7323,7 +7323,7 @@ async function runBatchChannelOnFrontend() {
         }
 
         phaseEl.textContent = 'Đang tải danh sách video của kênh...';
-        const channelRes = await fetch(`/api/tiktok-channel?unique_id=${encodeURIComponent(username)}&count=35`);
+        const channelRes = await fetch(`https://www.tikwm.com/api/user/posts?unique_id=${encodeURIComponent(username)}&count=35`);
         if (!channelRes.ok) {
             throw new Error('Không thể lấy danh sách video của kênh từ Tikwm');
         }
