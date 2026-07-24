@@ -1529,6 +1529,16 @@ def submit_to_aidancing(order_id, fallback_reason=None):
             if data.get('status') != 'pending':
                 return
 
+            # [FIX CACHE USER CU]
+            cost_c = float(data.get('costCoins') or 0)
+            if cost_c == 4.5 or cost_c == 6:
+                if str(data.get('modelId')) in ("160", "124", "125"):
+                    data['modelId'] = "159"
+                data['maxVideoSec'] = 10
+            elif cost_c == 3 and str(data.get('modelId')) == "130":
+                data['modelId'] = "159"
+                data['maxVideoSec'] = 10
+
             fb = f" [fallback: {fallback_reason}]" if fallback_reason else ""
             print(f"\n⚡ [NẠP ĐƠN / Aidancing]{fb} {order_id}... (giữ pending cho đến khi aidancing OK)")
 

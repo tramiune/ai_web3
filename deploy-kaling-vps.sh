@@ -41,9 +41,11 @@ set host $env(VPS_HOST)
 set user $env(VPS_USER)
 set pass $env(VPS_PASS)
 spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {bash -s}
-expect "password:" { send "$pass\r" }
-expect "Password:" { send "$pass\r" }
-expect -re {\$ |# }
+expect {
+  "password:" { send "$pass\r"; exp_continue }
+  "Password:" { send "$pass\r"; exp_continue }
+  -re {\$ |# } { }
+}
 send "export DEBIAN_FRONTEND=noninteractive\r"
 expect -re {\$ |# }
 send "apt-get update -qq && apt-get install -y -qq python3 python3-pip python3-venv git rsync libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2\r"
@@ -78,9 +80,11 @@ set host $env(VPS_HOST)
 set user $env(VPS_USER)
 set pass $env(VPS_PASS)
 spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {bash -s}
-expect "password:" { send "$pass\r" }
-expect "Password:" { send "$pass\r" }
-expect -re {\$ |# }
+expect {
+  "password:" { send "$pass\r"; exp_continue }
+  "Password:" { send "$pass\r"; exp_continue }
+  -re {\$ |# } { }
+}
 send "cd /root/ai_web3\r"
 expect -re {\$ |# }
 send "pip3 install -q -r requirements.txt\r"

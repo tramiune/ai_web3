@@ -31,6 +31,7 @@ def trim_reference_video_for_order(vid_path: str | Path, order_data: dict | None
     dur = probe_video_duration_seconds(str(path))
     if dur is None or dur <= max_sec + 0.15:
         return str(path)
-    print(f"✂️ Server cắt video {dur:.1f}s → {max_sec:.0f}s")
-    out = trim_video_to_seconds(path, max_seconds=max_sec)
+    safe_max = max(0.1, max_sec - 0.2)
+    print(f"✂️ Server cắt video {dur:.1f}s → {safe_max:.1f}s (chuẩn gói: {max_sec:.0f}s)")
+    out = trim_video_to_seconds(path, max_seconds=safe_max)
     return str(out)

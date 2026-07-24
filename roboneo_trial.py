@@ -18,8 +18,8 @@ TRIAL_START = datetime(2026, 6, 19, 0, 0, 0, tzinfo=VN_TZ)
 TRIAL_WINDOW = timedelta(hours=24)
 TRIAL_MODEL_ID = "130"
 TRIAL_COST = 3
-TRIAL_MAX_SEC = 12
-KALING_ROBONEO_MODEL_IDS = frozenset({"124", "131", TRIAL_MODEL_ID})
+TRIAL_MAX_SEC = 10
+KALING_ROBONEO_MODEL_IDS = frozenset({"124", "131"})  # 130 (trial) → Aidancing 159/10s, không qua RoboNeo
 
 
 def _parse_created_at(user_data: dict | None) -> datetime | None:

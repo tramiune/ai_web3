@@ -22,6 +22,43 @@ AIDANCING_ORIGIN = os.environ.get("AIDANCING_ORIGIN", "https://aidancing.net")
 DASHBOARD_URL = f"{AIDANCING_ORIGIN}/dashboard"
 DASHBOARD_PATHS = ("/dashboard", "/en/dashboard", "/vi/dashboard")
 _SKIP_AIDANCING_EMAILS = frozenset({"support@aidancing.net", "bootstrap-icons@1.11.3"})
+class FileLock:
+    def __init__(self, lock_file="/tmp/aidancing_submit.lock"):
+        self.lock_file = lock_file
+
+    def __enter__(self):
+        start_time = time.time()
+        timeout = 180  # Chờ tối đa 3 phút
+        while True:
+            try:
+                fd = os.open(self.lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                break
+            except FileExistsError:
+                try:
+                    mtime = os.path.getmtime(self.lock_file)
+                    if time.time() - mtime > timeout:
+                        print("⚠️ Cảnh báo: File lock bị kẹt quá lâu, tự động xoá...")
+                        os.remove(self.lock_file)
+                        continue
+                except OSError:
+                    pass
+                
+                if time.time() - start_time > timeout:
+                    print("⚠️ Timeout chờ file lock submit Aidancing! Tự động override...")
+                    try:
+                        os.remove(self.lock_file)
+                    except OSError:
+                        pass
+                    continue
+                time.sleep(1)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            os.remove(self.lock_file)
+        except OSError:
+            pass
 
 
 class SessionExpiredError(RuntimeError):
@@ -215,7 +252,6 @@ class AidancingApiClient:
             if len(found) == len(wanted):
                 break
         return found
-
     def create_job(
         self,
         model_id,
@@ -232,49 +268,50 @@ class AidancingApiClient:
         if not os.path.isfile(video_path):
             raise RuntimeError(f"File không tồn tại: {video_path}")
 
-        before_ids = {
-            int(j["id"]) for j in self.list_jobs(page=0, size=30).get("items", [])
-        }
-
-        data = {
-            "jobTypeId": str(model_id),
-            "aspectRatio": aspect_ratio,
-            "qualityMode": str(quality_mode),
-            "title": title,
-            "userPrompt": "",
-            "voiceId": "",
-        }
-        img_mime = mimetypes.guess_type(image_path)[0] or "image/jpeg"
-        vid_mime = mimetypes.guess_type(video_path)[0] or "video/mp4"
-
-        with open(image_path, "rb") as img, open(video_path, "rb") as vid:
-            files = {
-                "image": (os.path.basename(image_path), img, img_mime),
-                "video": (os.path.basename(video_path), vid, vid_mime),
+        with FileLock():
+            before_ids = {
+                int(j["id"]) for j in self.list_jobs(page=0, size=30).get("items", [])
             }
-            r = self.session.post(
-                f"{AIDANCING_ORIGIN}/create/general",
-                data=data,
-                files=files,
-                timeout=int(os.environ.get("BOT_CREATE_TIMEOUT_SEC", "600")),
-                allow_redirects=False,
-            )
 
-        if r.status_code not in (200, 302):
-            raise RuntimeError(
-                f"Create job failed: HTTP {r.status_code}\n{(r.text or '')[:500]}"
-            )
+            data = {
+                "jobTypeId": str(model_id),
+                "aspectRatio": aspect_ratio,
+                "qualityMode": str(quality_mode),
+                "title": title,
+                "userPrompt": "",
+                "voiceId": "",
+            }
+            img_mime = mimetypes.guess_type(image_path)[0] or "image/jpeg"
+            vid_mime = mimetypes.guess_type(video_path)[0] or "video/mp4"
 
-        wait_sec = int(os.environ.get("BOT_CREATE_JOB_APPEAR_SEC", "36"))
-        step = int(os.environ.get("BOT_CREATE_JOB_POLL_SEC", "3"))
-        for _ in range(max(1, wait_sec // step)):
-            time.sleep(step)
-            for item in self.list_jobs(page=0, size=30).get("items", []):
-                jid = int(item.get("id", 0))
-                if jid not in before_ids:
-                    return str(jid)
+            with open(image_path, "rb") as img, open(video_path, "rb") as vid:
+                files = {
+                    "image": (os.path.basename(image_path), img, img_mime),
+                    "video": (os.path.basename(video_path), vid, vid_mime),
+                }
+                r = self.session.post(
+                    f"{AIDANCING_ORIGIN}/create/general",
+                    data=data,
+                    files=files,
+                    timeout=int(os.environ.get("BOT_CREATE_TIMEOUT_SEC", "600")),
+                    allow_redirects=False,
+                )
 
-        raise RuntimeError("Đã submit nhưng không thấy job mới trên API")
+            if r.status_code not in (200, 302):
+                raise RuntimeError(
+                    f"Create job failed: HTTP {r.status_code}\n{(r.text or '')[:500]}"
+                )
+
+            wait_sec = int(os.environ.get("BOT_CREATE_JOB_APPEAR_SEC", "36"))
+            step = int(os.environ.get("BOT_CREATE_JOB_POLL_SEC", "3"))
+            for _ in range(max(1, wait_sec // step)):
+                time.sleep(step)
+                for item in self.list_jobs(page=0, size=30).get("items", []):
+                    jid = int(item.get("id", 0))
+                    if jid not in before_ids:
+                        return str(jid)
+
+            raise RuntimeError("Đã submit nhưng không thấy job mới trên API")
 
     def download_file(self, file_id, dest_path) -> str:
         file_id = str(file_id).split("/")[-1]

@@ -135,52 +135,32 @@ def parse_tiktok_username(raw: str) -> str:
 
 def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
     username = parse_tiktok_username(username)
-    print(f"🔗 [Tikwm] Đang lấy danh sách video của kênh @{username}...")
-    
     videos: list[dict] = []
     cursor = 0
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
     }
-    for attempt in range(max_pages):
-        try:
-            url = f"https://www.tikwm.com/api/user/posts"
-            params = {"unique_id": username, "count": 35, "cursor": cursor}
-            r = requests.get(url, params=params, headers=headers, timeout=45)
-            if not r.ok:
-                print(f"   ⚠️ Lỗi kết nối Tikwm HTTP {r.status_code}")
-                break
-            payload = r.json()
-            if payload.get("code") != 0:
-                print(f"   ⚠️ Tikwm API báo lỗi: {payload.get('msg')}")
-                break
-            
-            data = payload.get("data") or {}
-            batch = data.get("videos") or []
-            if not batch:
-                break
-                
-            for v in batch:
-                vid = str(v.get("video_id") or v.get("id") or "")
-                if not vid:
-                    continue
-                videos.append({
-                    "video_id": vid,
-                    "create_time": int(v.get("create_time") or 0),
-                    "web_video_url": f"https://www.tiktok.com/@{username}/video/{vid}",
-                    "hdplay": v.get("hdplay") or "",
-                    "play": v.get("play") or "",
-                    "wmplay": v.get("wmplay") or "",
-                })
-                
-            if not data.get("hasMore"):
-                break
-            cursor = int(data.get("cursor") or 0)
-            time.sleep(1.0)
-        except Exception as e:
-            print(f"   ⚠️ Lỗi khi lấy danh sách video Tikwm: {e}")
+    for _ in range(max_pages):
+        r = requests.get(
+            TIKWM_USER_POSTS,
+            params={"unique_id": username, "count": 30, "cursor": cursor},
+            headers=headers,
+            timeout=60,
+        )
+        r.raise_for_status()
+        payload = r.json()
+        if payload.get("code") != 0:
+            raise RuntimeError(f"tikwm: {payload.get('msg') or payload}")
+        data = payload.get("data") or {}
+        batch = data.get("videos") or []
+        if not batch:
             break
-            
+        videos.extend(batch)
+        if not data.get("hasMore"):
+            break
+        cursor = int(data.get("cursor") or 0)
+        time.sleep(0.4)
     return videos
 
 
@@ -929,17 +909,6 @@ def run_batch(
             for idx, v in enumerate(videos, start=1):
                 vid = str(v.get("video_id") or "")
                 play = v.get("hdplay") or v.get("play") or ""
-                if not play and v.get("web_video_url"):
-                    try:
-                        resolve_url = f"https://www.tikwm.com/api/?url={v['web_video_url']}&hd=1"
-                        res = requests.get(resolve_url, timeout=30)
-                        if res.ok:
-                            pay = res.json()
-                            if pay.get("code") == 0 and pay.get("data"):
-                                data = pay["data"]
-                                play = data.get("hdplay") or data.get("play") or ""
-                    except Exception as e:
-                        print(f"   ⚠️ Lỗi giải mã video {vid} qua TikWM: {e}")
                 if not vid or not play:
                     err = f"Video {vid or '?'}: không có link tải"
                     errors.append(err)

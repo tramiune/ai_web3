@@ -230,15 +230,16 @@ def _kaling_roboneo_enabled() -> bool:
 
 
 def _kaling_uses_roboneo(order_data: dict) -> bool:
-    """720p gói RoboNeo (124, 131, 130) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói."""
+    """720p gói RoboNeo (124, 131) — video dài hơn gói vẫn nạp RoboNeo, server cắt theo gói.
+    Model 130 (trial 3 coin) → Aidancing 159/10s, không qua RoboNeo."""
     if not _kaling_roboneo_enabled():
         return False
     from roboneo_trial import KALING_ROBONEO_MODEL_IDS, is_roboneo_trial_order
 
+    if is_roboneo_trial_order(order_data):
+        return False  # trial → Aidancing, không qua RoboNeo
     if resolution_for_order(order_data) != "720p":
         return False
-    if is_roboneo_trial_order(order_data):
-        return True
     model_id = str(order_data.get("modelId") or "").strip()
     if model_id in KALING_ROBONEO_MODEL_IDS:
         return True
