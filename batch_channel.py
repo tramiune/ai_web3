@@ -146,7 +146,7 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
     payload = {
         "profiles": [username],
         "resultsPerPage": 30 * max_pages,
-        "shouldDownloadVideos": False,
+        "shouldDownloadVideos": True,
         "shouldDownloadCovers": False,
         "shouldDownloadSlideshowImages": False
     }
@@ -169,8 +169,9 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
                 continue
                 
             create_time = item.get("createTime") or item.get("create_time") or 0
-            play = item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
-            hdplay = item.get("hdPlayUrl") or item.get("hdplay") or play
+            video_meta = item.get("videoMeta") or {}
+            play = video_meta.get("downloadAddr") or item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
+            hdplay = video_meta.get("downloadAddr") or item.get("hdPlayUrl") or item.get("hdplay") or play
             
             videos.append({
                 "video_id": vid,
