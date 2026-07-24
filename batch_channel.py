@@ -146,13 +146,13 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
     payload = {
         "profiles": [username],
         "resultsPerPage": 30 * max_pages,
-        "shouldDownloadVideos": True,
+        "shouldDownloadVideos": False,
         "shouldDownloadCovers": False,
         "shouldDownloadSlideshowImages": False
     }
     
     try:
-        r = requests.post(url, params=params, json=payload, timeout=120)
+        r = requests.post(url, params=params, json=payload, timeout=240)
         if not r.ok:
             print(f"   ❌ Apify API trả về lỗi: HTTP {r.status_code} - {r.text[:200]}")
             r.raise_for_status()
