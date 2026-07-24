@@ -135,33 +135,57 @@ def parse_tiktok_username(raw: str) -> str:
 
 def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
     username = parse_tiktok_username(username)
-    videos: list[dict] = []
-    cursor = 0
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
+    print(f"📡 [Apify] Đang lấy danh sách video của kênh @{username} qua Apify...")
+    
+    token = get_env("APIFY_TOKEN").strip()
+    if not token:
+        raise RuntimeError("Thiếu APIFY_TOKEN trong file .env trên VPS!")
+        
+    url = "https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items"
+    params = {"token": token}
+    payload = {
+        "profiles": [username],
+        "resultsPerPage": 30 * max_pages,
+        "shouldDownloadVideos": False,
+        "shouldDownloadCovers": False,
+        "shouldDownloadSlideshowImages": False
     }
-    for _ in range(max_pages):
-        r = requests.get(
-            TIKWM_USER_POSTS,
-            params={"unique_id": username, "count": 30, "cursor": cursor},
-            headers=headers,
-            timeout=60,
-        )
-        r.raise_for_status()
-        payload = r.json()
-        if payload.get("code") != 0:
-            raise RuntimeError(f"tikwm: {payload.get('msg') or payload}")
-        data = payload.get("data") or {}
-        batch = data.get("videos") or []
-        if not batch:
-            break
-        videos.extend(batch)
-        if not data.get("hasMore"):
-            break
-        cursor = int(data.get("cursor") or 0)
-        time.sleep(0.4)
-    return videos
+    
+    try:
+        r = requests.post(url, params=params, json=payload, timeout=120)
+        if not r.ok:
+            print(f"   ❌ Apify API trả về lỗi: HTTP {r.status_code} - {r.text[:200]}")
+            r.raise_for_status()
+            
+        items = r.json()
+        if not isinstance(items, list):
+            print(f"   ⚠️ Dữ liệu trả về từ Apify không hợp lệ (không phải list): {items}")
+            return []
+            
+        videos = []
+        for item in items:
+            vid = str(item.get("id") or item.get("video_id") or "")
+            if not vid:
+                continue
+                
+            create_time = item.get("createTime") or item.get("create_time") or 0
+            play = item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
+            hdplay = item.get("hdPlayUrl") or item.get("hdplay") or play
+            
+            videos.append({
+                "video_id": vid,
+                "create_time": int(create_time),
+                "web_video_url": f"https://www.tiktok.com/@{username}/video/{vid}",
+                "hdplay": hdplay,
+                "play": play,
+                "wmplay": item.get("wmplay") or "",
+            })
+            
+        print(f"   ✅ Lấy thành công {len(videos)} video từ Apify.")
+        return videos
+    except Exception as e:
+        print(f"   ❌ Lỗi gọi Apify cho kênh @{username}: {e}")
+        raise e
 
 
 def filter_videos_yesterday(videos: list[dict]) -> list[dict]:
