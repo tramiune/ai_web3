@@ -171,10 +171,28 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
             create_time = item.get("createTime") or item.get("create_time") or 0
             video_meta = item.get("videoMeta") or {}
             
-            # 1. Thử lấy link tải chuẩn
+            # 1. Thử lấy link tải chuẩn từ Apify
             play = video_meta.get("downloadAddr") or item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
+            hdplay = video_meta.get("downloadAddr") or item.get("hdPlayUrl") or item.get("hdplay") or play
             
-            # 2. Fallback: Nếu không có link tải trực tiếp từ Apify, lấy link video CDN trong danh sách phụ đề (vì TikTok sinh file phụ đề từ file video CDN gốc mp4)
+            # 2. Fallback: Nếu không có link tải, giải mã qua API đơn lẻ của Tikwm (API này không bị Cloudflare WAF chặn)
+            if not play:
+                video_url = f"https://www.tiktok.com/@{username}/video/{vid}"
+                print(f"   ⚠️ Video {vid} thiếu link tải từ Apify, đang giải mã qua Tikwm: {video_url}")
+                try:
+                    resolve_url = f"https://www.tikwm.com/api/?url={video_url}&hd=1"
+                    res = requests.get(resolve_url, timeout=30)
+                    if res.ok:
+                        pay = res.json()
+                        if pay.get("code") == 0 and pay.get("data"):
+                            data = pay["data"]
+                            play = data.get("play") or ""
+                            hdplay = data.get("hdplay") or play
+                            print(f"   ✅ Giải mã thành công video {vid} qua Tikwm.")
+                except Exception as ex:
+                    print(f"   ⚠️ Lỗi giải mã video {vid} qua Tikwm: {ex}")
+            
+            # 3. Fallback phụ đề (phòng hờ)
             if not play:
                 sub_links = video_meta.get("subtitleLinks") or []
                 if sub_links and isinstance(sub_links, list):
@@ -182,9 +200,8 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
                         dl = sub.get("downloadLink") or sub.get("tiktokLink") or ""
                         if dl and ("video" in dl or "mp4" in dl or "mime_type=video_mp4" in dl):
                             play = dl
+                            hdplay = dl
                             break
-                            
-            hdplay = video_meta.get("downloadAddr") or item.get("hdPlayUrl") or item.get("hdplay") or play
             
             videos.append({
                 "video_id": vid,
