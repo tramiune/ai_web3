@@ -170,7 +170,20 @@ def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
                 
             create_time = item.get("createTime") or item.get("create_time") or 0
             video_meta = item.get("videoMeta") or {}
+            
+            # 1. Thử lấy link tải chuẩn
             play = video_meta.get("downloadAddr") or item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
+            
+            # 2. Fallback: Nếu không có link tải trực tiếp từ Apify, lấy link video CDN trong danh sách phụ đề (vì TikTok sinh file phụ đề từ file video CDN gốc mp4)
+            if not play:
+                sub_links = video_meta.get("subtitleLinks") or []
+                if sub_links and isinstance(sub_links, list):
+                    for sub in sub_links:
+                        dl = sub.get("downloadLink") or sub.get("tiktokLink") or ""
+                        if dl and ("video" in dl or "mp4" in dl or "mime_type=video_mp4" in dl):
+                            play = dl
+                            break
+                            
             hdplay = video_meta.get("downloadAddr") or item.get("hdPlayUrl") or item.get("hdplay") or play
             
             videos.append({
