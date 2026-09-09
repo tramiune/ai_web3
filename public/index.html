@@ -57,14 +57,18 @@
     
     <!-- TikTok Pixel Code Start -->
     <script>
-    !function (w, d, t) {
-    w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
-    var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
-    ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+    (function () {
+        var pid = window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.tiktokPixelId;
+        if (!pid) return;
+        !function (w, d, t) {
+            w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
+            var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+            ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
 
-    ttq.load('D7VMB2RC77UDOFSGG2BG');
-    ttq.page();
-    }(window, document, 'ttq');
+            ttq.load(pid);
+            ttq.page();
+        }(window, document, 'ttq');
+    })();
     </script>
     <!-- TikTok Pixel Code End -->
 </head>
@@ -1600,14 +1604,15 @@ decoding="async">
                     <h3 style="font-size: 0.95rem; color: #fbbf24; font-weight: 700; margin-bottom: 10px;">📖 HƯỚNG DẪN TÍCH HỢP NHANH</h3>
                     <div style="font-size: 0.82rem; line-height: 1.6; color: #ececf1;">
                         <p style="margin-bottom: 8px;"><strong>1. Cổng kết nối (Endpoint):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">POST http://136.119.193.255:8080/v1/videos</pre>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">POST http://165.101.46.68:8080/v1/videos</pre>
                         
                         <p style="margin-bottom: 8px;"><strong>2. Gửi yêu cầu tạo video (POST Request):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X POST http://136.119.193.255:8080/v1/videos \
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X POST http://165.101.46.68:8080/v1/videos \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;" \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "159",
+    "quality": "720p",
     "character_image_url": "https://example.com/character.png",
     "reference_video_url": "https://example.com/motion.mp4"
   }'</pre>
@@ -1620,7 +1625,7 @@ decoding="async">
 }</pre>
 
                         <p style="margin-bottom: 8px;"><strong>3. Lấy trạng thái / kết quả video (GET Request):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X GET http://136.119.193.255:8080/v1/videos/&lt;order_id&gt; \
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X GET http://165.101.46.68:8080/v1/videos/&lt;order_id&gt; \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;"</pre>
                         <p style="margin-bottom: 4px; font-size: 0.75rem; color: var(--text-muted);">Phản hồi mẫu (Response JSON):</p>
                         <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.05); color: #4ade80; margin-bottom: 12px;">{
@@ -1632,9 +1637,11 @@ decoding="async">
                         
                         <p style="margin-bottom: 8px;"><strong>4. Bảng giá gọi API (trừ trực tiếp từ Coin của bạn):</strong></p>
                         <ul style="padding-left: 18px; margin-bottom: 0; display: flex; flex-direction: column; gap: 4px;">
-                            <li>Gói 10 giây (model 159): <strong>6 Coin / video</strong></li>
-                            <li>Gói 20 giây (model 160): <strong>12 Coin / video</strong></li>
+                            <li>Gói 10 giây (model 159): <strong>720p: 6 Coin</strong> | <strong>2K: 12 Coin</strong></li>
+                            <li>Gói 20 giây (model 160): <strong>720p: 10 Coin</strong> | <strong>2K: 20 Coin</strong></li>
+                            <li style="font-size: 0.75rem; color: #a1a1aa; margin-top: 2px;">* Tham số <code>quality</code> chọn <code>"720p"</code> (mặc định) hoặc <code>"2k"</code>.</li>
                         </ul>
+
                     </div>
                 </div>
             </div>

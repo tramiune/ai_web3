@@ -120,103 +120,181 @@ def _yesterday_vn_range() -> tuple[int, int]:
     return start, end
 
 
+def resolve_vt_tiktok_link(url: str) -> str:
+    if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
+        try:
+            r = requests.head(url, allow_redirects=True, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            m = re.search(r"tiktok\.com/@([^/?#\s]+)", r.url, re.I)
+            if m:
+                return m.group(1).strip()
+            r2 = requests.get(url, allow_redirects=True, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            m2 = re.search(r"tiktok\.com/@([^/?#\s]+)", r2.url, re.I)
+            if m2:
+                return m2.group(1).strip()
+        except Exception:
+            pass
+    return ""
+
+
 def parse_tiktok_username(raw: str) -> str:
     s = (raw or "").strip()
     if not s:
         raise ValueError("empty_channel")
-    if s.startswith("@"):
-        return s[1:].split("/")[0].strip()
-    if "tiktok.com" in s:
-        m = re.search(r"tiktok\.com/@([^/?#]+)", s, re.I)
-        if m:
-            return m.group(1).strip()
-    return s.split("/")[0].strip().lstrip("@")
+    if "vt.tiktok.com" in s or "vm.tiktok.com" in s:
+        resolved = resolve_vt_tiktok_link(s)
+        if resolved:
+            return resolved
+    m = re.search(r"tiktok\.com/@([^/?#\s]+)", s, re.I)
+    if m:
+        return m.group(1).strip()
+    s = re.sub(r"^(https?://)?(www\.)?tiktok\.com/@?", "", s, flags=re.I)
+    s = re.sub(r"^(https?://|@|www\.)+", "", s, flags=re.I)
+    s = s.lstrip("@").split("/")[0].split("?")[0].strip()
+    if not s or s.lower() in ("https:", "vt.tiktok.com", "vm.tiktok.com"):
+        raise ValueError("empty_channel")
+    return s
+
 
 
 def fetch_channel_videos(username: str, *, max_pages: int = 5) -> list[dict]:
+    """Lấy danh sách video kênh qua Apify nếu có token, fallback sang yt-dlp (FREE)."""
     username = parse_tiktok_username(username)
-    print(f"📡 [Apify] Đang lấy danh sách video của kênh @{username} qua Apify...")
-    
-    token = get_env("APIFY_TOKEN").strip()
-    if not token:
-        raise RuntimeError("Thiếu APIFY_TOKEN trong file .env trên VPS!")
-        
-    url = "https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items"
-    params = {"token": token}
-    payload = {
-        "profiles": [username],
-        "resultsPerPage": 30 * max_pages,
-        "shouldDownloadVideos": False,
-        "shouldDownloadCovers": False,
-        "shouldDownloadSlideshowImages": False
-    }
-    
-    try:
-        r = requests.post(url, params=params, json=payload, timeout=240)
-        if not r.ok:
-            print(f"   ❌ Apify API trả về lỗi: HTTP {r.status_code} - {r.text[:200]}")
-            r.raise_for_status()
-            
-        items = r.json()
-        if not isinstance(items, list):
-            print(f"   ⚠️ Dữ liệu trả về từ Apify không hợp lệ (không phải list): {items}")
-            return []
-            
-        videos = []
-        for item in items:
-            vid = str(item.get("id") or item.get("video_id") or "")
-            if not vid:
+
+    # 1. Thử cào qua Apify nếu có token
+    apify_token = os.environ.get("APIFY_TOKEN") or get_env("APIFY_TOKEN")
+    if apify_token:
+        print(f"   [Apify] Đang cào kênh @{username} qua Apify (Async)...")
+        try:
+            start_url = f"https://api.apify.com/v2/acts/clockworks~tiktok-scraper/runs?token={apify_token}"
+            payload = {
+                "profiles": [username],
+                "resultsPerPage": 60,
+                "shouldDownloadVideos": False,
+                "shouldDownloadCovers": False,
+                "shouldDownloadSlideshowImages": False
+            }
+            res = requests.post(start_url, json=payload, timeout=40)
+            if res.ok:
+                run_data = res.json().get("data", {})
+                run_id = run_data.get("id")
+                dataset_id = run_data.get("defaultDatasetId")
+                if run_id and dataset_id:
+                    # Poll cho tới khi hoàn tất
+                    poll_url = f"https://api.apify.com/v2/actor-runs/{run_id}?token={apify_token}"
+                    status = "RUNNING"
+                    start_time = time.time()
+                    while time.time() - start_time < 90:
+                        status_res = requests.get(poll_url, timeout=20)
+                        if status_res.ok:
+                            status_data = status_res.json().get("data", {})
+                            status = status_data.get("status")
+                            if status in ("SUCCEEDED", "FAILED", "TIMED-OUT", "ABORTED"):
+                                break
+                        time.sleep(3)
+
+                    if status == "SUCCEEDED":
+                        items_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={apify_token}"
+                        items_res = requests.get(items_url, timeout=40)
+                        if items_res.ok:
+                            items = items_res.json()
+                            videos = []
+                            for item in items:
+                                vid = item.get("id") or item.get("video_id")
+                                if not vid:
+                                    continue
+                                timestamp = item.get("createTime") or item.get("create_time") or 0
+                                videos.append({
+                                    "video_id": str(vid),
+                                    "create_time": int(timestamp),
+                                    "web_video_url": f"https://www.tiktok.com/@{username}/video/{vid}",
+                                    "hdplay": "",
+                                    "play": "",
+                                    "wmplay": "",
+                                })
+                            print(f"   ✅ [Apify] Lấy thành công {len(videos)} video từ Apify.")
+                            if videos:
+                                return videos
+                        else:
+                            print(f"   ⚠️ Lỗi lấy dữ liệu dataset từ Apify: HTTP {items_res.status_code}")
+                    else:
+                        print(f"   ⚠️ Apify actor kết thúc với trạng thái: {status}")
+                else:
+                    print(f"   ⚠️ Không lấy được run_id hoặc dataset_id từ kết quả khởi động Apify.")
+            else:
+                print(f"   ⚠️ Lỗi khi khởi động Apify actor: HTTP {res.status_code} - {res.text[:200]}")
+        except Exception as e:
+            print(f"   ⚠️ Lỗi khi cào qua Apify: {e}. Sẽ thử fallback qua yt-dlp...")
+
+    # 2. Fallback qua yt-dlp
+    print(f"   [yt-dlp] Đang cào kênh @{username} qua yt-dlp...")
+    url = f"https://www.tiktok.com/@{username}"
+
+    cmd = [
+        "yt-dlp",
+        "--impersonate", "chrome-133",
+        "--no-warnings",
+        "--socket-timeout", "20",
+        "--playlist-items", "1-60",
+        "--flat-playlist",
+        "--print", "%(id)s",
+        "--print", "%(timestamp)s",
+        url,
+    ]
+
+    out = ""
+    last_error = None
+    for attempt in range(3):
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            if proc.returncode != 0 and not proc.stdout.strip():
+                raise RuntimeError(proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "unknown")
+            out = proc.stdout
+            break
+        except Exception as e:
+            last_error = e
+            if attempt < 2 and "429" in str(e):
+                time.sleep(2 * (attempt + 1))
                 continue
-                
-            create_time = item.get("createTime") or item.get("create_time") or 0
-            video_meta = item.get("videoMeta") or {}
-            
-            # 1. Thử lấy link tải chuẩn từ Apify
-            play = video_meta.get("downloadAddr") or item.get("playUrl") or item.get("videoUrl") or item.get("play") or ""
-            hdplay = video_meta.get("downloadAddr") or item.get("hdPlayUrl") or item.get("hdplay") or play
-            
-            # 2. Fallback: Nếu không có link tải, giải mã qua API đơn lẻ của Tikwm (API này không bị Cloudflare WAF chặn)
-            if not play:
-                video_url = f"https://www.tiktok.com/@{username}/video/{vid}"
-                print(f"   ⚠️ Video {vid} thiếu link tải từ Apify, đang giải mã qua Tikwm: {video_url}")
-                try:
-                    resolve_url = f"https://www.tikwm.com/api/?url={video_url}&hd=1"
-                    res = requests.get(resolve_url, timeout=30)
-                    if res.ok:
-                        pay = res.json()
-                        if pay.get("code") == 0 and pay.get("data"):
-                            data = pay["data"]
-                            play = data.get("play") or ""
-                            hdplay = data.get("hdplay") or play
-                            print(f"   ✅ Giải mã thành công video {vid} qua Tikwm.")
-                except Exception as ex:
-                    print(f"   ⚠️ Lỗi giải mã video {vid} qua Tikwm: {ex}")
-            
-            # 3. Fallback phụ đề (phòng hờ)
-            if not play:
-                sub_links = video_meta.get("subtitleLinks") or []
-                if sub_links and isinstance(sub_links, list):
-                    for sub in sub_links:
-                        dl = sub.get("downloadLink") or sub.get("tiktokLink") or ""
-                        if dl and ("video" in dl or "mp4" in dl or "mime_type=video_mp4" in dl):
-                            play = dl
-                            hdplay = dl
-                            break
-            
-            videos.append({
-                "video_id": vid,
-                "create_time": int(create_time),
-                "web_video_url": f"https://www.tiktok.com/@{username}/video/{vid}",
-                "hdplay": hdplay,
-                "play": play,
-                "wmplay": item.get("wmplay") or "",
-            })
-            
-        print(f"   ✅ Lấy thành công {len(videos)} video từ Apify.")
-        return videos
-    except Exception as e:
-        print(f"   ❌ Lỗi gọi Apify cho kênh @{username}: {e}")
-        raise e
+    if not out:
+        raise RuntimeError(f"yt-dlp lỗi khi cào kênh: {last_error}")
+
+    lines = [l for l in out.splitlines() if l.strip()]
+    videos = []
+    for i in range(0, len(lines) - 1, 2):
+        vid = lines[i].strip()
+        ts_raw = lines[i + 1].strip()
+        if not vid:
+            continue
+        try:
+            timestamp = int(ts_raw or 0)
+        except ValueError:
+            timestamp = 0
+        videos.append({
+            "video_id": vid,
+            "create_time": timestamp,
+            "web_video_url": f"https://www.tiktok.com/@{username}/video/{vid}",
+            "hdplay": "",
+            "play": "",
+            "wmplay": "",
+        })
+    print(f"   ✅ Lấy thành công {len(videos)} video từ yt-dlp.")
+    return videos
+
+
+
+def resolve_play(username: str, video_id: str) -> str:
+    """Giải mã lấy link tải MP4 trực tiếp cho video (TikWM API)."""
+    video_url = f"https://www.tiktok.com/@{username}/video/{video_id}"
+    try:
+        res = requests.get(f"https://www.tikwm.com/api/?url={video_url}&hd=1", timeout=30)
+        if res.ok:
+            pay = res.json()
+            if pay.get("code") == 0 and pay.get("data"):
+                data = pay["data"]
+                return data.get("hdplay") or data.get("play") or ""
+    except Exception as ex:
+        print(f"   ⚠️ Lỗi giải mã TikWM cho video {video_id}: {ex}")
+    return ""
 
 
 def filter_videos_yesterday(videos: list[dict]) -> list[dict]:
@@ -335,22 +413,45 @@ def run_wardrobe_vae(
 MEO3_API_BASE = "https://api.meo3.cloud"
 
 
+def detect_image_aspect_ratio(image_path: str, default: str = "9:16") -> str:
+    """Tự động phát hiện tỉ lệ khung hình (9:16, 16:9, 1:1) của tệp ảnh."""
+    try:
+        from PIL import Image
+        with Image.open(image_path) as img:
+            w, h = img.size
+            ratio = w / h if h > 0 else 1.0
+            if ratio < 0.8:
+                return "9:16"
+            elif ratio > 1.25:
+                return "16:9"
+            else:
+                return "1:1"
+    except Exception:
+        return default
+
+
+# ── MEO3 Wardrobe (api.meo3.cloud) ─────────────────────────────────────────
+MEO3_API_BASE = os.environ.get("MEO3_API_BASE", "https://api.meo3.cloud").rstrip("/")
+MEO3_API_KEY = os.environ.get("MEO3_API_KEY", "")
+
+
 def run_wardrobe_meo3(
     template_url: str,
     clothes_path: str,
     *,
     tmp: str,
-    aspect_ratio: str = "1:1",
+    aspect_ratio: str = "9:16",
     poll_interval: float = 3.0,
     timeout_sec: float = 180.0,
 ) -> str:
     """Thay đồ qua API meo3.cloud — POST /api/try-on, rồi poll GET /api/tasks/{id}."""
-    # 1. Tải ảnh người mẫu (template) về local
     template_path = os.path.join(tmp, "meo3_person.jpg")
     download_file(template_url, template_path, referer="https://kaling.cloud/")
-    print(f"👗 Thay đồ Meo3 (aspect={aspect_ratio})...")
+    print(f"👗 Thay đồ Meo3 (api.meo3.cloud/api/try-on, aspect={aspect_ratio})...")
 
-    # 2. Gửi yêu cầu thay đồ
+    api_key = os.environ.get("MEO3_API_KEY") or MEO3_API_KEY
+    req_headers = {"X-API-Key": api_key} if api_key else {}
+
     with open(template_path, "rb") as fp_person, open(clothes_path, "rb") as fp_clothes:
         resp = requests.post(
             f"{MEO3_API_BASE}/api/try-on",
@@ -363,8 +464,10 @@ def run_wardrobe_meo3(
                 "aspectRatio": aspect_ratio,
                 "model": "nano_banana_pro",
             },
+            headers=req_headers,
             timeout=30,
         )
+
     if not resp.ok:
         raise RuntimeError(f"Meo3 try-on request failed: {resp.status_code} {resp.text[:200]}")
     task_id = resp.json().get("taskId")
@@ -372,7 +475,6 @@ def run_wardrobe_meo3(
         raise RuntimeError(f"Meo3 no taskId in response: {resp.text[:200]}")
     print(f"   Meo3 task: {task_id}")
 
-    # 3. Poll trạng thái
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
         time.sleep(poll_interval)
@@ -391,6 +493,71 @@ def run_wardrobe_meo3(
             raise RuntimeError(f"Meo3 task failed: {status_data.get('error', 'unknown')}")
 
     raise RuntimeError(f"Meo3 timeout sau {timeout_sec}s (task={task_id})")
+
+
+def run_wardrobe_aidancing(
+    template_url: str,
+    clothes_path: str,
+    *,
+    tmp: str,
+    aspect_ratio: str = "9:16",
+    poll_interval: float = 3.0,
+    timeout_sec: float = 180.0,
+) -> str:
+    """Thay đồ qua API chính chủ image.aidancing.net — POST /jobs (type=OUTFIT_SWAP)."""
+    template_path = os.path.join(tmp, "aidancing_person.jpg")
+    download_file(template_url, template_path, referer="https://kaling.cloud/")
+    print(f"👗 Thay đồ AiDancing chính chủ (image.aidancing.net)...")
+
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
+
+    with open(template_path, "rb") as fp_person, open(clothes_path, "rb") as fp_clothes:
+        resp = session.post(
+            f"https://image.aidancing.net/jobs",
+            files={
+                "image1": ("nguoi.jpg", fp_person, "image/jpeg"),
+                "image2": ("ao.jpg", fp_clothes, "image/jpeg"),
+            },
+            data={
+                "type": "OUTFIT_SWAP",
+                "prompt": "Thay the trang phuc cua nhan vat trong anh 1 bang trang phuc trong anh 2",
+            },
+            timeout=30,
+        )
+    if not resp.ok:
+        raise RuntimeError(f"AiDancing OUTFIT_SWAP request failed: {resp.status_code} {resp.text[:200]}")
+    
+    res_data = resp.json()
+    job_id = res_data.get("jobUid") or res_data.get("id")
+    if not job_id:
+        raise RuntimeError(f"AiDancing no jobUid in response: {resp.text[:200]}")
+    print(f"   AiDancing jobUid: {job_id}")
+
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        time.sleep(poll_interval)
+        status_resp = session.get(f"https://image.aidancing.net/jobs?type=OUTFIT_SWAP", timeout=15)
+        if not status_resp.ok:
+            continue
+        jobs = status_resp.json()
+        if isinstance(jobs, list):
+            target = next((j for j in jobs if (j.get("jobUid") == job_id or j.get("id") == job_id)), None)
+            if target:
+                status = str(target.get("status", "")).upper()
+                print(f"   AiDancing status: {status}")
+                if status == "COMPLETED":
+                    out_url = target.get("outputUrl")
+                    if not out_url:
+                        raise RuntimeError("AiDancing completed but no outputUrl")
+                    if not out_url.startswith("http"):
+                        out_url = f"https://image.aidancing.net{out_url}"
+                    return out_url
+                if status == "FAILED":
+                    raise RuntimeError(f"AiDancing job failed: {target.get('error', 'unknown')}")
+
+    print("⚠️ AiDancing timeout, fallback sang Meo3 backup...")
+    return run_wardrobe_meo3(template_url, clothes_path, tmp=tmp, aspect_ratio=aspect_ratio, poll_interval=poll_interval, timeout_sec=timeout_sec)
 
 
 
@@ -587,13 +754,14 @@ def _process_video_item(
             _sync_config_run_progress(
                 cfg_ref,
                 state="running",
-                phase=f"{progress_label}: đang thay đồ AI (VAE)…",
+                phase=f"{progress_label}: đang thay đồ AI (AiDancing)…",
             )
         try:
             _deduct_user_coins(db, admin_uid, cost_coins)
             coins_deducted = True
-            char_url = run_wardrobe_meo3(
-                template_url, frame_local, tmp=tmp,
+            aspect = detect_image_aspect_ratio(frame_local, default="9:16")
+            char_url = run_wardrobe_aidancing(
+                template_url, frame_local, tmp=tmp, aspect_ratio=aspect,
             )
             motion_url = upload_motion_video(video_local)
             order_id = create_batch_order(
@@ -964,6 +1132,11 @@ def run_batch(
             for idx, v in enumerate(videos, start=1):
                 vid = str(v.get("video_id") or "")
                 play = v.get("hdplay") or v.get("play") or ""
+                if not play and vid:
+                    print(f"   🔍 Lấy link MP4 trực tiếp cho video {vid} qua TikWM...")
+                    play = resolve_play(username, vid)
+                    v["play"] = play
+                    v["hdplay"] = play
                 if not vid or not play:
                     err = f"Video {vid or '?'}: không có link tải"
                     errors.append(err)

@@ -150,6 +150,7 @@ class AidancingApiClient:
         self._cookie = (cookie or load_cookie()).strip()
         if not self._cookie:
             raise ValueError("AIDANCING_COOKIE is empty")
+        import http.cookies
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -161,9 +162,16 @@ class AidancingApiClient:
                 "Accept": "*/*",
                 "Origin": AIDANCING_ORIGIN,
                 "Referer": DASHBOARD_URL,
-                "Cookie": self._cookie,
             }
         )
+        try:
+            C = http.cookies.SimpleCookie()
+            C.load(self._cookie)
+            for k, v in C.items():
+                self.session.cookies.set(k, v.value, domain="aidancing.net")
+        except Exception:
+            self.session.headers["Cookie"] = self._cookie
+
 
     @staticmethod
     def _check_auth(response: requests.Response) -> None:
@@ -243,7 +251,7 @@ class AidancingApiClient:
         found: dict[int, dict] = {}
         if not wanted:
             return found
-        for p in range(3):
+        for p in range(15):
             data = self.list_jobs(page=p, size=50)
             for item in data.get("items", []):
                 jid = int(item.get("id", 0))
@@ -252,6 +260,7 @@ class AidancingApiClient:
             if len(found) == len(wanted):
                 break
         return found
+
     def create_job(
         self,
         model_id,
@@ -268,50 +277,111 @@ class AidancingApiClient:
         if not os.path.isfile(video_path):
             raise RuntimeError(f"File không tồn tại: {video_path}")
 
-        with FileLock():
-            before_ids = {
-                int(j["id"]) for j in self.list_jobs(page=0, size=30).get("items", [])
-            }
+        temp_image_path = None
+        image_upload_path = image_path
+        try:
+            from PIL import Image
+            import tempfile
+            with Image.open(image_path) as img:
+                if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                    fmt = "PNG"
+                    ext = ".png"
+                else:
+                    fmt = "JPEG"
+                    ext = ".jpg"
+                
+                fd, temp_image_path = tempfile.mkstemp(suffix=ext)
+                os.close(fd)
+                
+                if fmt == "JPEG" and img.mode != "RGB":
+                    img = img.convert("RGB")
+                
+                img.save(temp_image_path, fmt, quality=95)
+                image_upload_path = temp_image_path
+        except Exception as pil_err:
+            print(f"⚠️ PIL preprocess warning: {pil_err}")
 
-            data = {
-                "jobTypeId": str(model_id),
-                "aspectRatio": aspect_ratio,
-                "qualityMode": str(quality_mode),
-                "title": title,
-                "userPrompt": "",
-                "voiceId": "",
-            }
-            img_mime = mimetypes.guess_type(image_path)[0] or "image/jpeg"
-            vid_mime = mimetypes.guess_type(video_path)[0] or "video/mp4"
+        try:
+            with FileLock():
+                before_ids: set[int] = set()
+                for _p in range(5):
+                    _items = self.list_jobs(page=_p, size=50).get("items", [])
+                    before_ids.update(int(j["id"]) for j in _items if j.get("id"))
+                    if len(_items) < 50:
+                        break
 
-            with open(image_path, "rb") as img, open(video_path, "rb") as vid:
-                files = {
-                    "image": (os.path.basename(image_path), img, img_mime),
-                    "video": (os.path.basename(video_path), vid, vid_mime),
+                data = {
+                    "jobTypeId": str(model_id),
+                    "aspectRatio": aspect_ratio,
+                    "qualityMode": str(quality_mode),
+                    "title": title,
+                    "userPrompt": "",
+                    "voiceId": "",
                 }
-                r = self.session.post(
-                    f"{AIDANCING_ORIGIN}/create/general",
-                    data=data,
-                    files=files,
-                    timeout=int(os.environ.get("BOT_CREATE_TIMEOUT_SEC", "600")),
-                    allow_redirects=False,
-                )
+                img_mime = mimetypes.guess_type(image_upload_path)[0] or "image/jpeg"
+                vid_mime = mimetypes.guess_type(video_path)[0] or "video/mp4"
 
-            if r.status_code not in (200, 302):
+                with open(image_upload_path, "rb") as img, open(video_path, "rb") as vid:
+                    files = {
+                        "image": (os.path.basename(image_upload_path), img, img_mime),
+                        "video": (os.path.basename(video_path), vid, vid_mime),
+                    }
+                    r = self.session.post(
+                        f"{AIDANCING_ORIGIN}/create/general",
+                        data=data,
+                        files=files,
+                        timeout=int(os.environ.get("BOT_CREATE_TIMEOUT_SEC", "600")),
+                        allow_redirects=True,
+                    )
+
+                if r.status_code != 200 or "create/general" in r.url:
+                    import re
+                    html = r.text or ""
+                    err_msg = "Lỗi không xác định hoặc tài khoản hết xu"
+                    alerts = re.findall(r'<div[^>]*class=\"[^\"]*(?:alert|error|danger|invalid)[^\"]*\"[^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE)
+                    if alerts:
+                        err_msg = re.sub(r'<[^>]+>', '', alerts[0]).strip()
+                    else:
+                        spans = re.findall(r'<span[^>]*class=\"[^\"]*(?:error|invalid)[^\"]*\"[^>]*>(.*?)</span>', html, re.DOTALL | re.IGNORECASE)
+                        if spans:
+                            err_msg = re.sub(r'<[^>]+>', '', spans[0]).strip()
+                    
+                    raise RuntimeError(f"Tạo job thất bại (Aidancing từ chối): {err_msg}")
+
+                wait_sec = int(os.environ.get("BOT_CREATE_JOB_APPEAR_SEC", "120"))
+                step = int(os.environ.get("BOT_CREATE_JOB_POLL_SEC", "3"))
+                deadline = time.monotonic() + wait_sec
+                new_seen: list[tuple] = []
+                while time.monotonic() < deadline:
+                    time.sleep(step)
+                    for page in range(20):
+                        items = self.list_jobs(page=page, size=50).get("items", [])
+                        for item in items:
+                            jid = int(item.get("id", 0))
+                            if not jid or jid in before_ids:
+                                continue
+                            it_title = (item.get("title") or "").strip()
+                            if len(new_seen) < 5:
+                                new_seen.append((jid, it_title, item.get("status")))
+                            if title and title != "MotionAI Bot":
+                                if it_title == title:
+                                    return str(jid)
+                            else:
+                                return str(jid)
+                        if len(items) < 50:
+                            break
+
+                detail = "\n".join(str(s) for s in new_seen) or "(rỗng)"
                 raise RuntimeError(
-                    f"Create job failed: HTTP {r.status_code}\n{(r.text or '')[:500]}"
+                    f"Đã submit nhưng không thấy job mới trên API. Pagination đã quét 20 trang. "
+                    f"Job mới quan sát thấy: {detail}"
                 )
-
-            wait_sec = int(os.environ.get("BOT_CREATE_JOB_APPEAR_SEC", "36"))
-            step = int(os.environ.get("BOT_CREATE_JOB_POLL_SEC", "3"))
-            for _ in range(max(1, wait_sec // step)):
-                time.sleep(step)
-                for item in self.list_jobs(page=0, size=30).get("items", []):
-                    jid = int(item.get("id", 0))
-                    if jid not in before_ids:
-                        return str(jid)
-
-            raise RuntimeError("Đã submit nhưng không thấy job mới trên API")
+        finally:
+            if temp_image_path and os.path.exists(temp_image_path):
+                try:
+                    os.remove(temp_image_path)
+                except Exception:
+                    pass
 
     def download_file(self, file_id, dest_path) -> str:
         file_id = str(file_id).split("/")[-1]

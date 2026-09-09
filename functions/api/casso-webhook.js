@@ -337,16 +337,20 @@ async function grantCoins(token, projectId, userId, coins, topupId) {
   let current = 0;
   if (userRes.ok) {
     const userData = await userRes.json();
-    current = parseInt(userData?.fields?.coins?.integerValue || 0);
+    const cField = userData?.fields?.coins;
+    const rawVal = cField?.integerValue ?? cField?.doubleValue ?? cField?.stringValue ?? "0";
+    current = parseFloat(rawVal) || 0;
   } else if (userRes.status !== 404) {
     const errText = await userRes.text();
     throw new Error(`Read user ${userId} failed (${userRes.status}): ${errText}`);
   }
 
+  const nextCoins = Math.round((current + coins) * 100) / 100;
+
   await fetch(`${baseUrl}/users/${userId}?updateMask.fieldPaths=coins`, {
     method: "PATCH",
     headers: { "Authorization": `Bearer ${token}` },
-    body: JSON.stringify({ fields: { coins: { integerValue: current + coins } } })
+    body: JSON.stringify({ fields: { coins: { doubleValue: nextCoins } } })
   });
 
   await fetch(`${baseUrl}/topups/${topupId}?updateMask.fieldPaths=status`, {

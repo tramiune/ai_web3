@@ -938,19 +938,42 @@ function metaEventId(prefix) {
     return `${safe}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function tiktokPixelId() {
+    return (window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.tiktokPixelId) || '';
+}
+
+function isTiktokPixelReady() {
+    return typeof ttq === 'object' && typeof ttq.track === 'function' && !!tiktokPixelId();
+}
+
 function trackMetaEvent(eventName, params = {}) {
-    if (!isMetaPixelReady()) return;
-    const payload = { ...params };
-    if (!payload.eventID) payload.eventID = metaEventId(eventName);
-    fbq('track', eventName, payload);
-    console.log(`📘 Meta Pixel: ${eventName}`, payload);
+    // 1. Track Meta Pixel
+    if (isMetaPixelReady()) {
+        const payload = { ...params };
+        if (!payload.eventID) payload.eventID = metaEventId(eventName);
+        fbq('track', eventName, payload);
+        console.log(`📘 Meta Pixel: ${eventName}`, payload);
+    }
+
+    // 2. Track TikTok Pixel
+    if (isTiktokPixelReady()) {
+        const payload = { ...params };
+        ttq.track(eventName, payload);
+        console.log(`🎵 TikTok Pixel: ${eventName}`, payload);
+    }
 }
 
 function updateMetaAdvancedMatching(user) {
-    if (!isMetaPixelReady() || !user?.email) return;
+    if (!user?.email) return;
     const em = String(user.email).trim().toLowerCase();
     if (!em) return;
-    fbq('init', metaPixelId(), { em });
+
+    if (isMetaPixelReady()) {
+        fbq('init', metaPixelId(), { em });
+    }
+    if (isTiktokPixelReady()) {
+        ttq.identify({ email: em });
+    }
 }
 
 export function t(path, params = {}) {
@@ -2723,8 +2746,8 @@ window.selectTopup = async (id, method = 'vietqr') => {
 
     const amount = selectedTopupPackage.amount;
     const bankId = "OCB";
-    const accNo = "CASS03121403";
-    const accName = "CAO THI QUYNH TRAM";
+    const accNo = "CASS0965951536";
+    const accName = "VAN DINH HOANG";
     const qrUrl = `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accName)}`;
 
     qrImg.src = qrUrl;

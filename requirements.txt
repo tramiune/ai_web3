@@ -5,3 +5,5 @@ google-cloud-firestore
 boto3
 Pillow
 imageio-ffmpeg
+yt-dlp
+curl_cffi
