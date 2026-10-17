@@ -26,8 +26,10 @@ function getServiceAccountFromEnv(env, key) {
 }
 
 function pickPrefixFromDescription(descUpper) {
-  // Match e.g. KL200ABCD, NH200ABCD or MS550Z9K1 anywhere in description
-  const m = (descUpper || '').match(/\b(KL|NH|MS)\d{1,6}[A-Z0-9]{2,8}\b/);
+  // Match e.g. KL200ABCD, NH200ABCD, MS550Z9K1, AQA..., TBT... anywhere in description
+  const m =
+    (descUpper || '').match(/\b(KL|NH|MS|AQA|TBT)\d{1,6}[A-Z0-9]{2,8}\b/) ||
+    (descUpper || '').match(/\b(AQA|TBT)[A-Z0-9]{4,14}\b/);
   return m ? m[1] : null;
 }
 
@@ -58,6 +60,37 @@ export async function onRequestPost(context) {
         const amount = transaction.amount || 0;
 
         const prefix = pickPrefixFromDescription(description);
+
+        if (prefix === 'AQA') {
+          const AQUA_AI_BACKEND_URL = 'https://aquaai.vn/api/payment/casso-webhook';
+          await fetch(AQUA_AI_BACKEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 0, data: [transaction] }),
+          }).catch((e) => console.error('AQA forward error:', e));
+          continue;
+        }
+
+        if (prefix === 'TBT') {
+          const TBT_URLS = [
+            'https://api.aquaai.vn:8443/api/payment/casso-webhook',
+            'https://tradebangtoan.cloud/api/payment/casso-webhook',
+          ];
+          for (const tbtUrl of TBT_URLS) {
+            try {
+              const r = await fetch(tbtUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 0, data: [transaction] }),
+              });
+              if (r.ok) break;
+            } catch (e) {
+              console.error('TBT forward error:', e);
+            }
+          }
+          continue;
+        }
+
         if (!prefix || !configs[prefix]) continue;
 
         let state = cache.get(prefix);
