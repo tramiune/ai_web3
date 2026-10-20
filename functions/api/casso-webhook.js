@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
         const prefix = pickPrefixFromDescription(description);
 
         if (prefix === 'AQA') {
-          const AQUA_AI_BACKEND_URL = 'https://aquaai.vn/api/payment/casso-webhook';
+          const AQUA_AI_BACKEND_URL = 'https://api.aquaai.vn/api/payment/casso-webhook';
           await fetch(AQUA_AI_BACKEND_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
