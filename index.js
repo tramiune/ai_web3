@@ -1,6 +1,7 @@
 import { onRequestPost as onCassoRequestPost } from './functions/api/casso-webhook.js';
 import { onRequestPost as onTikTokVideoPost } from './functions/api/tiktok-video.js';
 import { onRequestGet as onTikTokChannelGet } from './functions/api/tiktok-channel.js';
+import { handlePartnerVideosRequest } from './functions/api/partner-videos.js';
 
 function isAllowedMediaUrl(rawUrl) {
   try {
@@ -15,6 +16,11 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
     const method = request.method;
+
+    // --- Partner Customer API (/v1/videos & /v1/videos/:orderId) -------------
+    if (url.pathname === '/v1/videos' || url.pathname.startsWith('/v1/videos/')) {
+      return handlePartnerVideosRequest(request, env);
+    }
 
     // --- Casso (VietQR) webhook ----------------------------------------------
     if (url.pathname === '/api/casso-webhook' && method === 'POST') {

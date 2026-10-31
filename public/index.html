@@ -1604,10 +1604,10 @@ decoding="async">
                     <h3 style="font-size: 0.95rem; color: #fbbf24; font-weight: 700; margin-bottom: 10px;">📖 HƯỚNG DẪN TÍCH HỢP NHANH</h3>
                     <div style="font-size: 0.82rem; line-height: 1.6; color: #ececf1;">
                         <p style="margin-bottom: 8px;"><strong>1. Cổng kết nối (Endpoint):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">POST http://165.101.46.68:8080/v1/videos</pre>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">POST https://kaling.cloud/v1/videos</pre>
                         
                         <p style="margin-bottom: 8px;"><strong>2. Gửi yêu cầu tạo video (POST Request):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X POST http://165.101.46.68:8080/v1/videos \
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X POST https://kaling.cloud/v1/videos \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1625,7 +1625,7 @@ decoding="async">
 }</pre>
 
                         <p style="margin-bottom: 8px;"><strong>3. Lấy trạng thái / kết quả video (GET Request):</strong></p>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X GET http://165.101.46.68:8080/v1/videos/&lt;order_id&gt; \
+                        <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.78rem; border: 1px solid rgba(255,255,255,0.05); color: #c084fc; margin-bottom: 8px;">curl -X GET https://kaling.cloud/v1/videos/&lt;order_id&gt; \
   -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;"</pre>
                         <p style="margin-bottom: 4px; font-size: 0.75rem; color: var(--text-muted);">Phản hồi mẫu (Response JSON):</p>
                         <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.05); color: #4ade80; margin-bottom: 12px;">{
