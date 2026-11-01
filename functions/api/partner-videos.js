@@ -188,7 +188,7 @@ export async function handlePartnerVideosRequest(request, env) {
   }
 
   const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, '');
+  const path = url.pathname.replace(/^\/api(?=\/v1\/videos)/, '').replace(/\/+$/, '');
 
   let cfg;
   let token;

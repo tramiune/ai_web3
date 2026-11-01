@@ -17,8 +17,13 @@ export default {
     const url = new URL(request.url);
     const method = request.method;
 
-    // --- Partner Customer API (/v1/videos & /v1/videos/:orderId) -------------
-    if (url.pathname === '/v1/videos' || url.pathname.startsWith('/v1/videos/')) {
+    // --- Partner Customer API (/v1/videos & /api/v1/videos) ------------------
+    if (
+      url.pathname === '/v1/videos' ||
+      url.pathname.startsWith('/v1/videos/') ||
+      url.pathname === '/api/v1/videos' ||
+      url.pathname.startsWith('/api/v1/videos/')
+    ) {
       return handlePartnerVideosRequest(request, env);
     }
 
