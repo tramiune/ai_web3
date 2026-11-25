@@ -118,29 +118,57 @@ window.reportTopupComplaint = async () => {
 const KALING_VAE_10 = { cost: 5, maxVideoSec: 10, vaeDurationSec: 10, vaeResolution: '720p' };
 const KALING_VAE_15 = { cost: 9, maxVideoSec: 15, vaeDurationSec: 15, vaeResolution: '720p' };
 const KALING_VAE_20 = { cost: 10, maxVideoSec: 20, vaeDurationSec: 20, vaeResolution: '720p' };
+const DURATION_MODEL_KEYS = ['ad10', 'ad15', 'ad20', 'ad25', 'ad30'];
 const BATCH_CHANNEL_MODELS = {
     ad10: {
-        cost: 3.1,
+        cost: 3,
         modelId: '159',
         renderProvider: 'aidancing',
         maxVideoSec: 10,
-        serviceLabel: 'Nhanh (10s)',
+        serviceLabel: '10 giây',
         vaeDurationSec: 10,
         vaeResolution: '720p',
     },
+    ad15: {
+        cost: 4.5,
+        modelId: '248',
+        renderProvider: 'aidancing',
+        maxVideoSec: 15,
+        serviceLabel: '15 giây',
+        vaeDurationSec: 15,
+        vaeResolution: '720p',
+    },
     ad20: {
-        cost: 6.1,
+        cost: 6,
         modelId: '160',
         renderProvider: 'aidancing',
         maxVideoSec: 20,
-        serviceLabel: 'Nhanh (20s)',
+        serviceLabel: '20 giây',
         vaeDurationSec: 20,
+        vaeResolution: '720p',
+    },
+    ad25: {
+        cost: 7.5,
+        modelId: '248',
+        renderProvider: 'aidancing',
+        maxVideoSec: 25,
+        serviceLabel: '25 giây',
+        vaeDurationSec: 25,
+        vaeResolution: '720p',
+    },
+    ad30: {
+        cost: 9,
+        modelId: '248',
+        renderProvider: 'aidancing',
+        maxVideoSec: 30,
+        serviceLabel: '30 giây',
+        vaeDurationSec: 30,
         vaeResolution: '720p',
     },
 };
 const KALING_VAE_30 = { cost: 20, maxVideoSec: 30, vaeDurationSec: 30, vaeResolution: '720p' };
 /** Tạm ẩn trên UI — backend vẫn xử lý đơn cũ */
-const HIDDEN_MODEL_KEYS = new Set(['vae20', 'vae1080_30', 'vae10', 'vae15']);
+const HIDDEN_MODEL_KEYS = new Set(['vae20', 'vae1080_30', 'vae10', 'vae15', 'rbTrial']);
 const MAX_VIDEO_DURATION_SEC = KALING_VAE_30.maxVideoSec;
 const ROBONEO_TRIAL = {
     startMs: new Date('2026-06-19T00:00:00+07:00').getTime(),
@@ -152,14 +180,14 @@ const ROBONEO_TRIAL = {
 const MAX_CHAR_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024;
 
-/** Thời lượng video đã chọn — dùng validate tối đa 10s. */
+/** Thời lượng video đã chọn — dùng validate tối đa 30s. */
 let kalingSelectedDurationSec = null;
 
-/** Coin luôn là số nguyên — tránh hiển thị 99.0000000001 sau phép trừ float. */
+/** Làm tròn tối đa 2 chữ số thập phân để hỗ trợ giá .5 coin cho học viên mà không dính lỗi float. */
 function normalizeCoins(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
-    return Math.round(n);
+    return Math.round(n * 100) / 100;
 }
 
 function formatCoinAmount(value) {
@@ -395,28 +423,35 @@ function formatRoboneoTrialRemaining(userData) {
     return t('modals.roboneo_trial_remaining', { h, m });
 }
 
+function isHocVienPricingUser(userData) {
+    const uData = userData || window.__currentUserData || (typeof FB_CACHE !== 'undefined' && FB_CACHE.userProfile) || null;
+    return Boolean(
+        canUseBatchChannel() ||
+        (uData && (
+            uData.role === 'hocvien' ||
+            uData.role === 'student' ||
+            uData.isHocVien === true ||
+            uData.isStudent === true
+        ))
+    );
+}
+
 function getSelectedModelKey() {
     const checked = document.querySelector('input[name="model-type"]:checked');
-    let key = checked ? checked.value : 'ad20';
-    if (usesBatchChannelModelPricing() && key !== 'ad10' && key !== 'ad20') {
-        return 'ad10';
-    }
-    if (key === ROBONEO_TRIAL.modelKey && !isRoboneoTrialEligible(window.__currentUserData)) {
-        return 'ad10';
-    }
-    if (HIDDEN_MODEL_KEYS.has(key)) {
-        return 'ad10';
+    const key = checked ? checked.value : 'ad20';
+    if (!DURATION_MODEL_KEYS.includes(key) || HIDDEN_MODEL_KEYS.has(key)) {
+        return 'ad20';
     }
     return key;
 }
 
 function usesBatchChannelModelPricing() {
-    return canUseBatchChannel();
+    return isHocVienPricingUser();
 }
 
 function getModelPreset(modelKey) {
     const key = modelKey || getSelectedModelKey();
-    const base = MODELS[key] || MODELS.vae10;
+    const base = MODELS[key] || MODELS.ad20;
     const batch = BATCH_CHANNEL_MODELS[key];
     if (usesBatchChannelModelPricing() && batch) {
         return {
@@ -449,34 +484,35 @@ function modelCoinCost(modelKey) {
 function syncModelPriceLabels() {
     Object.keys(MODELS).forEach((key) => {
         const el = document.getElementById(`model-${key}-cost`);
-        if (el) el.textContent = String(getModelPreset(key).cost);
+        if (el) el.textContent = formatCoinAmount(getModelPreset(key).cost);
     });
+    const studentBadge = document.getElementById('student-pricing-badge');
+    if (studentBadge) {
+        studentBadge.style.display = isHocVienPricingUser() ? 'inline-flex' : 'none';
+    }
 }
 
 function syncOrderModelCardCopy() {
-    const batch = usesBatchChannelModelPricing();
     const cards = [
-        { key: 'ad10', titleKey: 'build_channel.model_10s', descKey: 'build_channel.model_10s_desc', defaultTitle: 'modals.model_ad10', defaultDesc: 'modals.model_ad10_desc' },
-        { key: 'ad20', titleKey: 'build_channel.model_20s', descKey: 'build_channel.model_20s_desc', defaultTitle: 'modals.model_ad20', defaultDesc: 'modals.model_ad20_desc' },
+        { key: 'ad10', titleKey: 'modals.model_ad10', descKey: 'modals.model_ad10_desc' },
+        { key: 'ad15', titleKey: 'modals.model_ad15', descKey: 'modals.model_ad15_desc' },
+        { key: 'ad20', titleKey: 'modals.model_ad20', descKey: 'modals.model_ad20_desc' },
+        { key: 'ad25', titleKey: 'modals.model_ad25', descKey: 'modals.model_ad25_desc' },
+        { key: 'ad30', titleKey: 'modals.model_ad30', descKey: 'modals.model_ad30_desc' },
     ];
-    cards.forEach(({ key, titleKey, descKey, defaultTitle, defaultDesc }) => {
+    cards.forEach(({ key, titleKey, descKey }) => {
         const label = document.querySelector(`input[name="model-type"][value="${key}"]`)?.closest('label');
         if (!label) return;
         const titleEl = label.querySelector('.model-card-title');
         const descEl = label.querySelector('.model-card-desc');
-        if (titleEl) titleEl.textContent = t(batch ? titleKey : defaultTitle);
-        if (descEl) descEl.textContent = t(batch ? descKey : defaultDesc);
+        if (titleEl) titleEl.textContent = t(titleKey);
+        if (descEl) descEl.textContent = t(descKey);
     });
 }
 
 function updateOrderModelSelectionUI() {
-    const batchOnly = usesBatchChannelModelPricing();
     const trialWrap = document.getElementById('model-rbtrial-wrap');
-    if (trialWrap) {
-        trialWrap.style.display = batchOnly ? 'none' : (isRoboneoTrialEligible(window.__currentUserData) ? '' : 'none');
-    }
-    const vae1080Label = document.querySelector('input[name="model-type"][value="vae1080_30"]')?.closest('label');
-    if (vae1080Label) vae1080Label.style.display = batchOnly ? 'none' : '';
+    if (trialWrap) trialWrap.style.display = 'none';
 
     HIDDEN_MODEL_KEYS.forEach((modelKey) => {
         const label = document.querySelector(`input[name="model-type"][value="${modelKey}"]`)?.closest('label');
@@ -486,11 +522,7 @@ function updateOrderModelSelectionUI() {
     });
 
     const checked = document.querySelector('input[name="model-type"]:checked');
-    if (checked && HIDDEN_MODEL_KEYS.has(checked.value)) {
-        const fallback = document.querySelector('input[name="model-type"][value="ad20"]');
-        if (fallback) fallback.checked = true;
-    }
-    if (batchOnly && checked && checked.value !== 'ad10' && checked.value !== 'ad20') {
+    if (!checked || !DURATION_MODEL_KEYS.includes(checked.value) || HIDDEN_MODEL_KEYS.has(checked.value)) {
         const fallback = document.querySelector('input[name="model-type"][value="ad20"]');
         if (fallback) fallback.checked = true;
     }
@@ -666,6 +698,16 @@ const MODELS = {
         vaeDurationSec: 10,
         vaeResolution: "720p",
     },
+    ad15: {
+        nameKey: "modals.model_ad15",
+        cost: 9,
+        timeKey: "modals.model_ad15_desc",
+        modelId: "248",
+        renderProvider: "aidancing",
+        maxVideoSec: 15,
+        vaeDurationSec: 15,
+        vaeResolution: "720p",
+    },
     ad20: {
         nameKey: "modals.model_ad20",
         cost: 12,
@@ -674,6 +716,26 @@ const MODELS = {
         renderProvider: "aidancing",
         maxVideoSec: 20,
         vaeDurationSec: 20,
+        vaeResolution: "720p",
+    },
+    ad25: {
+        nameKey: "modals.model_ad25",
+        cost: 15,
+        timeKey: "modals.model_ad25_desc",
+        modelId: "248",
+        renderProvider: "aidancing",
+        maxVideoSec: 25,
+        vaeDurationSec: 25,
+        vaeResolution: "720p",
+    },
+    ad30: {
+        nameKey: "modals.model_ad30",
+        cost: 18,
+        timeKey: "modals.model_ad30_desc",
+        modelId: "248",
+        renderProvider: "aidancing",
+        maxVideoSec: 30,
+        vaeDurationSec: 30,
         vaeResolution: "720p",
     },
     vae15: {
@@ -711,15 +773,10 @@ const MODELS = {
 function localizedModel(key) {
     const modelKey = key || getSelectedModelKey();
     const m = getModelPreset(modelKey);
-    const batch = usesBatchChannelModelPricing() && BATCH_CHANNEL_MODELS[modelKey];
     return {
         ...m,
-        name: batch
-            ? t(modelKey === 'ad10' ? 'build_channel.model_10s' : 'build_channel.model_20s')
-            : t(m.nameKey),
-        time: batch
-            ? t(modelKey === 'ad10' ? 'build_channel.model_10s_desc' : 'build_channel.model_20s_desc')
-            : t(m.timeKey),
+        name: t(m.nameKey),
+        time: t(m.timeKey),
         cost: m.cost,
         renderProvider: m.renderProvider,
     };
@@ -1896,6 +1953,7 @@ async function handleUserLoggedIn(user) {
 
             updateBatchChannelNewBadge();
             updateBatchChannelNavVisibility(window.__batchChannelAllowed);
+            updateFirstOrderUI();
 
             if (isAdmin) {
                 const adminProfileItem = document.getElementById('admin-dropdown-item-profile');
@@ -2758,12 +2816,10 @@ window.selectTopup = async (id, method = 'vietqr') => {
 window.openOrderModal = () => {
     updateRoboneoTrialUI(window.__currentUserData);
     updateOrderModelSelectionUI();
-    if (usesBatchChannelModelPricing()) {
+    const checked = document.querySelector('input[name="model-type"]:checked');
+    if (!checked || !DURATION_MODEL_KEYS.includes(checked.value)) {
         const defaultModel = document.querySelector('input[name="model-type"][value="ad20"]');
         if (defaultModel) defaultModel.checked = true;
-    } else if (isRoboneoTrialEligible(window.__currentUserData)) {
-        const trialRadio = document.querySelector(`input[name="model-type"][value="${ROBONEO_TRIAL.modelKey}"]`);
-        if (trialRadio) trialRadio.checked = true;
     }
     updateFirstOrderUI();
     window.switchVideoSource('upload');
@@ -3920,11 +3976,19 @@ async function setupEventListeners() {
                     return showToast(t('modals.video_upload_required'));
                 }
 
-                // Tự động chuyển model 20s xuống 10s nếu video tải lên ngắn hơn hoặc bằng 10s
-                if (modelKeySelected === 'ad20' && kalingDurationSec <= 10.15) {
-                    modelKeySelected = 'ad10';
-                    maxSec = getMaxVideoSecForModel(modelKeySelected);
-                    console.log('🔄 Auto downgraded ad20 -> ad10 due to video <= 10s');
+                // Tự động hạ mốc thời lượng nếu video tải lên ngắn hơn mốc khách chọn (tránh bị tính giá cao hơn)
+                if (DURATION_MODEL_KEYS.includes(modelKeySelected)) {
+                    let fittedKey = 'ad30';
+                    if (kalingDurationSec <= 10.15) fittedKey = 'ad10';
+                    else if (kalingDurationSec <= 15.15) fittedKey = 'ad15';
+                    else if (kalingDurationSec <= 20.15) fittedKey = 'ad20';
+                    else if (kalingDurationSec <= 25.15) fittedKey = 'ad25';
+                    const fittedMaxSec = getMaxVideoSecForModel(fittedKey);
+                    if (fittedMaxSec < maxSec) {
+                        console.log(`🔄 Auto downgraded ${modelKeySelected} (${maxSec}s) -> ${fittedKey} (${fittedMaxSec}s) due to video ${kalingDurationSec.toFixed(2)}s`);
+                        modelKeySelected = fittedKey;
+                        maxSec = fittedMaxSec;
+                    }
                 }
 
                 const longVideo = kalingDurationSec > 30.15;
@@ -4006,7 +4070,7 @@ async function setupEventListeners() {
                     const aspectRatio = aspectRatioEl ? aspectRatioEl.value : '16:9';
 
                     transaction.update(userRef, {
-                        coins: currentCoins - model.cost,
+                        coins: normalizeCoins(currentCoins - model.cost),
                         updatedAt: serverTimestamp()
                     });
 
@@ -4530,7 +4594,7 @@ function renderAdminUsers() {
                 </td>
                 <td>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <input type="number" value="${d.coins || 0}" 
+                        <input type="number" step="any" value="${formatCoinAmount(d.coins || 0)}" 
                                style="width: 80px; padding: 4px 8px; border-radius:4px; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); color:white;"
                                id="user-coins-${d.id}">
                         <button class="btn-primary" style="padding: 4px 8px; font-size:0.75rem;" 
@@ -5223,7 +5287,8 @@ window.changeAdminReferralPage = (newPage) => {
 window.updateUserCoins = async (userId) => {
     const { db, doc, updateDoc } = window.firebase;
     const input = document.getElementById(`user-coins-${userId}`);
-    const newAmount = parseInt(input.value);
+    const parsed = parseFloat(input.value);
+    const newAmount = Number.isFinite(parsed) ? normalizeCoins(parsed) : NaN;
     
     if (isNaN(newAmount)) return showToast(t('admin.toast_invalid_amount'));
 
@@ -7116,10 +7181,13 @@ function applyBatchChannelConfigToForm(cfg) {
 function parseTikTokUsername(raw) {
     const s = (raw || '').trim();
     if (!s) return '';
-    if (s.startsWith('@')) return s.slice(1).split('/')[0];
+    if (s.startsWith('@')) return s.slice(1).split('/')[0].split('?')[0].trim();
     const m = s.match(/tiktok\.com\/@([^/?#]+)/i);
-    if (m) return m[1];
-    return s.replace(/^@/, '').split('/')[0];
+    if (m) return m[1].trim();
+    if (/^https?:\/\//i.test(s) || /^(vt|vm)\.tiktok\.com/i.test(s)) {
+        return /(tiktok\.com)/i.test(s) ? s : '';
+    }
+    return s.replace(/^@/, '').split('/')[0].split('?')[0].trim();
 }
 
 function batchChannelRunNowPending(cfg) {

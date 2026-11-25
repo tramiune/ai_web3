@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="icon-32.png" sizes="32x32">
     <link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
@@ -877,26 +877,59 @@
                         <li class="batch-step">
                             <span class="batch-step-num">3</span>
                             <div class="batch-step-body">
-                                <div class="batch-field-label" data-i18n="build_channel.model_label">Chọn gói</div>
-                                <div class="model-selection-grid batch-model-grid">
-                                    <label class="card compact-card" style="cursor: pointer; padding: 0.8rem;">
+                                <div class="batch-field-label" data-i18n="build_channel.model_label">Chọn thời lượng</div>
+                                <div class="model-selection-grid duration-selection-grid batch-model-grid">
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.7rem 0.45rem;">
                                         <input type="radio" name="batch-model-type" value="ad10" checked>
-                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
                                             <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_10s">10 giây</div>
-                                            <div style="font-size: 0.7rem; color: var(--text-muted);" data-i18n="build_channel.model_10s_desc">720p · Kling 2.6</div>
-                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                                <span>3.1</span>
+                                            <div style="font-size: 0.68rem; color: var(--text-muted);" data-i18n="build_channel.model_10s_desc">Tối đa 10s</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                                <span>3</span>
                                                 <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                             </div>
                                         </div>
                                     </label>
-                                    <label class="card compact-card" id="batch-model-ad20-wrap" style="cursor: pointer; padding: 0.8rem;">
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                        <input type="radio" name="batch-model-type" value="ad15">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                            <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_15s">15 giây</div>
+                                            <div style="font-size: 0.68rem; color: var(--text-muted);" data-i18n="build_channel.model_15s_desc">Tối đa 15s</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                                <span>4.5</span>
+                                                <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="card compact-card" id="batch-model-ad20-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
                                         <input type="radio" name="batch-model-type" value="ad20">
-                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
                                             <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_20s">20 giây</div>
-                                            <div style="font-size: 0.7rem; color: var(--text-muted);" data-i18n="build_channel.model_20s_desc">720p · Kling 2.6 Pro</div>
-                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                                <span>6.1</span>
+                                            <div style="font-size: 0.68rem; color: var(--text-muted);" data-i18n="build_channel.model_20s_desc">Tối đa 20s</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                                <span>6</span>
+                                                <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                        <input type="radio" name="batch-model-type" value="ad25">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                            <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_25s">25 giây</div>
+                                            <div style="font-size: 0.68rem; color: var(--text-muted);" data-i18n="build_channel.model_25s_desc">Tối đa 25s</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                                <span>7.5</span>
+                                                <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="card compact-card" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                        <input type="radio" name="batch-model-type" value="ad30">
+                                        <div class="card-content-inline" style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                            <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="build_channel.model_30s">30 giây</div>
+                                            <div style="font-size: 0.68rem; color: var(--text-muted);" data-i18n="build_channel.model_30s_desc">Tối đa 30s</div>
+                                            <div style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                                <span>9</span>
                                                 <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                             </div>
                                         </div>
@@ -1155,112 +1188,82 @@
                     <div id="custom-model-info" style="display: none; margin-bottom: 1.5rem;"></div>
 
                     <div class="form-group" id="model-selection-group">
-                        <label data-i18n="modals.model_label">Chọn gói</label>
-                        <div class="model-selection-grid">
-                            <label class="card compact-card model-rbtrial-card" id="model-rbtrial-wrap" style="display: none; cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="rbTrial">
-                                <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div style="font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;">
-                                        <span data-i18n="modals.model_rbTrial">Ưu đãi nick mới</span>
-                                        <span class="model-trial-badge" data-i18n="status.new">MỚI</span>
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_rbTrial_desc">720p · 10s · 24h</div>
-                                    <div id="rbtrial-countdown" class="model-trial-countdown"></div>
-                                    <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-rbTrial-cost">3</span>
-                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
-                                    </div>
-                                </div>
-                            </label>
-                            <label class="card compact-card" id="model-ad10-wrap" style="cursor: pointer; padding: 0.8rem;">
+                        <div class="model-label-row">
+                            <label data-i18n="modals.model_label" style="margin-bottom: 0;">Chọn thời lượng</label>
+                            <span id="student-pricing-badge" class="student-discount-badge" style="display: none;" data-i18n="modals.student_discount_badge">Học viên -50%</span>
+                        </div>
+                        <div class="model-selection-grid duration-selection-grid">
+                            <label class="card compact-card" id="model-ad10-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
                                 <input type="radio" name="model-type" value="ad10">
                                 <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
                                     <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_ad10">
-                                        Nhanh 10s</div>
-                                    <div class="model-card-desc" style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_ad10_desc">720p · tối đa 10s</div>
+                                        10 giây</div>
+                                    <div class="model-card-desc" style="font-size: 0.68rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_ad10_desc">Tối đa 10s</div>
                                     <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
                                         <span id="model-ad10-cost">6</span>
                                         <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                     </div>
                                 </div>
                             </label>
-                            <label class="card compact-card" id="model-ad20-wrap" style="cursor: pointer; padding: 0.8rem;">
+                            <label class="card compact-card" id="model-ad15-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                <input type="radio" name="model-type" value="ad15">
+                                <div class="card-content-inline"
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_ad15">
+                                        15 giây</div>
+                                    <div class="model-card-desc" style="font-size: 0.68rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_ad15_desc">Tối đa 15s</div>
+                                    <div
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                        <span id="model-ad15-cost">9</span>
+                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="card compact-card" id="model-ad20-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
                                 <input type="radio" name="model-type" value="ad20" checked>
                                 <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
                                     <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_ad20">
-                                        Nhanh 20s</div>
-                                    <div class="model-card-desc" style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_ad20_desc">720p · tối đa 20s</div>
+                                        20 giây</div>
+                                    <div class="model-card-desc" style="font-size: 0.68rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_ad20_desc">Tối đa 20s</div>
                                     <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
                                         <span id="model-ad20-cost">12</span>
                                         <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                     </div>
                                 </div>
                             </label>
-                            <label class="card compact-card" id="model-vae10-wrap" style="cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="vae10">
+                            <label class="card compact-card" id="model-ad25-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                <input type="radio" name="model-type" value="ad25">
                                 <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_vae10">
-                                        Kling 2.6</div>
-                                    <div class="model-card-desc" style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_vae10_desc">720p · tối đa 10s</div>
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_ad25">
+                                        25 giây</div>
+                                    <div class="model-card-desc" style="font-size: 0.68rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_ad25_desc">Tối đa 25s</div>
                                     <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-vae10-cost">5</span>
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                        <span id="model-ad25-cost">15</span>
                                         <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                     </div>
                                 </div>
                             </label>
-                            <label class="card compact-card" id="model-vae15-wrap" style="cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="vae15">
+                            <label class="card compact-card" id="model-ad30-wrap" style="cursor: pointer; padding: 0.7rem 0.45rem;">
+                                <input type="radio" name="model-type" value="ad30">
                                 <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_vae15">
-                                        Kling 2.6 Plus</div>
-                                    <div class="model-card-desc" style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_vae15_desc">720p · tối đa 15s</div>
+                                    style="flex-direction: column; align-items: center; text-align: center; gap: 3px;">
+                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_ad30">
+                                        30 giây</div>
+                                    <div class="model-card-desc" style="font-size: 0.68rem; color: var(--text-muted);"
+                                        data-i18n="modals.model_ad30_desc">Tối đa 30s</div>
                                     <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-vae15-cost">9</span>
-                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
-                                    </div>
-                                </div>
-                            </label>
-                            <label class="card compact-card" id="model-vae20-wrap" style="display: none; cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="vae20">
-                                <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div class="model-card-title" style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_vae20">
-                                        Kling 2.6 Pro</div>
-                                    <div class="model-card-desc" style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_vae20_desc">1080p · tối đa 20s</div>
-                                    <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-vae20-cost">10</span>
-                                        <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
-                                    </div>
-                                </div>
-                            </label>
-                            <label class="card compact-card" id="model-vae1080_30-wrap" style="display: none; cursor: pointer; padding: 0.8rem;">
-                                <input type="radio" name="model-type" value="vae1080_30">
-                                <div class="card-content-inline"
-                                    style="flex-direction: column; align-items: center; text-align: center; gap: 4px;">
-                                    <div style="font-weight: 700; font-size: 0.85rem;" data-i18n="modals.model_vae1080_30">
-                                        Kling 2.6 HD</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted);"
-                                        data-i18n="modals.model_vae1080_30_desc">1080p · tối đa 30s</div>
-                                    <div
-                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <span id="model-vae1080_30-cost">20</span>
+                                        style="color: var(--accent); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 3px;">
+                                        <span id="model-ad30-cost">18</span>
                                         <span style="font-size: 0.65rem; opacity: 0.8;">Coins</span>
                                     </div>
                                 </div>
@@ -1413,7 +1416,7 @@
     </div>
 
     <script src="lang-config.js"></script>
-    <script src="translations.js"></script>
+    <script src="translations.js?v=2"></script>
     <script src="translations-locales.js"></script>
     <!-- Firebase SDKs -->
     <script type="module">
@@ -1424,7 +1427,7 @@
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         import { firebaseConfig, ADMIN_EMAILS } from "./firebase-config.js";
-        import { initAppLogic } from "./script.js?v=7";
+        import { initAppLogic } from "./script.js?v=8";
 
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
