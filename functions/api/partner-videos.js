@@ -327,6 +327,35 @@ export async function handlePartnerVideosRequest(request, env) {
     return handlePartnerVideosSupabase(request, env, path);
   }
 
+  // Proxy thẳng sang VPS AquaAI backend (Supabase kaling_* — không cần cấu hình secrets trên Cloudflare)
+  const upstreamUrl = 'https://api.aquaai.vn/api/payment/kaling-v1' + path.replace(/^\/v1/, '') + url.search;
+  const headers = new Headers();
+  const auth = request.headers.get('Authorization');
+  const xKey = request.headers.get('X-API-Key');
+  const ctype = request.headers.get('Content-Type');
+  if (auth) headers.set('Authorization', auth);
+  if (xKey) headers.set('X-API-Key', xKey);
+  if (ctype) headers.set('Content-Type', ctype);
+
+  const upstreamRes = await fetch(upstreamUrl, {
+    method: request.method,
+    headers,
+    body: request.method === 'POST' ? await request.text() : undefined,
+  });
+  const respText = await upstreamRes.text();
+  return new Response(respText, {
+    status: upstreamRes.status,
+    headers: {
+      'Content-Type': upstreamRes.headers.get('Content-Type') || 'application/json',
+      'Cache-Control': 'no-store',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+// Legacy Firestore handler retained below only as reference
+async function _legacyHandlePartnerVideosFirestore(request, env, path) {
+
   let cfg;
   let token;
   try {
