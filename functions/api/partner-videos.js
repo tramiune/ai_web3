@@ -182,6 +182,139 @@ function isHttpUrl(val) {
   }
 }
 
+function isKalingSupabaseEnabled(env) {
+  return (
+    String(env?.KALING_DB_BACKEND || '').trim().toLowerCase() === 'supabase' &&
+    Boolean(env?.SUPABASE_URL) &&
+    Boolean(env?.SUPABASE_SERVICE_ROLE_KEY)
+  );
+}
+
+function sbHeaders(env) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function handlePartnerVideosSupabase(request, env, path) {
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  const apiKey = extractApiKey(request);
+  if (!apiKey) {
+    return jsonResponse({ detail: 'Missing or invalid Authorization header' }, 401);
+  }
+
+  // POST /v1/videos -> atomic RPC kaling_partner_create_order
+  if (path === '/v1/videos' && request.method === 'POST') {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      return jsonResponse({ detail: 'Invalid JSON body' }, 400);
+    }
+
+    const modelId = String(payload?.model_id || '').trim();
+    if (modelId !== '159' && modelId !== '160') {
+      return jsonResponse(
+        { detail: "Invalid model_id. Only '159' (10s) and '160' (20s) are supported." },
+        400
+      );
+    }
+
+    const charUrl = String(payload?.character_image_url || '').trim();
+    const refVideoUrl = String(payload?.reference_video_url || '').trim();
+    if (!isHttpUrl(charUrl) || !isHttpUrl(refVideoUrl)) {
+      return jsonResponse(
+        { detail: 'Both character_image_url and reference_video_url must be valid HTTP/HTTPS URLs.' },
+        400
+      );
+    }
+
+    const quality = String(payload?.quality || '720p').trim();
+    const orderId = 'kl_ord_' + randomHex(8);
+
+    const rpcRes = await fetch(`${base}/rest/v1/rpc/kaling_partner_create_order`, {
+      method: 'POST',
+      headers: sbHeaders(env),
+      body: JSON.stringify({
+        p_api_key: apiKey,
+        p_model_id: modelId,
+        p_char_url: charUrl,
+        p_ref_video_url: refVideoUrl,
+        p_quality: quality,
+        p_order_id: orderId,
+      }),
+    });
+
+    if (!rpcRes.ok) {
+      const errText = await rpcRes.text();
+      return jsonResponse({ detail: 'Database transaction failed: ' + errText }, 500);
+    }
+
+    const result = await rpcRes.json();
+    if (!result?.ok) {
+      return jsonResponse({ detail: result?.detail || 'Order rejected' }, result?.http_status || 400);
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        order_id: result.order_id,
+        status: result.status || 'pending',
+        cost_credits: Number(result.cost_credits || 0),
+      },
+      202
+    );
+  }
+
+  // GET /v1/videos/:orderId -> authenticate api_key + fetch kaling_orders
+  const matchGet = path.match(/^\/v1\/videos\/([^/]+)$/);
+  if (matchGet && request.method === 'GET') {
+    const userRes = await fetch(
+      `${base}/rest/v1/kaling_users?api_key=eq.${encodeURIComponent(apiKey)}&select=id&limit=1`,
+      { headers: sbHeaders(env) }
+    );
+    if (!userRes.ok) {
+      return jsonResponse({ detail: 'Failed to authenticate API Key' }, 500);
+    }
+    const users = await userRes.json();
+    if (!Array.isArray(users) || users.length === 0) {
+      return jsonResponse({ detail: 'Invalid API Key' }, 403);
+    }
+    const uid = String(users[0].id);
+
+    const orderId = decodeURIComponent(matchGet[1]);
+    const ordRes = await fetch(
+      `${base}/rest/v1/kaling_orders?id=eq.${encodeURIComponent(orderId)}&select=id,user_id,status,result_link,error_message,system_note,admin_note&limit=1`,
+      { headers: sbHeaders(env) }
+    );
+    if (!ordRes.ok) {
+      const errText = await ordRes.text();
+      return jsonResponse({ detail: 'Failed to read order: ' + errText }, 500);
+    }
+    const orders = await ordRes.json();
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return jsonResponse({ detail: 'Order not found' }, 404);
+    }
+    const ord = orders[0];
+    if (String(ord.user_id) !== uid) {
+      return jsonResponse({ detail: 'Access denied for this order' }, 403);
+    }
+    const status = String(ord.status || 'pending');
+    const errorMessage = ord.error_message || ord.system_note || ord.admin_note || null;
+    return jsonResponse({
+      order_id: orderId,
+      status,
+      result_url: ord.result_link || null,
+      error_message: status === 'failed' ? errorMessage : null,
+    });
+  }
+
+  return jsonResponse({ detail: 'Method Not Allowed' }, 405);
+}
+
 export async function handlePartnerVideosRequest(request, env) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -189,6 +322,10 @@ export async function handlePartnerVideosRequest(request, env) {
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api(?=\/v1\/videos)/, '').replace(/\/+$/, '');
+
+  if (isKalingSupabaseEnabled(env)) {
+    return handlePartnerVideosSupabase(request, env, path);
+  }
 
   let cfg;
   let token;

@@ -15,6 +15,118 @@ function isStarterTopup(topup) {
   return Number(topup?.coins) === 10 && Number(topup?.amount) === 10000;
 }
 
+function isKalingSupabaseEnabled(env) {
+  return (
+    String(env?.KALING_DB_BACKEND || '').trim().toLowerCase() === 'supabase' &&
+    Boolean(env?.SUPABASE_URL) &&
+    Boolean(env?.SUPABASE_SERVICE_ROLE_KEY)
+  );
+}
+
+function sbHeaders(env, extra = {}) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+}
+
+function mapSupabaseKalingTopup(row) {
+  if (!row || !row.id) return null;
+  return {
+    id: String(row.id),
+    userId: String(row.user_id || ''),
+    status: String(row.status || ''),
+    transferContent: String(row.transfer_content || ''),
+    coins: Number(row.coins || 0),
+    userName: row.user_name || 'Khách',
+    userEmail: row.user_email || '',
+    amount: Math.round(Number(row.amount || 0)),
+    packageId: row.package_id || '',
+    currency: row.currency || 'VND',
+  };
+}
+
+async function findPendingKalingTopupSupabase(env, codes) {
+  if (!Array.isArray(codes) || codes.length === 0) return null;
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  for (const code of codes) {
+    const url = `${base}/rest/v1/kaling_topups?transfer_content=ilike.${encodeURIComponent(code)}&status=eq.pending&limit=5`;
+    const res = await fetch(url, { headers: sbHeaders(env) });
+    if (!res.ok) continue;
+    const rows = await res.json();
+    if (Array.isArray(rows) && rows.length > 0) {
+      return mapSupabaseKalingTopup(rows[0]);
+    }
+  }
+  return null;
+}
+
+async function fetchRecentPendingKalingTopupsSupabase(env, daysBack = 14) {
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  const sinceIso = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  const url = `${base}/rest/v1/kaling_topups?status=eq.pending&created_at=gte.${encodeURIComponent(sinceIso)}&order=created_at.desc&limit=1000`;
+  const res = await fetch(url, { headers: sbHeaders(env) });
+  if (!res.ok) return [];
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return [];
+  return rows.map(mapSupabaseKalingTopup).filter(Boolean);
+}
+
+async function kalingUserHasApprovedStarterSupabase(env, userId, excludeTopupId = '') {
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  const url = `${base}/rest/v1/kaling_topups?user_id=eq.${encodeURIComponent(userId)}&status=eq.approved&select=id,package_id,coins,amount&limit=100`;
+  const res = await fetch(url, { headers: sbHeaders(env) });
+  if (!res.ok) return false;
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return false;
+  return rows.some((r) => {
+    if (excludeTopupId && String(r.id) === String(excludeTopupId)) return false;
+    if (r.package_id === 'starter_v2') return true;
+    return Number(r.coins) === 10 && Math.round(Number(r.amount)) === 10000;
+  });
+}
+
+async function approveKalingTopupSupabase(env, topupId, actualAmount) {
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  const res = await fetch(`${base}/rest/v1/rpc/kaling_approve_topup`, {
+    method: 'POST',
+    headers: sbHeaders(env),
+    body: JSON.stringify({
+      p_topup_id: topupId,
+      p_actual_amount: actualAmount,
+      p_gateway: 'casso',
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Supabase kaling_approve_topup failed (${res.status}): ${txt}`);
+  }
+  return res.json();
+}
+
+async function fetchKalingTodayTotalSupabase(env) {
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, '');
+  const now = new Date();
+  const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  vnTime.setUTCHours(0, 0, 0, 0);
+  const startOfDayUtc = new Date(vnTime.getTime() - 7 * 60 * 60 * 1000).toISOString();
+  const url = `${base}/rest/v1/kaling_topups?status=eq.approved&created_at=gte.${encodeURIComponent(startOfDayUtc)}&select=amount,currency&limit=1000`;
+  const res = await fetch(url, { headers: sbHeaders(env) });
+  if (!res.ok) return 0;
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return 0;
+  let total = 0;
+  for (const r of rows) {
+    let val = Number(r.amount || 0);
+    if (String(r.currency || 'VND').toUpperCase() === 'USD') val *= 25400;
+    total += val;
+  }
+  return total;
+}
+
 function getServiceAccountFromEnv(env, key) {
   const envSecret = env ? env[key] : null;
   if (!envSecret) throw new Error(`Missing ${key} env var`);
@@ -90,6 +202,8 @@ export async function onRequestPost(context) {
 
       const cache = new Map(); // prefix -> { token, recentPendingTopups, cfg }
       const processedTopupIds = new Set();
+      const kalingUseSupabase = isKalingSupabaseEnabled(env);
+      let kalingSbRecentPending = null;
 
       for (const transaction of body.data) {
         const description = (transaction.description || "").toUpperCase();
@@ -130,9 +244,37 @@ export async function onRequestPost(context) {
 
         let matchedPrefix = null;
         let matchedState = null;
+        let matchedViaSupabase = false;
         let topup = null;
 
         for (const { prefix, codes } of matches) {
+          // Nhánh Supabase cho Kaling (chỉ bật khi KALING_DB_BACKEND=supabase)
+          if (prefix === 'KL' && kalingUseSupabase) {
+            let found = await findPendingKalingTopupSupabase(env, codes);
+            if (found && processedTopupIds.has(`KL:${found.id}`)) {
+              found = null;
+            }
+            if (!found) {
+              if (!kalingSbRecentPending) {
+                kalingSbRecentPending = await fetchRecentPendingKalingTopupsSupabase(env, 14);
+              }
+              found = kalingSbRecentPending.find(
+                (t) =>
+                  t.status === 'pending' &&
+                  !processedTopupIds.has(`KL:${t.id}`) &&
+                  t.transferContent &&
+                  description.includes(t.transferContent.toUpperCase())
+              );
+            }
+            if (found) {
+              matchedPrefix = 'KL';
+              matchedViaSupabase = true;
+              topup = found;
+              break;
+            }
+            continue;
+          }
+
           if (!configs[prefix]) continue;
 
           let state = cache.get(prefix);
@@ -169,6 +311,91 @@ export async function onRequestPost(context) {
             topup = found;
             break;
           }
+        }
+
+        if (topup && matchedViaSupabase) {
+           const prefix = 'KL';
+           const coins = topup.coins;
+           const code = topup.transferContent;
+
+           // Kaling: gói Starter 10k chỉ được nạp 1 lần / user
+           if (isStarterTopup(topup)) {
+             const usedStarter = await kalingUserHasApprovedStarterSupabase(env, topup.userId, topup.id);
+             if (usedStarter) {
+               console.warn(`[CẢNH BÁO] User ${topup.userId} đã nạp gói Starter trước đó (Supabase)`);
+               const message = `⚠️ *TỪ CHỐI NẠP TRÙNG GÓI STARTER (KL)*\n\n` +
+                               `👤 Khách: ${topup.userName || 'N/A'}\n` +
+                               `📝 Nội dung: ${code}\n` +
+                               `*Gói 10.000đ chỉ dùng 1 lần — không cộng coin.*`;
+               await notifyTelegram(message);
+               continue;
+             }
+           }
+
+           // KIỂM TRA BẢO MẬT: Xác minh số tiền chuyển khoản thực tế có đủ không
+           if (topup.amount && amount < topup.amount) {
+               console.warn(`[CẢNH BÁO] Nạp thiếu tiền (Supabase): Yêu cầu ${topup.amount}, nhận ${amount}`);
+               const message = `⚠️ *CẢNH BÁO NẠP THIẾU TIỀN!*\n\n` +
+                               `👤 Khách: ${topup.userName || 'N/A'}\n` +
+                               `💵 Số tiền nhận: ${amount.toLocaleString()}đ\n` +
+                               `📉 Yêu cầu: ${topup.amount.toLocaleString()}đ\n` +
+                               `🪙 Đơn: ${coins} Coin\n` +
+                               `📝 Nội dung: ${code}\n` +
+                               `*Lưu ý:* Hệ thống KHÔNG cộng coin tự động cho giao dịch này.`;
+               await notifyTelegram(message);
+               continue;
+           }
+
+           const approveRes = await approveKalingTopupSupabase(env, topup.id, amount);
+           if (!approveRes?.ok) {
+             console.error('[Kaling Supabase] approve failed:', approveRes);
+             continue;
+           }
+           topup.status = 'approved';
+           processedTopupIds.add(`KL:${topup.id}`);
+           if (approveRes.already_approved) {
+             continue;
+           }
+           console.log(`[Supabase] Successfully granted ${coins} coins to Kaling user ${topup.userId}`);
+
+           const todayTotalVnd = await trackDailyRevenueVnd(env, amount, topup.id, prefix);
+           let todayLine = '';
+           if (todayTotalVnd != null) {
+               todayLine = `\n📊 Tổng hôm nay: ${todayTotalVnd.toLocaleString('vi-VN')}đ`;
+           } else {
+               try {
+                   const todayTotal = await fetchKalingTodayTotalSupabase(env);
+                   todayLine = `\n📊 Tổng hôm nay: ${Math.round(todayTotal).toLocaleString('vi-VN')}đ`;
+               } catch (e) {
+                   console.error("Lỗi lấy tổng tiền hôm nay (Supabase):", e);
+               }
+           }
+
+           const tidDisplay = transaction.tid || transaction.id || 'N/A';
+           const message = `💰 *NẠP TIỀN THÀNH CÔNG!*\n\n` +
+                           `👤 Khách: ${topup.userName || 'N/A'}\n` +
+                           `📧 Email: ${topup.userEmail || 'N/A'}\n` +
+                           `💵 Số tiền: ${amount.toLocaleString()}đ\n` +
+                           `🪙 Coin nhận: +${coins}\n` +
+                           `📝 Nội dung: ${code}\n` +
+                           `🔑 Mã GD: \`${tidDisplay}\`` +
+                           todayLine;
+           await notifyTelegram(message);
+
+           if (approveRes.referral_paid && approveRes.referral) {
+             try {
+               const ref = approveRes.referral;
+               await notifyTelegram(
+                 `🎁 *HOA HỒNG GIỚI THIỆU \\(casso\\)*\n\n` +
+                 `👤 Người giới thiệu: ${ref.referrer_name || 'N/A'}\n` +
+                 `📧 Email: ${ref.referrer_email || ''}\n` +
+                 `💵 Hoa hồng: ${formatMoneyForTelegram(ref.commission_amount, ref.currency || 'VND')}\n` +
+                 `🛒 Người được mời nạp: ${topup.userName || 'N/A'} (${formatMoneyForTelegram(ref.base_amount, ref.currency || 'VND') || coins + ' Coin'})\n` +
+                 `🔑 Topup ID: ${topup.id}`
+               );
+             } catch (e) { /* swallow */ }
+           }
+           continue;
         }
 
         if (topup && matchedState) {
