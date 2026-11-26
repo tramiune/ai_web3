@@ -1,12 +1,12 @@
 """
-Firestore-compatible Supabase PostgREST + RPC adapter for Kaling (kaling_* tables).
+Firestore-compatible Supabase PostgREST + RPC adapter for all 3 satellite sites:
+  - kaling (kaling.cloud)       -> kaling_* tables  (env: KALING_BACKEND=supabase)
+  - motion (motionaistudio.cloud) -> motion_* tables (env: MOTION_BACKEND=supabase)
+  - nhay   (nhay.cloud)         -> nhay_* tables    (env: NHAY_BACKEND=supabase)
 
-Designed so /root/multibot (site_bot.py, xiaoyang_motion.py, roboneo_motion.py,
-site_shared.py, api_server.py) and /root/ai_web3/batch_channel.py can switch
-Kaling between Firestore and Supabase via a single env var:
-    KALING_BACKEND=supabase   (default: firestore)
-
-MotionAI and Nhay.cloud continue running untouched on Firestore.
+Designed so /root/multibot (multi_bot.py, site_bot.py, xiaoyang_motion.py,
+roboneo_motion.py, site_shared.py, api_server.py) and /root/ai_web3/batch_channel.py
+can run 100% on shared Supabase with ZERO Firebase connections.
 """
 
 from __future__ import annotations
@@ -86,20 +86,38 @@ def _load_dotenv_file(path: Path) -> dict[str, str]:
 # Bidirectional Collection & Field Maps (Firestore camelCase <-> Supabase snake_case)
 # ---------------------------------------------------------------------------
 
-COLLECTION_TABLE_MAP = {
-    "users": ("kaling_users", "id"),
-    "orders": ("kaling_orders", "id"),
-    "topups": ("kaling_topups", "id"),
-    "bots": ("kaling_bots", "id"),
-    "referralAllowlist": ("kaling_referral_allowlist", "email"),
-    "referralCodes": ("kaling_referral_codes", "code"),
-    "referralEarnings": ("kaling_referral_earnings", "id"),
-    "batchChannelAllowlist": ("kaling_batch_channel_allowlist", "email"),
-    "batchChannelConfig": ("kaling_batch_channel_config", "id"),
-    "batchChannelRuns": ("kaling_batch_channel_runs", "id"),
+COLLECTION_SUFFIX_MAP = {
+    "users": ("users", "id"),
+    "orders": ("orders", "id"),
+    "topups": ("topups", "id"),
+    "bots": ("bots", "id"),
+    "referralAllowlist": ("referral_allowlist", "email"),
+    "referralCodes": ("referral_codes", "code"),
+    "referralEarnings": ("referral_earnings", "id"),
+    "batchChannelAllowlist": ("batch_channel_allowlist", "email"),
+    "batchChannelConfig": ("batch_channel_config", "id"),
+    "batchChannelRuns": ("batch_channel_runs", "id"),
 }
 
-FIELD_MAPS: dict[str, dict[str, str]] = {
+# Backwards-compatible default for kaling
+COLLECTION_TABLE_MAP = {
+    col: (f"kaling_{suffix}", pk)
+    for col, (suffix, pk) in COLLECTION_SUFFIX_MAP.items()
+}
+
+SITE_ID_PREFIX = {
+    "kaling": "kl_",
+    "motion": "ms_",
+    "nhay": "nh_",
+}
+
+SITE_BACKEND_ENV = {
+    "kaling": "KALING_BACKEND",
+    "motion": "MOTION_BACKEND",
+    "nhay": "NHAY_BACKEND",
+}
+
+BASE_FIELD_MAPS: dict[str, dict[str, str]] = {
     "users": {
         "email": "email",
         "displayName": "display_name",
@@ -274,6 +292,20 @@ FIELD_MAPS: dict[str, dict[str, str]] = {
     },
 }
 
+NHAY_EXTRA_FIELDS: dict[str, dict[str, str]] = {
+    "users": {
+        "authProvider": "auth_provider",
+        "promoLastDate": "promo_last_date",
+        "promoTodayCount": "promo_today_count",
+        "promoTotalCount": "promo_total_count",
+    },
+    "orders": {
+        "dailyPromo": "daily_promo",
+        "promoDate": "promo_date",
+        "roboneoRefPlan": "roboneo_ref_plan",
+    },
+}
+
 TABLES_WITH_EXTRA = {"users", "orders", "topups", "batchChannelConfig"}
 
 TIMESTAMP_SNAKE_COLS = {
@@ -282,14 +314,17 @@ TIMESTAMP_SNAKE_COLS = {
     "engine_balances_updated_at",
 }
 
-REVERSE_FIELD_MAPS: dict[str, dict[str, str]] = {
-    col: {v: k for k, v in fmap.items()}
-    for col, fmap in FIELD_MAPS.items()
-}
+
+def get_field_map(site_id: str, col: str) -> dict[str, str]:
+    fmap = dict(BASE_FIELD_MAPS.get(col, {}))
+    if site_id == "nhay" and col in NHAY_EXTRA_FIELDS:
+        fmap.update(NHAY_EXTRA_FIELDS[col])
+    return fmap
 
 
-def row_to_firestore_dict(col: str, row: dict[str, Any]) -> dict[str, Any]:
-    rev = REVERSE_FIELD_MAPS.get(col, {})
+def row_to_firestore_dict(col: str, row: dict[str, Any], site_id: str = "kaling") -> dict[str, Any]:
+    fmap = get_field_map(site_id, col)
+    rev = {v: k for k, v in fmap.items()}
     out: dict[str, Any] = {}
     extra = row.get("extra")
     if isinstance(extra, dict):
@@ -311,8 +346,13 @@ def row_to_firestore_dict(col: str, row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def firestore_payload_to_row(col: str, payload: dict[str, Any], existing_extra: dict[str, Any] | None = None) -> tuple[dict[str, Any], float | None]:
-    fmap = FIELD_MAPS.get(col, {})
+def firestore_payload_to_row(
+    col: str,
+    payload: dict[str, Any],
+    existing_extra: dict[str, Any] | None = None,
+    site_id: str = "kaling",
+) -> tuple[dict[str, Any], float | None]:
+    fmap = get_field_map(site_id, col)
     row: dict[str, Any] = {}
     extra_updates: dict[str, Any] = dict(existing_extra or {})
     extra_touched = False
@@ -367,7 +407,7 @@ class SupabaseDocSnapshot:
         self.id = ref.id
         self.exists = row is not None
         self._row = row
-        self._dict = row_to_firestore_dict(ref.col_name, row) if row is not None else None
+        self._dict = row_to_firestore_dict(ref.col_name, row, site_id=ref._client.site_id) if row is not None else None
 
     def to_dict(self) -> dict[str, Any] | None:
         if self._dict is None:
@@ -384,14 +424,14 @@ class SupabaseWatchHandle:
 
 
 class SupabaseDocRef:
-    def __init__(self, client: "KalingSupabaseClient", col_name: str, doc_id: str):
+    def __init__(self, client: "SiteSupabaseClient", col_name: str, doc_id: str):
         self._client = client
         self.col_name = col_name
         self.id = doc_id
 
     @property
     def _table_pk(self) -> tuple[str, str]:
-        return COLLECTION_TABLE_MAP[self.col_name]
+        return self._client._table_pk(self.col_name)
 
     def get(self, transaction=None) -> SupabaseDocSnapshot:
         table, pk = self._table_pk
@@ -405,10 +445,12 @@ class SupabaseDocRef:
             snap = self.get()
             if snap.exists and snap._row and isinstance(snap._row.get("extra"), dict):
                 existing_extra = snap._row["extra"]
-        row, coin_inc = firestore_payload_to_row(self.col_name, payload, existing_extra=existing_extra)
+        row, coin_inc = firestore_payload_to_row(
+            self.col_name, payload, existing_extra=existing_extra, site_id=self._client.site_id
+        )
         row[pk] = self.id
         if self.col_name in ("users", "orders", "topups", "bots") and "site" not in row:
-            row["site"] = "kaling"
+            row["site"] = self._client.site_id
         self._client._upsert(table, pk, row)
         if coin_inc is not None:
             self._client.adjust_coins(self.id, coin_inc, require_sufficient=False)
@@ -416,8 +458,7 @@ class SupabaseDocRef:
     def update(self, payload: dict[str, Any]) -> None:
         table, pk = self._table_pk
         existing_extra = None
-        # Only pre-fetch extra if payload has unmapped fields
-        fmap = FIELD_MAPS.get(self.col_name, {})
+        fmap = get_field_map(self._client.site_id, self.col_name)
         needs_extra = self.col_name in TABLES_WITH_EXTRA and any(
             k not in fmap and not (self.col_name == "users" and k == "uid") for k in payload.keys()
         )
@@ -425,7 +466,9 @@ class SupabaseDocRef:
             snap = self.get()
             if snap.exists and snap._row and isinstance(snap._row.get("extra"), dict):
                 existing_extra = snap._row["extra"]
-        row, coin_inc = firestore_payload_to_row(self.col_name, payload, existing_extra=existing_extra)
+        row, coin_inc = firestore_payload_to_row(
+            self.col_name, payload, existing_extra=existing_extra, site_id=self._client.site_id
+        )
         if row:
             self._client._patch(table, {pk: f"eq.{self.id}"}, row)
         if coin_inc is not None:
@@ -449,16 +492,18 @@ class SupabaseDocRef:
                         last_sig = sig
                         callback([snap], [FakeDocumentChange(snap, "MODIFIED")], _now_iso())
                 except Exception as e:
-                    print(f"⚠️ [SupabaseWatch {self.col_name}/{self.id}] {e}")
+                    print(f"⚠️ [SupabaseWatch {self._client.site_id}/{self.col_name}/{self.id}] {e}")
                 stop_ev.wait(poll_sec)
 
-        t = threading.Thread(target=_loop, daemon=True, name=f"sb-watch-{self.col_name}-{self.id}")
+        t = threading.Thread(
+            target=_loop, daemon=True, name=f"sb-watch-{self._client.site_id}-{self.col_name}-{self.id}"
+        )
         t.start()
         return SupabaseWatchHandle(stop_ev)
 
 
 class SupabaseQuery:
-    def __init__(self, client: "KalingSupabaseClient", col_name: str, filters=None, limit_n: int | None = None, order_by=None):
+    def __init__(self, client: "SiteSupabaseClient", col_name: str, filters=None, limit_n: int | None = None, order_by=None):
         self._client = client
         self.col_name = col_name
         self._filters: list[tuple[str, str, Any]] = list(filters or [])
@@ -486,7 +531,7 @@ class SupabaseQuery:
         return SupabaseQuery(self._client, self.col_name, self._filters, self._limit, self._order_by + [(field_path, d)])
 
     def _build_params(self) -> tuple[dict[str, str], list[tuple[str, str, Any]]]:
-        fmap = FIELD_MAPS.get(self.col_name, {})
+        fmap = get_field_map(self._client.site_id, self.col_name)
         params: dict[str, str] = {}
         post_filters: list[tuple[str, str, Any]] = []
         op_map = {"==": "eq", "!=": "neq", ">": "gt", ">=": "gte", "<": "lt", "<=": "lte"}
@@ -513,7 +558,7 @@ class SupabaseQuery:
         return params, post_filters
 
     def stream(self):
-        table, pk = COLLECTION_TABLE_MAP[self.col_name]
+        table, pk = self._client._table_pk(self.col_name)
         params, post_filters = self._build_params()
         rows = self._client._select(table, params)
         snaps: list[SupabaseDocSnapshot] = []
@@ -527,7 +572,7 @@ class SupabaseQuery:
                     cur = d.get(fp)
                     if op == "==" and cur != val:
                         ok = False
-                    elif op == "!=" and cur == val:
+                    elif op != "==" and op == "!=" and cur == val:
                         ok = False
                     if not ok:
                         break
@@ -564,32 +609,39 @@ class SupabaseQuery:
                     if changes:
                         callback(snaps, changes, _now_iso())
                 except Exception as e:
-                    print(f"⚠️ [SupabaseQueryWatch {self.col_name}] {e}")
+                    print(f"⚠️ [SupabaseQueryWatch {self._client.site_id}/{self.col_name}] {e}")
                 stop_ev.wait(poll_sec)
 
-        t = threading.Thread(target=_loop, daemon=True, name=f"sb-qwatch-{self.col_name}")
+        t = threading.Thread(
+            target=_loop, daemon=True, name=f"sb-qwatch-{self._client.site_id}-{self.col_name}"
+        )
         t.start()
         return SupabaseWatchHandle(stop_ev)
 
 
 class SupabaseCollectionRef(SupabaseQuery):
-    def __init__(self, client: "KalingSupabaseClient", col_name: str):
+    def __init__(self, client: "SiteSupabaseClient", col_name: str):
         super().__init__(client, col_name)
 
     def document(self, doc_id: str | None = None) -> SupabaseDocRef:
         if not doc_id:
-            doc_id = "kl_" + secrets.token_hex(10)
+            pfx = SITE_ID_PREFIX.get(self._client.site_id, "kl_")
+            doc_id = pfx + secrets.token_hex(10)
         return SupabaseDocRef(self._client, self.col_name, str(doc_id))
 
 
 # ---------------------------------------------------------------------------
-# Main Client
+# Main Multi-Site Client
 # ---------------------------------------------------------------------------
 
-class KalingSupabaseClient:
+class SiteSupabaseClient:
     is_supabase_compat = True
 
-    def __init__(self, url: str, service_role_key: str):
+    def __init__(self, url: str, service_role_key: str, site_id: str = "kaling"):
+        site_clean = str(site_id or "kaling").strip().lower()
+        if site_clean not in ("kaling", "motion", "nhay"):
+            raise ValueError(f"Unsupported site_id: {site_id}")
+        self.site_id = site_clean
         self.url = url.rstrip("/")
         self.key = service_role_key
         self._session = requests.Session()
@@ -599,8 +651,14 @@ class KalingSupabaseClient:
             "Content-Type": "application/json",
         })
 
+    def _table_pk(self, col_name: str) -> tuple[str, str]:
+        if col_name not in COLLECTION_SUFFIX_MAP:
+            raise KeyError(f"Unsupported Supabase collection for {self.site_id}: {col_name}")
+        suffix, pk = COLLECTION_SUFFIX_MAP[col_name]
+        return f"{self.site_id}_{suffix}", pk
+
     @classmethod
-    def from_env(cls) -> "KalingSupabaseClient":
+    def from_env(cls, site_id: str = "kaling") -> "SiteSupabaseClient":
         url = (os.environ.get("SUPABASE_URL") or "").strip()
         key = (os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
         if not url or not key:
@@ -615,12 +673,12 @@ class KalingSupabaseClient:
                 if url and key:
                     break
         if not url or not key:
-            raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for KalingSupabaseClient")
-        return cls(url, key)
+            raise RuntimeError(f"Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for {site_id}")
+        return cls(url, key, site_id=site_id)
 
     def collection(self, col_name: str) -> SupabaseCollectionRef:
-        if col_name not in COLLECTION_TABLE_MAP:
-            raise KeyError(f"Unsupported Kaling Supabase collection: {col_name}")
+        if col_name not in COLLECTION_SUFFIX_MAP:
+            raise KeyError(f"Unsupported Supabase collection for {self.site_id}: {col_name}")
         return SupabaseCollectionRef(self, col_name)
 
     def _select(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
@@ -658,16 +716,16 @@ class KalingSupabaseClient:
         r.raise_for_status()
         return r.json() if r.content else None
 
-    # --- Atomic Kaling RPC convenience methods ---
+    # --- Atomic site-scoped RPC convenience methods ---
 
     def fail_order_and_refund(self, order_id: str, system_note: str = "") -> dict[str, Any]:
-        return self.rpc("kaling_fail_order_and_refund", {
+        return self.rpc(f"{self.site_id}_fail_order_and_refund", {
             "p_order_id": str(order_id),
             "p_system_note": str(system_note or ""),
         }) or {}
 
     def adjust_coins(self, user_id: str, delta: float, require_sufficient: bool = False) -> dict[str, Any]:
-        return self.rpc("kaling_service_adjust_coins", {
+        return self.rpc(f"{self.site_id}_service_adjust_coins", {
             "p_user_id": str(user_id),
             "p_delta": round(float(delta), 2),
             "p_require_sufficient": bool(require_sufficient),
@@ -692,12 +750,29 @@ class KalingSupabaseClient:
         }) or {}
 
 
-def kaling_backend_is_supabase() -> bool:
-    val = (os.environ.get("KALING_BACKEND") or "").strip().lower()
+# Backwards-compatible alias for Kaling callers
+class KalingSupabaseClient(SiteSupabaseClient):
+    def __init__(self, url: str, service_role_key: str):
+        super().__init__(url, service_role_key, site_id="kaling")
+
+    @classmethod
+    def from_env(cls, site_id: str = "kaling") -> "SiteSupabaseClient":
+        return super().from_env(site_id=site_id)
+
+
+def site_backend_is_supabase(site_id: str) -> bool:
+    key = SITE_BACKEND_ENV.get(str(site_id or "").strip().lower())
+    if not key:
+        return False
+    val = (os.environ.get(key) or "").strip().lower()
     if not val:
         for env_path in (Path("/root/multibot/.env"), Path("/root/ai_web3/.env")):
             vals = _load_dotenv_file(env_path)
-            if vals.get("KALING_BACKEND"):
-                val = vals["KALING_BACKEND"].strip().lower()
+            if vals.get(key):
+                val = vals[key].strip().lower()
                 break
     return val == "supabase"
+
+
+def kaling_backend_is_supabase() -> bool:
+    return site_backend_is_supabase("kaling")
