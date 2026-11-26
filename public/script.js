@@ -1743,6 +1743,15 @@ async function handleUserLoggedIn(authUser) {
     }
     updateMetaAdvancedMatching(user);
 
+    if (linked.isNew) {
+        trackMetaEvent('CompleteRegistration', {
+            value: 0,
+            currency: 'VND',
+            status: true,
+            content_name: 'google.com'
+        });
+    }
+
     if (user.email) {
         trackAnalyticsEvent('login', { method: 'google' });
     }

@@ -308,6 +308,7 @@ export const kalingApi = {
         if (error) throw error;
         return {
             user: mapKalingUserRow(data?.user),
+            isNew: Boolean(data?.is_new),
             isReferralAllowed: Boolean(data?.is_referral_allowed),
             isBatchChannelAllowed: Boolean(data?.is_batch_channel_allowed),
         };
