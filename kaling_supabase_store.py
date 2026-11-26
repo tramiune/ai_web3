@@ -752,8 +752,8 @@ class SiteSupabaseClient:
 
 # Backwards-compatible alias for Kaling callers
 class KalingSupabaseClient(SiteSupabaseClient):
-    def __init__(self, url: str, service_role_key: str):
-        super().__init__(url, service_role_key, site_id="kaling")
+    def __init__(self, url: str, service_role_key: str, site_id: str = "kaling"):
+        super().__init__(url, service_role_key, site_id=site_id)
 
     @classmethod
     def from_env(cls, site_id: str = "kaling") -> "SiteSupabaseClient":
