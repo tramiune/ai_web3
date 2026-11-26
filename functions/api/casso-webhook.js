@@ -25,12 +25,47 @@ function getServiceAccountFromEnv(env, key) {
   }
 }
 
-function pickPrefixFromDescription(descUpper) {
-  // Match e.g. KL200ABCD, NH200ABCD, MS550Z9K1, AQA..., TBT... anywhere in description
-  const m =
-    (descUpper || '').match(/\b(KL|NH|MS|AQA|TBT)\d{1,6}[A-Z0-9]{2,8}\b/) ||
-    (descUpper || '').match(/\b(AQA|TBT)[A-Z0-9]{4,14}\b/);
-  return m ? m[1] : null;
+function extractTransferMatches(descUpper) {
+  const text = String(descUpper || '').toUpperCase();
+  const byPrefix = new Map(); // prefix -> string[]
+  const addCode = (code, pfx) => {
+    const clean = String(code || '').trim().toUpperCase();
+    if (!clean || !pfx) return;
+    let list = byPrefix.get(pfx);
+    if (!list) {
+      list = [];
+      byPrefix.set(pfx, list);
+    }
+    if (!list.includes(clean)) list.push(clean);
+  };
+
+  // 1. Khớp chuẩn có ranh giới từ (VD: KL100YTND, KL10U2BB, NH200ABCD, MS550Z9K1, AQA..., TBT...)
+  const strictPatterns = [
+    /\b(KL|NH|MS|AQA|TBT)\d{1,6}[A-Z0-9]{2,8}\b/g,
+    /\b(AQA|TBT)[A-Z0-9]{4,14}\b/g,
+  ];
+  for (const re of strictPatterns) {
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      addCode(m[0], m[1]);
+    }
+  }
+
+  // 2. Fallback nếu ngân hàng dính liền tiền tố phía trước (VD: FT26330KL100YTND hoặc FT26330AQA12345)
+  if (byPrefix.size === 0) {
+    const loosePatterns = [
+      /(KL|NH|MS|AQA|TBT)\d{1,6}[A-Z0-9]{2,8}/g,
+      /(AQA|TBT)[A-Z0-9]{4,14}/g,
+    ];
+    for (const re of loosePatterns) {
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        addCode(m[0], m[1]);
+      }
+    }
+  }
+
+  return Array.from(byPrefix.entries()).map(([prefix, codes]) => ({ prefix, codes }));
 }
 
 export async function onRequestPost(context) {
@@ -53,15 +88,17 @@ export async function onRequestPost(context) {
         }
       }
 
-      const cache = new Map(); // prefix -> { token, pendingTopups, cfg }
+      const cache = new Map(); // prefix -> { token, recentPendingTopups, cfg }
+      const processedTopupIds = new Set();
 
       for (const transaction of body.data) {
         const description = (transaction.description || "").toUpperCase();
         const amount = transaction.amount || 0;
 
-        const prefix = pickPrefixFromDescription(description);
+        const matches = extractTransferMatches(description);
+        if (matches.length === 0) continue;
 
-        if (prefix === 'AQA') {
+        if (matches.some((m) => m.prefix === 'AQA')) {
           const AQUA_AI_BACKEND_URL = 'https://api.aquaai.vn/api/payment/casso-webhook';
           await fetch(AQUA_AI_BACKEND_URL, {
             method: 'POST',
@@ -71,7 +108,7 @@ export async function onRequestPost(context) {
           continue;
         }
 
-        if (prefix === 'TBT') {
+        if (matches.some((m) => m.prefix === 'TBT')) {
           const TBT_URLS = [
             'https://api.aquaai.vn:8443/api/payment/casso-webhook',
             'https://tradebangtoan.cloud/api/payment/casso-webhook',
@@ -91,21 +128,52 @@ export async function onRequestPost(context) {
           continue;
         }
 
-        if (!prefix || !configs[prefix]) continue;
+        let matchedPrefix = null;
+        let matchedState = null;
+        let topup = null;
 
-        let state = cache.get(prefix);
-        if (!state) {
-          const cfg = configs[prefix];
-          const token = await getAccessToken(cfg.client_email, cfg.private_key);
-          const pendingTopups = await fetchPendingTopups(token, cfg.project_id);
-          state = { token, pendingTopups, cfg };
-          cache.set(prefix, state);
+        for (const { prefix, codes } of matches) {
+          if (!configs[prefix]) continue;
+
+          let state = cache.get(prefix);
+          if (!state) {
+            const cfg = configs[prefix];
+            const token = await getAccessToken(cfg.client_email, cfg.private_key);
+            state = { token, recentPendingTopups: null, cfg };
+            cache.set(prefix, state);
+          }
+
+          // 1. Ưu tiên query trực tiếp theo mã chuyển khoản (transferContent == code) — O(1), không bao giờ bị giới hạn limit 1000 đơn pending!
+          let found = await findPendingTopupByCodes(state.token, state.cfg.project_id, codes);
+          if (found && processedTopupIds.has(`${prefix}:${found.id}`)) {
+            found = null;
+          }
+
+          // 2. Fallback: quét các đơn pending tạo trong 14 ngày gần nhất (phòng ngân hàng cắt/chèn ký tự vào mã)
+          if (!found) {
+            if (!state.recentPendingTopups) {
+              state.recentPendingTopups = await fetchRecentPendingTopups(state.token, state.cfg.project_id);
+            }
+            found = state.recentPendingTopups.find(
+              (t) =>
+                t.status === 'pending' &&
+                !processedTopupIds.has(`${prefix}:${t.id}`) &&
+                t.transferContent &&
+                description.includes(t.transferContent.toUpperCase())
+            );
+          }
+
+          if (found) {
+            matchedPrefix = prefix;
+            matchedState = state;
+            topup = found;
+            break;
+          }
         }
 
-        // Tìm đơn nạp khớp với nội dung chuyển khoản (chỉ cần nội dung chứa mã là được)
-        const topup = state.pendingTopups.find(t => description.includes(t.transferContent.toUpperCase()));
-
-        if (topup) {
+        if (topup && matchedState) {
+           const prefix = matchedPrefix;
+           const state = matchedState;
            const coins = topup.coins;
            const code = topup.transferContent;
 
@@ -138,6 +206,8 @@ export async function onRequestPost(context) {
            }
 
            await grantCoins(state.token, state.cfg.project_id, topup.userId, coins, topup.id);
+           topup.status = 'approved';
+           processedTopupIds.add(`${prefix}:${topup.id}`);
            console.log(`Successfully granted ${coins} coins to user ${topup.userId}`);
            
            const todayTotalVnd = await trackDailyRevenueVnd(env, amount, topup.id, prefix);
@@ -282,41 +352,96 @@ async function userHasApprovedStarterTopup(token, projectId, userId, excludeTopu
   });
 }
 
-async function fetchPendingTopups(token, projectId) {
-  const PROJECT_ID = projectId;
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+function mapTopupDoc(doc) {
+  const fields = doc?.fields || {};
+  const transferContent = fields.transferContent?.stringValue || '';
+  const userId = fields.userId?.stringValue || '';
+  const status = fields.status?.stringValue || '';
+  if (!transferContent || !userId) return null;
+  const rawCoins = fields.coins?.integerValue ?? fields.coins?.doubleValue ?? fields.coins?.stringValue ?? 0;
+  const rawAmount = fields.amount?.integerValue ?? fields.amount?.doubleValue ?? fields.amount?.stringValue ?? 0;
+  return {
+    id: doc.name.split("/").pop(),
+    userId,
+    status,
+    transferContent,
+    coins: Number(rawCoins) || 0,
+    userName: fields.userName?.stringValue || 'Khách',
+    userEmail: fields.userEmail?.stringValue || '',
+    amount: Math.round(Number(rawAmount) || 0),
+  };
+}
+
+/**
+ * Truy vấn trực tiếp đúng đơn nạp theo mã transferContent (single-field index, không cần composite index,
+ * không bao giờ bị cắt mất đơn dù collection có hàng chục nghìn đơn pending).
+ */
+async function findPendingTopupByCodes(token, projectId, codes) {
+  if (!Array.isArray(codes) || codes.length === 0) return null;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+  for (const code of codes) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "topups" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "transferContent" },
+              op: "EQUAL",
+              value: { stringValue: code },
+            },
+          },
+          limit: 20,
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!Array.isArray(data)) continue;
+    for (const item of data) {
+      if (!item.document) continue;
+      const mapped = mapTopupDoc(item.document);
+      if (mapped && mapped.status === "pending") {
+        return mapped;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Fallback an toàn: lấy các đơn tạo trong 14 ngày gần nhất (single-field index createdAt DESC)
+ * rồi lọc status === "pending" trong code — không phụ thuộc thứ tự bảng chữ cái của Document ID.
+ */
+async function fetchRecentPendingTopups(token, projectId, daysBack = 14) {
+  const sinceIso = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${token}` },
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: "topups" }],
         where: {
-          fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "pending" } }
+          fieldFilter: {
+            field: { fieldPath: "createdAt" },
+            op: "GREATER_THAN_OR_EQUAL",
+            value: { timestampValue: sinceIso },
+          },
         },
-        limit: 1000
-      }
-    })
+        orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }],
+        limit: 1000,
+      },
+    }),
   });
   const data = await res.json();
   if (!Array.isArray(data)) return [];
-  
+
   return data
-    .filter(item => item.document)
-    .map(item => {
-      const doc = item.document;
-      const fields = doc.fields;
-      return {
-        id: doc.name.split("/").pop(),
-        userId: fields.userId.stringValue,
-        status: fields.status.stringValue,
-        transferContent: fields.transferContent.stringValue,
-        coins: parseInt(fields.coins?.integerValue || 0),
-        userName: fields.userName?.stringValue || 'Khách',
-        userEmail: fields.userEmail?.stringValue || '',
-        amount: parseInt(fields.amount?.integerValue || fields.amount?.doubleValue || fields.amount?.stringValue || 0)
-      };
-    });
+    .filter((item) => item.document)
+    .map((item) => mapTopupDoc(item.document))
+    .filter((t) => t && t.status === "pending");
 }
 
 async function fetchTodayTotalAmount(token, projectId) {
