@@ -254,19 +254,363 @@ function generateId(prefix = 'kl_') {
 // High-level Kaling API (Auth, Profile, Orders, Topups, Referral, Batch, API)
 // ---------------------------------------------------------------------------
 
+const OAUTH_POPUP_NAME = 'kaling_google_oauth';
+const OAUTH_CHANNEL_NAME = 'kaling_oauth_channel';
+const OAUTH_POPUP_PENDING_KEY = 'kaling_oauth_popup_pending';
+const OAUTH_POPUP_RESULT_KEY = 'kaling_oauth_popup_result';
+const OAUTH_REDIRECT_CTX_KEY = 'kaling_oauth_redirect_ctx';
+
+let _activeOAuthPopupCleanup = null;
+
+function openCenteredOAuthPopup(name) {
+    const w = 500;
+    const h = 650;
+    const dualLeft = typeof window.screenLeft === 'number' ? window.screenLeft : (window.screenX || 0);
+    const dualTop = typeof window.screenTop === 'number' ? window.screenTop : (window.screenY || 0);
+    const viewW = window.innerWidth || document.documentElement.clientWidth || screen.width;
+    const viewH = window.innerHeight || document.documentElement.clientHeight || screen.height;
+    const left = Math.max(0, Math.round(dualLeft + (viewW - w) / 2));
+    const top = Math.max(0, Math.round(dualTop + (viewH - h) / 2));
+    const features = `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+    let popup = null;
+    try {
+        popup = window.open('about:blank', name, features);
+    } catch (_) {
+        popup = null;
+    }
+    if (popup && !popup.closed) {
+        try {
+            popup.document.title = 'Đăng nhập Google — Kaling';
+            popup.document.body.style.cssText = 'margin:0;background:#0b0d14;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;';
+            popup.document.body.innerHTML = '<div><div style="font-size:15px;font-weight:600;margin-bottom:8px;">Đang mở đăng nhập Google...</div><div style="font-size:12px;opacity:.65;">Vui lòng chờ trong giây lát</div></div>';
+        } catch (_) { /* ignore cross-origin */ }
+    }
+    return popup;
+}
+
+function saveOAuthRedirectContext() {
+    try {
+        localStorage.setItem(OAUTH_REDIRECT_CTX_KEY, JSON.stringify({
+            search: window.location.search || '',
+            pendingAction: window.pendingAction || null,
+            ts: Date.now(),
+        }));
+    } catch (_) { /* ignore storage errors */ }
+}
+
+function clearOAuthPopupMarkers() {
+    try { localStorage.removeItem(OAUTH_POPUP_PENDING_KEY); } catch (_) {}
+    try { localStorage.removeItem(OAUTH_POPUP_RESULT_KEY); } catch (_) {}
+}
+
+function parseOAuthCallbackError() {
+    const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search || '');
+    const err = hashParams.get('error_description') || hashParams.get('error')
+        || queryParams.get('error_description') || queryParams.get('error');
+    return err ? String(err) : null;
+}
+
 export const kalingApi = {
     supabase,
 
+    /**
+     * Runs at page boot inside an OAuth popup callback window.
+     * Hands the freshly obtained Supabase session back to the opener/main tab
+     * via BroadcastChannel + postMessage + localStorage, then closes the popup.
+     * Returns true if the main tab acknowledged the handoff and this popup closed
+     * (or is closing), so the popup skips booting the full app UI.
+     */
+    async handleOAuthPopupCallbackIfNeeded() {
+        if (!window.__OAUTH_IS_POPUP_CALLBACK) return false;
+
+        try {
+            document.documentElement.style.background = '#0b0d14';
+            if (document.body) {
+                document.body.style.cssText = 'margin:0;background:#0b0d14;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;';
+                document.body.innerHTML = '<div><div style="font-size:15px;font-weight:600;">Đang hoàn tất đăng nhập...</div></div>';
+            }
+        } catch (_) {}
+
+        const oauthErr = parseOAuthCallbackError();
+        let session = null;
+        if (!oauthErr) {
+            try {
+                const { data } = await supabase.auth.getSession();
+                session = data?.session || null;
+            } catch (e) {
+                console.warn('[KalingSB] popup getSession failed:', e);
+            }
+        }
+
+        const payload = oauthErr
+            ? { type: 'oauth_error', channel: OAUTH_CHANNEL_NAME, error: oauthErr, ts: Date.now() }
+            : {
+                type: 'oauth_done',
+                channel: OAUTH_CHANNEL_NAME,
+                access_token: session?.access_token || '',
+                refresh_token: session?.refresh_token || '',
+                uid: session?.user?.id || '',
+                ts: Date.now(),
+            };
+
+        try { localStorage.removeItem(OAUTH_POPUP_PENDING_KEY); } catch (_) {}
+
+        let acked = false;
+        let bc = null;
+        const ackPromise = new Promise((resolve) => {
+            const onAck = () => {
+                if (acked) return;
+                acked = true;
+                resolve(true);
+            };
+            try {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    bc = new BroadcastChannel(OAUTH_CHANNEL_NAME);
+                    bc.onmessage = (ev) => {
+                        if (ev?.data?.type === 'oauth_ack') onAck();
+                    };
+                    bc.postMessage(payload);
+                }
+            } catch (_) {}
+
+            try {
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage(payload, window.location.origin);
+                }
+            } catch (_) {}
+
+            try {
+                localStorage.setItem(OAUTH_POPUP_RESULT_KEY, JSON.stringify(payload));
+            } catch (_) {}
+
+            setTimeout(() => resolve(acked), 450);
+        });
+
+        await ackPromise;
+        try { bc?.close(); } catch (_) {}
+
+        if (acked) {
+            try { window.close(); } catch (_) {}
+            // Safety fallback: if mobile OS refuses window.close(), reload cleanly as logged-in app
+            await new Promise((r) => setTimeout(r, 650));
+            if (!window.closed) {
+                window.location.replace(window.location.origin + '/');
+            }
+            return true;
+        }
+
+        // Main tab did not ACK (e.g., iOS evicted the original tab in background).
+        // Mark fromPopupFallback so the clean reload suppresses duplicate PageView and restores pendingAction.
+        try {
+            const rawCtx = localStorage.getItem(OAUTH_REDIRECT_CTX_KEY);
+            let target = window.location.origin + '/';
+            if (rawCtx) {
+                const ctx = JSON.parse(rawCtx);
+                if (ctx && ctx.ts && (Date.now() - ctx.ts) < 10 * 60 * 1000) {
+                    ctx.fromPopupFallback = true;
+                    localStorage.setItem(OAUTH_REDIRECT_CTX_KEY, JSON.stringify(ctx));
+                    if (ctx.search) {
+                        target = window.location.origin + '/' + ctx.search;
+                    }
+                }
+            }
+            window.location.replace(target);
+        } catch (_) {
+            window.location.replace(window.location.origin + '/');
+        }
+        return true;
+    },
+
     async signInWithGoogle() {
-        const redirectTo = window.location.origin + window.location.pathname;
-        const { error } = await supabase.auth.signInWithOAuth({
+        // Cancel any previous in-flight popup watcher
+        if (typeof _activeOAuthPopupCleanup === 'function') {
+            _activeOAuthPopupCleanup();
+            _activeOAuthPopupCleanup = null;
+        }
+
+        // Persist fbclid/utm & pendingAction so both redirect fallback and evicted-tab recovery preserve them
+        saveOAuthRedirectContext();
+        try { localStorage.removeItem(OAUTH_POPUP_RESULT_KEY); } catch (_) {}
+        try { localStorage.setItem(OAUTH_POPUP_PENDING_KEY, String(Date.now())); } catch (_) {}
+
+        // CRITICAL: open popup SYNCHRONOUSLY in click handler before any await so iOS Safari/Chrome don't block it
+        const popup = openCenteredOAuthPopup(OAUTH_POPUP_NAME);
+        const redirectTo = window.location.origin + '/';
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo,
+                skipBrowserRedirect: true,
                 queryParams: { prompt: 'select_account' },
             },
         });
-        if (error) throw error;
+
+        if (error || !data?.url) {
+            clearOAuthPopupMarkers();
+            if (popup && !popup.closed) {
+                try { popup.close(); } catch (_) {}
+            }
+            throw error || new Error('Không lấy được đường dẫn đăng nhập Google');
+        }
+
+        // Fallback to full-page redirect if browser blocked the popup
+        if (!popup || popup.closed) {
+            try { localStorage.removeItem(OAUTH_POPUP_PENDING_KEY); } catch (_) {}
+            window.location.assign(data.url);
+            return { redirected: true };
+        }
+
+        try {
+            popup.location.href = data.url;
+            popup.focus();
+        } catch (_) {
+            try { localStorage.removeItem(OAUTH_POPUP_PENDING_KEY); } catch (_) {}
+            window.location.assign(data.url);
+            return { redirected: true };
+        }
+
+        return await new Promise((resolve, reject) => {
+            let settled = false;
+            let bc = null;
+            let pollTimer = null;
+            let timeoutTimer = null;
+
+            const cleanup = () => {
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+                window.removeEventListener('message', onMessage);
+                window.removeEventListener('storage', onStorage);
+                try { bc?.close(); } catch (_) {}
+                bc = null;
+                if (_activeOAuthPopupCleanup === cleanup) _activeOAuthPopupCleanup = null;
+            };
+            _activeOAuthPopupCleanup = cleanup;
+
+            const finishWithPayload = async (msg) => {
+                if (settled || !msg) return;
+                if (msg.type === 'oauth_error') {
+                    settled = true;
+                    try { bc?.postMessage({ type: 'oauth_ack' }); } catch (_) {}
+                    clearOAuthPopupMarkers();
+                    try { localStorage.removeItem(OAUTH_REDIRECT_CTX_KEY); } catch (_) {}
+                    cleanup();
+                    if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
+                    if (String(msg.error || '').toLowerCase().includes('access_denied')) {
+                        resolve({ cancelled: true });
+                    } else {
+                        reject(new Error(msg.error || 'Đăng nhập Google thất bại'));
+                    }
+                    return;
+                }
+                if (msg.type !== 'oauth_done') return;
+
+                settled = true;
+                try { bc?.postMessage({ type: 'oauth_ack' }); } catch (_) {}
+                clearOAuthPopupMarkers();
+                try { localStorage.removeItem(OAUTH_REDIRECT_CTX_KEY); } catch (_) {}
+                cleanup();
+                if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
+
+                try {
+                    if (msg.access_token && msg.refresh_token) {
+                        const { data: sessData } = await supabase.auth.setSession({
+                            access_token: msg.access_token,
+                            refresh_token: msg.refresh_token,
+                        });
+                        resolve({ session: sessData?.session || null });
+                        return;
+                    }
+                    const { data: sessData } = await supabase.auth.getSession();
+                    resolve({ session: sessData?.session || null });
+                } catch (e) {
+                    reject(e);
+                }
+            };
+
+            const onMessage = (ev) => {
+                if (ev.origin !== window.location.origin) return;
+                if (ev?.data?.channel !== OAUTH_CHANNEL_NAME) return;
+                finishWithPayload(ev.data);
+            };
+
+            const onStorage = (ev) => {
+                if (ev.key === OAUTH_POPUP_RESULT_KEY && ev.newValue) {
+                    try {
+                        finishWithPayload(JSON.parse(ev.newValue));
+                    } catch (_) {}
+                } else if (ev.key === 'kaling_sb_auth' && ev.newValue) {
+                    supabase.auth.getSession().then(({ data: sd }) => {
+                        if (sd?.session) {
+                            finishWithPayload({
+                                type: 'oauth_done',
+                                access_token: sd.session.access_token,
+                                refresh_token: sd.session.refresh_token,
+                            });
+                        }
+                    }).catch(() => {});
+                }
+            };
+
+            try {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    bc = new BroadcastChannel(OAUTH_CHANNEL_NAME);
+                    bc.onmessage = (ev) => finishWithPayload(ev?.data);
+                }
+            } catch (_) {}
+
+            window.addEventListener('message', onMessage);
+            window.addEventListener('storage', onStorage);
+
+            pollTimer = setInterval(async () => {
+                if (settled) return;
+                // Check localStorage result directly in case storage event was coalesced
+                try {
+                    const raw = localStorage.getItem(OAUTH_POPUP_RESULT_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && parsed.ts && (Date.now() - parsed.ts) < 5 * 60 * 1000) {
+                            finishWithPayload(parsed);
+                            return;
+                        }
+                    }
+                } catch (_) {}
+
+                let isClosed = false;
+                try { isClosed = Boolean(popup.closed); } catch (_) { isClosed = false; }
+                if (isClosed) {
+                    // Brief grace window for localStorage commit before treating as user cancel
+                    setTimeout(async () => {
+                        if (settled) return;
+                        try {
+                            const { data: sd } = await supabase.auth.getSession();
+                            if (sd?.session) {
+                                finishWithPayload({
+                                    type: 'oauth_done',
+                                    access_token: sd.session.access_token,
+                                    refresh_token: sd.session.refresh_token,
+                                });
+                                return;
+                            }
+                        } catch (_) {}
+                        settled = true;
+                        clearOAuthPopupMarkers();
+                        try { localStorage.removeItem(OAUTH_REDIRECT_CTX_KEY); } catch (_) {}
+                        cleanup();
+                        resolve({ cancelled: true });
+                    }, 350);
+                }
+            }, 450);
+
+            timeoutTimer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                clearOAuthPopupMarkers();
+                cleanup();
+                resolve({ cancelled: true });
+            }, 5 * 60 * 1000);
+        });
     },
 
     async signOut() {
@@ -294,7 +638,7 @@ export const kalingApi = {
             if (event === 'SIGNED_OUT') {
                 lastSessionUid = '__SIGNED_OUT__';
                 emit(null);
-            } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+            } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
                 emit(session || null);
             }
         });

@@ -1731,6 +1731,10 @@ async function handleUserLoggedIn(authUser) {
     if (dashIn) dashIn.style.display = 'block';
     if (dashOut) dashOut.style.display = 'none';
 
+    if (!window.pendingAction && window.__restoredPendingAction) {
+        window.pendingAction = window.__restoredPendingAction;
+        window.__restoredPendingAction = null;
+    }
     if (window.pendingAction === 'openOrderModal') {
         window.pendingAction = null;
         setTimeout(() => {

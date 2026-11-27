@@ -20,6 +20,52 @@
 
     <script src="analytics-config.js"></script>
 
+    <!-- OAuth Popup & Redirect Guard: prevent duplicate PageView and preserve fbclid/utm -->
+    <script>
+    (function () {
+        var h = window.location.hash || '';
+        var s = window.location.search || '';
+        var hasTokens = /(?:^|[#&])(access_token|refresh_token|error_description|error)=/.test(h)
+            || /(?:^|[?&])(code|error_description|error)=/.test(s);
+        var isPopup = false;
+        try {
+            var pendingTs = Number(localStorage.getItem('kaling_oauth_popup_pending') || '0');
+            var pendingFresh = pendingTs > 0 && (Date.now() - pendingTs) < 5 * 60 * 1000;
+            isPopup = Boolean(
+                hasTokens && (
+                    window.name === 'kaling_google_oauth'
+                    || Boolean(window.opener && window.opener !== window)
+                    || pendingFresh
+                )
+            );
+        } catch (_) {}
+
+        var suppressPageView = isPopup || hasTokens;
+        try {
+            var rawCtx = localStorage.getItem('kaling_oauth_redirect_ctx');
+            if (rawCtx && !isPopup) {
+                var ctx = JSON.parse(rawCtx);
+                var fresh = Boolean(ctx && ctx.ts && (Date.now() - ctx.ts) < 10 * 60 * 1000);
+                if (fresh && (hasTokens || ctx.fromPopupFallback)) {
+                    suppressPageView = true;
+                    if (ctx.search && !s) {
+                        window.history.replaceState({}, '', window.location.pathname + ctx.search + h);
+                    }
+                    if (ctx.pendingAction) {
+                        window.__restoredPendingAction = ctx.pendingAction;
+                    }
+                    localStorage.removeItem('kaling_oauth_redirect_ctx');
+                } else if (!fresh) {
+                    localStorage.removeItem('kaling_oauth_redirect_ctx');
+                }
+            }
+        } catch (_) {}
+
+        window.__OAUTH_IS_POPUP_CALLBACK = isPopup;
+        window.__OAUTH_SUPPRESS_PAGEVIEW = suppressPageView;
+    })();
+    </script>
+
     <!-- Meta (Facebook) Pixel -->
     <script>
     (function () {
@@ -42,7 +88,9 @@
             s.parentNode.insertBefore(t, s);
         }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
         fbq('init', pid);
-        fbq('track', 'PageView');
+        if (!window.__OAUTH_SUPPRESS_PAGEVIEW) {
+            fbq('track', 'PageView');
+        }
     })();
     </script>
     <noscript id="meta-pixel-noscript"></noscript>
@@ -50,7 +98,7 @@
     (function () {
         var pid = window.ANALYTICS_CONFIG && window.ANALYTICS_CONFIG.metaPixelId;
         var el = document.getElementById('meta-pixel-noscript');
-        if (!pid || !el) return;
+        if (!pid || !el || window.__OAUTH_SUPPRESS_PAGEVIEW) return;
         el.innerHTML = '<img height="1" width="1" style="display:none" alt="" src="https://www.facebook.com/tr?id=' + encodeURIComponent(pid) + '&ev=PageView&noscript=1"/>';
     })();
     </script>
@@ -66,7 +114,9 @@
             ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
 
             ttq.load(pid);
-            ttq.page();
+            if (!window.__OAUTH_SUPPRESS_PAGEVIEW) {
+                ttq.page();
+            }
         }(window, document, 'ttq');
     })();
     </script>
@@ -1199,14 +1249,20 @@
     <script src="translations-locales.js"></script>
     <!-- Supabase Client (Shared with aquaai.vn) -->
     <script type="module">
-        import { kalingApi, ADMIN_EMAILS, AQUA_ADMIN_KALING_URL } from "./supabase-client.js?v=3";
-        import { initAppLogic } from "./script.js?v=11";
+        import { kalingApi, ADMIN_EMAILS, AQUA_ADMIN_KALING_URL } from "./supabase-client.js?v=4";
+        import { initAppLogic } from "./script.js?v=12";
 
         window.kalingApi = kalingApi;
         window.ADMIN_EMAILS = ADMIN_EMAILS;
         window.AQUA_ADMIN_KALING_URL = AQUA_ADMIN_KALING_URL;
 
-        initAppLogic().catch(err => console.error('initAppLogic failed:', err));
+        kalingApi.handleOAuthPopupCallbackIfNeeded()
+            .then((handled) => {
+                if (!handled) {
+                    return initAppLogic();
+                }
+            })
+            .catch(err => console.error('initAppLogic failed:', err));
     </script>
     <!-- Image Viewer Modal -->
     <div id="image-viewer-modal" class="modal-overlay" onclick="closeModal('image-viewer-modal')">
